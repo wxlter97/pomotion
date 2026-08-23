@@ -61,10 +61,37 @@ export function deleteSession(blockId: string) {
   });
 }
 
+export function postManualSession(blockId: string, durationMinutes: number, start: string, end: string) {
+  return request<{
+    ok: true;
+    session: { blockId?: string; durationMinutes: number; start: string; end: string };
+  }>('/api/session', {
+    method: 'POST',
+    body: JSON.stringify({ block_id: blockId, duration_minutes: durationMinutes, start, end }),
+  });
+}
+
+export function updateSession(blockId: string, durationMinutes: number, start: string, end: string) {
+  return request<{ ok: true; session: { durationMinutes: number; start: string; end: string } }>(
+    '/api/session',
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ block_id: blockId, duration_minutes: durationMinutes, start, end }),
+    }
+  );
+}
+
 export function updateTaskChecked(blockId: string, checked: boolean) {
   return request<{ ok: true; checked: boolean }>('/api/task', {
     method: 'PATCH',
     body: JSON.stringify({ block_id: blockId, checked }),
+  });
+}
+
+export function updateTaskText(blockId: string, text: string) {
+  return request<{ ok: true; text: string }>('/api/task', {
+    method: 'PATCH',
+    body: JSON.stringify({ block_id: blockId, text }),
   });
 }
 

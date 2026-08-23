@@ -1,5 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { postSession } from '../api';
+import { playChime, unlockAudio } from '../sound';
 import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
 import type { Session, Task, TimerMode, TimerPhase } from '../types';
 import ProgressRing from './ProgressRing';
@@ -27,8 +28,9 @@ const Timer = forwardRef<
     task: Task | null;
     onSessionLogged: (blockId: string, session: Session) => void;
     onPhaseChange?: (phase: TimerPhase) => void;
+    soundsEnabled: boolean;
   }
->(function Timer({ task, onSessionLogged, onPhaseChange }, ref) {
+>(function Timer({ task, onSessionLogged, onPhaseChange, soundsEnabled }, ref) {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
   const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -137,6 +139,7 @@ const Timer = forwardRef<
     }
 
     if (mode === 'pomodoro' && natural) {
+      if (soundsEnabled) playChime('work-done');
       setPhase('break');
       setStartedAt(Date.now());
     } else {
@@ -152,6 +155,7 @@ const Timer = forwardRef<
     if (mode === 'pomodoro' && phase === 'work' && elapsed >= WORK_MS) {
       void finishWork(true);
     } else if (mode === 'pomodoro' && phase === 'break' && elapsed >= BREAK_MS) {
+      if (soundsEnabled) playChime('break-done');
       setPhase('idle');
       setStartedAt(null);
     }
@@ -160,6 +164,7 @@ const Timer = forwardRef<
 
   function start() {
     if (!task || phase !== 'idle') return;
+    unlockAudio(); // gesto real del usuario: deja el audio listo para el chime automático de más tarde
     setError(null);
     setPhase('work');
     setStartedAt(Date.now());

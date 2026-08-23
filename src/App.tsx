@@ -8,6 +8,7 @@ import Timer, { type TimerHandle } from './components/Timer';
 import { computeAfterBlockId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { Session, Task, TasksResponse, TimerPhase } from './types';
+import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'error';
@@ -37,6 +38,24 @@ function MoonIcon() {
   );
 }
 
+function SoundOnIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+    </svg>
+  );
+}
+
+function SoundOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
+      <path d="M16 9l5 6M21 9l-5 6" />
+    </svg>
+  );
+}
+
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
   const [data, setData] = useState<TasksResponse | null>(null);
@@ -53,6 +72,7 @@ export default function App() {
   const [addingWeek, setAddingWeek] = useState(false);
   const [addWeekError, setAddWeekError] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
+  const [soundsEnabled, toggleSounds] = useSoundSetting();
   const timerRef = useRef<TimerHandle>(null);
 
   // Mientras haya un timer corriendo, la tarea activa queda con sus
@@ -260,6 +280,28 @@ export default function App() {
     setSelectedTask((prev) => (prev?.blockId === blockId ? null : prev));
   }
 
+  function handleTaskTextUpdated(blockId: string, text: string) {
+    setData((prev) => {
+      if (!prev) return prev;
+      return { ...prev, tasks: prev.tasks.map((t) => (t.blockId === blockId ? { ...t, text } : t)) };
+    });
+    setSelectedTask((prev) => (prev?.blockId === blockId ? { ...prev, text } : prev));
+  }
+
+  function handleSessionUpdated(taskBlockId: string, session: Session) {
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        tasks: prev.tasks.map((t) =>
+          t.blockId === taskBlockId
+            ? { ...t, sessions: t.sessions.map((s) => (s.blockId === session.blockId ? session : s)) }
+            : t
+        ),
+      };
+    });
+  }
+
   async function handleReorderTask(task: Task, targetIndex: number) {
     if (!data?.dayContainerId || !data.dayHeadingBlockId) return;
     const afterBlockId = computeAfterBlockId(data.tasks, task.blockId, targetIndex, data.dayHeadingBlockId);
@@ -309,6 +351,18 @@ export default function App() {
     </button>
   );
 
+  const soundToggleButton = (
+    <button
+      type="button"
+      className="btn btn-icon"
+      onClick={toggleSounds}
+      title={soundsEnabled ? 'Desactivar sonidos' : 'Activar sonidos'}
+      aria-label={soundsEnabled ? 'Desactivar sonidos' : 'Activar sonidos'}
+    >
+      {soundsEnabled ? <SoundOnIcon /> : <SoundOffIcon />}
+    </button>
+  );
+
   if (authState === 'checking') {
     return (
       <div className="center-screen">
@@ -344,6 +398,7 @@ export default function App() {
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
+          {soundToggleButton}
           {themeToggleButton}
           <button
             type="button"
@@ -420,7 +475,10 @@ export default function App() {
                   busyTaskIds={busyTaskIds}
                   onTaskCreated={handleTaskCreated}
                   onTaskDeleted={handleTaskDeleted}
+                  onTaskTextUpdated={handleTaskTextUpdated}
                   onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
+                  onSessionUpdated={handleSessionUpdated}
+                  onManualSessionAdded={handleSessionLogged}
                 />
               </section>
 
@@ -430,6 +488,7 @@ export default function App() {
                   task={selectedTask}
                   onSessionLogged={handleSessionLogged}
                   onPhaseChange={setTimerPhase}
+                  soundsEnabled={soundsEnabled}
                 />
               </section>
             </div>

@@ -84,11 +84,27 @@ export async function deleteBlock(blockId: string): Promise<unknown> {
   return notionFetch(`/blocks/${blockId}`, { method: 'DELETE' });
 }
 
-/** Marca/desmarca un bloque to_do, sin tocar su texto. */
-export async function setToDoChecked(blockId: string, checked: boolean): Promise<unknown> {
+/** Actualiza checked y/o el texto de un to_do (solo lo que se pase). */
+export async function updateToDo(
+  blockId: string,
+  updates: { checked?: boolean; text?: string }
+): Promise<unknown> {
+  const to_do: Record<string, unknown> = {};
+  if (updates.checked !== undefined) to_do.checked = updates.checked;
+  if (updates.text !== undefined) {
+    to_do.rich_text = [{ type: 'text', text: { content: updates.text } }];
+  }
   return notionFetch(`/blocks/${blockId}`, {
     method: 'PATCH',
-    body: JSON.stringify({ to_do: { checked } }),
+    body: JSON.stringify({ to_do }),
+  });
+}
+
+/** Reemplaza el texto de un bloque paragraph — usado para editar una sesión ya registrada. */
+export async function updateParagraphText(blockId: string, text: string): Promise<unknown> {
+  return notionFetch(`/blocks/${blockId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ paragraph: { rich_text: [{ type: 'text', text: { content: text } }] } }),
   });
 }
 

@@ -1,20 +1,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
-import { appendBlockChildren, deleteBlock, setToDoChecked } from './_lib/notion.js';
+import { appendBlockChildren, deleteBlock, updateToDo } from './_lib/notion.js';
 
-async function handleToggle(req: VercelRequest, res: VercelResponse) {
-  const body = (req.body ?? {}) as { block_id?: string; checked?: boolean };
-  const { block_id: blockId, checked } = body;
+async function handleUpdate(req: VercelRequest, res: VercelResponse) {
+  const body = (req.body ?? {}) as { block_id?: string; checked?: boolean; text?: string };
+  const { block_id: blockId, checked, text } = body;
 
   if (!blockId || typeof blockId !== 'string') {
     return res.status(400).json({ error: 'invalid_block_id', message: 'Falta block_id' });
   }
-  if (typeof checked !== 'boolean') {
+  if (checked === undefined && text === undefined) {
+    return res.status(400).json({ error: 'nothing_to_update', message: 'Nada que actualizar' });
+  }
+  if (checked !== undefined && typeof checked !== 'boolean') {
     return res.status(400).json({ error: 'invalid_checked', message: 'checked debe ser booleano' });
   }
 
-  await setToDoChecked(blockId, checked);
-  return res.status(200).json({ ok: true, checked });
+  let trimmedText: string | undefined;
+  if (text !== undefined) {
+    trimmedText = typeof text === 'string' ? text.trim() : '';
+    if (!trimmedText) {
+      return res.status(400).json({ error: 'invalid_text', message: 'El texto no puede estar vacío' });
+    }
+  }
+
+  await updateToDo(blockId, { checked, text: trimmedText });
+  return res.status(200).json({ ok: true, checked, text: trimmedText });
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
@@ -59,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
 
   try {
-    if (req.method === 'PATCH') return await handleToggle(req, res);
+    if (req.method === 'PATCH') return await handleUpdate(req, res);
     if (req.method === 'POST') return await handleCreate(req, res);
     if (req.method === 'DELETE') return await handleDelete(req, res);
     res.setHeader('Allow', 'PATCH, POST, DELETE');

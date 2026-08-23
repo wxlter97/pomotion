@@ -32,7 +32,13 @@ Notion como bloque hijo del `to_do` correspondiente.
   calendario distinto o demasiado viejo.
 - Confirmación antes de cancelar un timer activo al cambiar de tarea, día o
   semana.
+- Editar el texto de una tarea sin borrarla y recrearla (conserva sus
+  sesiones), editar una sesión ya registrada (duración/horas), y registrar
+  una sesión manual sin correr el timer en vivo — para cuando se te
+  olvidó iniciarlo.
 - Botón para eliminar una sesión mal registrada (borra el bloque en Notion).
+- Sonido al completar una fase del pomodoro (sintetizado con Web Audio
+  API, sin archivos de audio), con botón para desactivarlo.
 - Título de la pestaña con el countdown en vivo, anillo de progreso visual.
 - Atajos de teclado: `espacio` inicia/detiene, `1`–`5` cambia de día,
   `[`/`]` cambia de semana, `T` cambia el tema.
