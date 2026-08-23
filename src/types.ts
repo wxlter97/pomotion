@@ -15,8 +15,15 @@ export type Task = {
 
 export type WeekSource = 'auto-matched' | 'auto-fallback' | 'requested';
 
+export type FileEntry = {
+  id: string;
+  label: string;
+};
+
 export type TasksResponse = {
-  week: string;
+  // null: el archivo activo todavía no tiene ninguna semana (ej. recién
+  // creado) — distinto de una semana existente sin desglose por día.
+  week: string | null;
   weekSource: WeekSource;
   isCurrentWeek: boolean;
   previousWeekLabel: string | null;

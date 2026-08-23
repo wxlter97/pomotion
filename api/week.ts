@@ -42,8 +42,8 @@ async function loadExistingWeeks(activePageId: string): Promise<ExistingWeeks> {
   return { labels, endDates, topAnchorBlockId };
 }
 
-async function handleSuggest(res: VercelResponse) {
-  const activePageId = await resolveActivePageId();
+async function handleSuggest(res: VercelResponse, fileId: string | undefined) {
+  const activePageId = await resolveActivePageId(fileId);
   const { endDates } = await loadExistingWeeks(activePageId);
   const today = todayDateStringInTz(TIMEZONE);
   const { start, end } = computeNextWeekRange(endDates, today);
@@ -51,8 +51,8 @@ async function handleSuggest(res: VercelResponse) {
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
-  const body = (req.body ?? {}) as { start?: string; end?: string };
-  const { start, end } = body;
+  const body = (req.body ?? {}) as { start?: string; end?: string; file?: string };
+  const { start, end, file: fileId } = body;
 
   if (!start || !DATE_RE.test(start)) {
     return res.status(400).json({ error: 'invalid_start', message: 'start debe ser "YYYY-MM-DD"' });
@@ -65,7 +65,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   }
 
   const label = formatWeekLabel(start, end);
-  const activePageId = await resolveActivePageId();
+  const activePageId = await resolveActivePageId(fileId);
   const { labels, topAnchorBlockId } = await loadExistingWeeks(activePageId);
 
   if (labels.includes(label)) {
@@ -95,7 +95,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
 
   try {
-    if (req.method === 'GET') return await handleSuggest(res);
+    if (req.method === 'GET') {
+      const fileId = typeof req.query.file === 'string' ? req.query.file : undefined;
+      return await handleSuggest(res, fileId);
+    }
     if (req.method === 'POST') return await handleCreate(req, res);
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'method_not_allowed' });

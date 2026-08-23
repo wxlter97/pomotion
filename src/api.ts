@@ -1,4 +1,4 @@
-import type { TasksResponse } from './types';
+import type { FileEntry, TasksResponse } from './types';
 
 export class UnauthorizedError extends Error {}
 
@@ -34,10 +34,15 @@ export function logout() {
   return request<{ ok: true }>('/api/logout', { method: 'POST' });
 }
 
-export function getTasks(day?: string, week?: string) {
+export function getFiles() {
+  return request<{ files: FileEntry[] }>('/api/files');
+}
+
+export function getTasks(day?: string, week?: string, fileId?: string) {
   const params = new URLSearchParams();
   if (day) params.set('day', day);
   if (week) params.set('week', week);
+  if (fileId) params.set('file', fileId);
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
@@ -116,13 +121,14 @@ export function reorderTask(blockId: string, containerId: string, afterBlockId: 
   });
 }
 
-export function getNextWeekSuggestion() {
-  return request<{ start: string; end: string; label: string }>('/api/week');
+export function getNextWeekSuggestion(fileId?: string) {
+  const query = fileId ? `?file=${encodeURIComponent(fileId)}` : '';
+  return request<{ start: string; end: string; label: string }>(`/api/week${query}`);
 }
 
-export function createWeek(start: string, end: string) {
+export function createWeek(start: string, end: string, fileId?: string) {
   return request<{ ok: true; week: { label: string; start: string; end: string } }>('/api/week', {
     method: 'POST',
-    body: JSON.stringify({ start, end }),
+    body: JSON.stringify({ start, end, file: fileId }),
   });
 }

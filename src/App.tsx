@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createWeek, getNextWeekSuggestion, getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
+import { createWeek, getFiles, getNextWeekSuggestion, getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import DismissibleBanner from './components/DismissibleBanner';
+import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { computeAfterBlockId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
-import type { Session, Task, TasksResponse, TimerPhase } from './types';
+import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'error';
 type PendingSwitch = { message: string; run: () => void };
+
+const FILE_STORAGE_KEY = 'pomotion:file';
 
 function formatTotal(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -96,6 +99,17 @@ export default function App() {
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const timerRef = useRef<TimerHandle>(null);
 
+  // Selector de archivo (Trabajo/Casa/Hábitos, etc.). `files` queda vacío
+  // si no hay NOTION_FILES_INDEX_PAGE_ID configurada — modo de un solo
+  // archivo, retrocompatible, el selector ni aparece. selectedFileIdRef
+  // espeja el estado para que `refresh` pueda leerlo sin necesitar la
+  // dependencia (mismo patrón que ya usa day/week: se pasan explícitos).
+  const [files, setFiles] = useState<FileEntry[]>([]);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const selectedFileIdRef = useRef<string | null>(null);
+  const filesRef = useRef<FileEntry[]>([]);
+  const filesLoadedRef = useRef(false);
+
   // Mientras haya un timer corriendo, la tarea activa queda con sus
   // controles de mover/arrastrar/borrar bloqueados — reordenarla o
   // borrarla le cambiaría (o le quitaría) el blockId por debajo, y
@@ -104,11 +118,30 @@ export default function App() {
   // día siguen totalmente editables.
   const lockedTaskBlockId = timerPhase !== 'idle' ? (selectedTask?.blockId ?? null) : null;
 
-  const refresh = useCallback(async (day?: string, week?: string) => {
+  const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getTasks(day, week);
+      let fileId = fileIdParam ?? selectedFileIdRef.current ?? undefined;
+      // Solo la primera vez: resuelve la lista de archivos y, si hay más
+      // de uno configurado, la selección persistida (o el primero por
+      // defecto) — antes de pedir las tareas, para no hacer un segundo
+      // round-trip visible al usuario.
+      if (!filesLoadedRef.current) {
+        const filesRes = await getFiles();
+        filesLoadedRef.current = true;
+        filesRef.current = filesRes.files;
+        setFiles(filesRes.files);
+        if (filesRes.files.length > 0 && !fileId) {
+          const stored = localStorage.getItem(FILE_STORAGE_KEY);
+          fileId = filesRes.files.find((f) => f.id === stored)?.id ?? filesRes.files[0].id;
+        }
+        if (fileId) {
+          setSelectedFileId(fileId);
+          selectedFileIdRef.current = fileId;
+        }
+      }
+      const res = await getTasks(day, week, fileId);
       setData(res);
       setAuthState('authed');
       setSelectedTask((prev) => {
@@ -131,7 +164,23 @@ export default function App() {
         setSelectedTask(null);
       } else {
         setError(err instanceof Error ? err.message : 'Error cargando tareas');
-        setAuthState((prev) => (prev === 'checking' ? 'error' : prev));
+        // No dejar datos de un día/semana/archivo distinto detrás del
+        // banner de error — ej. al cambiar a un archivo sin ninguna
+        // semana todavía, antes quedaban visibles (y parcialmente
+        // editables) las tareas del archivo anterior.
+        setData(null);
+        setSelectedTask(null);
+        setAuthState((prev) => {
+          if (prev !== 'checking') return prev;
+          // Si hay más de un archivo configurado, no escalar a la
+          // pantalla de error de página completa (sin forma de volver al
+          // selector) — mejor mostrar el shell de la app con el banner de
+          // error, para poder cambiar a otro archivo que sí funcione. Solo
+          // sin alternativa (modo de un solo archivo, o si ni siquiera se
+          // pudo resolver la lista de archivos) se muestra el error
+          // bloqueante de siempre.
+          return filesRef.current.length === 0 ? 'error' : 'authed';
+        });
       }
     } finally {
       setLoading(false);
@@ -166,7 +215,7 @@ export default function App() {
       if (day === data?.selectedDay) return;
       // Mantener la misma semana que se está viendo (no volver a "hoy" al
       // cambiar de día dentro de una semana pasada/futura).
-      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () => void refresh(day, data?.week));
+      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () => void refresh(day, data?.week ?? undefined));
     },
     [data, refresh, guardIfRunning]
   );
@@ -179,6 +228,22 @@ export default function App() {
     [refresh, guardIfRunning]
   );
 
+  const guardedSelectFile = useCallback(
+    (fileId: string) => {
+      if (fileId === selectedFileId) return;
+      guardIfRunning('Cambiar de archivo lo cancela sin guardar esa sesión.', () => {
+        setSelectedFileId(fileId);
+        selectedFileIdRef.current = fileId;
+        localStorage.setItem(FILE_STORAGE_KEY, fileId);
+        // Sin día/semana explícitos: cada archivo tiene su propia rotación
+        // de semanas, así que se vuelve a auto-detectar "hoy" en el nuevo
+        // archivo en vez de arrastrar la semana/día que se estaba viendo.
+        void refresh(undefined, undefined, fileId);
+      });
+    },
+    [selectedFileId, guardIfRunning, refresh]
+  );
+
   function confirmPendingSwitch() {
     pendingSwitch?.run();
     setPendingSwitch(null);
@@ -187,7 +252,7 @@ export default function App() {
   async function handleRequestAddWeek() {
     setAddWeekError(null);
     try {
-      const suggestion = await getNextWeekSuggestion();
+      const suggestion = await getNextWeekSuggestion(selectedFileId ?? undefined);
       setPendingNewWeek(suggestion);
     } catch (err) {
       setAddWeekError(err instanceof Error ? err.message : 'No se pudo calcular la semana siguiente');
@@ -199,7 +264,7 @@ export default function App() {
     setAddingWeek(true);
     setAddWeekError(null);
     try {
-      const res = await createWeek(pendingNewWeek.start, pendingNewWeek.end);
+      const res = await createWeek(pendingNewWeek.start, pendingNewWeek.end, selectedFileId ?? undefined);
       setPendingNewWeek(null);
       const newLabel = res.week.label;
       guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, newLabel));
@@ -340,7 +405,7 @@ export default function App() {
 
     try {
       await reorderTask(task.blockId, data.dayContainerId, afterBlockId);
-      void refresh(data.selectedDay ?? undefined, data.week);
+      void refresh(data.selectedDay ?? undefined, data.week ?? undefined);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev)); // revertir
       setError(err instanceof Error ? err.message : 'No se pudo reordenar la tarea');
@@ -358,6 +423,7 @@ export default function App() {
     setAuthState('guest');
     setData(null);
     setSelectedTask(null);
+    filesLoadedRef.current = false;
   }
 
   const themeToggleButton = (
@@ -430,7 +496,7 @@ export default function App() {
           <button
             type="button"
             className="btn btn-icon"
-            onClick={() => void refresh(data?.selectedDay ?? undefined, data?.week)}
+            onClick={() => void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined)}
             disabled={loading}
             title="Actualizar"
             aria-label="Actualizar"
@@ -443,9 +509,16 @@ export default function App() {
         </div>
       </header>
 
+      <FileSelector
+        files={files}
+        selectedFileId={selectedFileId}
+        onSelectFile={guardedSelectFile}
+        loading={loading}
+      />
+
       {error && <p className="error banner">{error}</p>}
       {addWeekError && <p className="error banner">{addWeekError}</p>}
-      {data && data.weekSource === 'auto-fallback' && (
+      {data && data.week && data.weekSource === 'auto-fallback' && (
         <DismissibleBanner
           key={`week-fallback-${data.week}`}
           tone="warning"
@@ -488,8 +561,9 @@ export default function App() {
           {data.availableDays.length === 0 ? (
             <div className="empty-week card">
               <p className="muted">
-                Esta semana no tiene tareas desglosadas por día en Notion (ej. una semana de
-                vacaciones o feriados). Usa las flechas de arriba para ver otra semana.
+                {data.week === null
+                  ? 'Este archivo todavía no tiene ninguna semana. Usa el botón "+" de arriba para crear la primera.'
+                  : 'Esta semana no tiene tareas desglosadas por día en Notion (ej. una semana de vacaciones o feriados). Usa las flechas de arriba para ver otra semana.'}
               </p>
             </div>
           ) : (

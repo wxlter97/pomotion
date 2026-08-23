@@ -44,6 +44,10 @@ Notion como bloque hijo del `to_do` correspondiente.
   `[`/`]` cambia de semana, `T` cambia el tema.
 - Favicon + manifest básico (ícono generado con
   [scripts/gen-icons.mjs](scripts/gen-icons.mjs), sin dependencias).
+- Múltiples archivos (Trabajo, Casa, Hábitos, etc.), cada uno con su
+  propia rotación de semanas — ver sección 5 más abajo. Opcional: sin
+  configurarlo, la app funciona igual que siempre con un solo archivo
+  implícito.
 
 ## 1. Crear la integración de Notion
 
@@ -101,8 +105,33 @@ en Vercel (**Project Settings → Environment Variables**) para producción:
 | `NOTION_INDEX_PAGE_ID`   | ID de la página índice permanente (paso 2).                        |
 | `APP_PASSWORD`           | Contraseña compartida para entrar a la app.                        |
 | `APP_TIMEZONE` (opcional)| Zona horaria para "hoy" y para formatear horas. Default: `America/El_Salvador`. |
+| `NOTION_FILES_INDEX_PAGE_ID` (opcional) | Página raíz de archivos (paso 5). Sin esto, modo de un solo archivo. |
 
-## 5. Desarrollo local
+## 5. Múltiples archivos (opcional)
+
+Por defecto la app usa un solo archivo (`NOTION_INDEX_PAGE_ID`, pasos
+2-3). Si quieres gestionar varios en paralelo — Trabajo, Casa, Hábitos,
+lo que sea — con cada uno rotando sus propias semanas de forma
+independiente, agrega un nivel más de indirección:
+
+1. Crea una página nueva en Notion, ej. `pomotion — archivos`, y
+   compártela con la integración (mismo paso que la página índice).
+2. Dentro, un bloque por archivo: el texto que quieras como nombre
+   (ej. `Trabajo`) seguido de un link a la página **índice** de ese
+   archivo — la página índice de cada archivo es exactamente lo mismo
+   que describe el paso 2 de arriba (un bloque con el link a su semanal
+   activa), una por archivo. Para el archivo "Trabajo" podés perfectamente
+   reusar la página índice que ya tenías (cero cambios a tu historial).
+3. Copia el ID de esta página raíz → `NOTION_FILES_INDEX_PAGE_ID`.
+
+Con esto configurado aparece un selector de archivos en el header de la
+app (se oculta solo si queda con 0 o 1 archivo). Cada archivo recuerda su
+propia selección de día/semana; cambiar de archivo vuelve a auto-detectar
+"hoy" en el nuevo. Un archivo recién creado (sin ninguna semana todavía)
+no es un error — el botón "+" de arriba crea la primera semana igual que
+en cualquier otro.
+
+## 6. Desarrollo local
 
 ```bash
 npm install
@@ -126,10 +155,10 @@ Alternativa: si prefieres probar con el runtime real de Vercel,
 
 Abre `http://localhost:5173`.
 
-## 6. Deploy en Vercel
+## 7. Deploy en Vercel
 
 1. `vercel link` (o importa el repo directo desde el dashboard de Vercel).
-2. Configura las 3-4 variables de entorno de la tabla de arriba en el
+2. Configura las variables de entorno de la tabla de arriba en el
    proyecto de Vercel.
 3. `vercel --prod`, o simplemente haz push a `main` si conectaste el repo de
    GitHub.

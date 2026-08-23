@@ -325,6 +325,50 @@ h3 {
   gap: 0.5rem;
 }
 
+/* --- Selector de archivo (Trabajo/Casa/Hábitos, etc.) — cada uno con su
+ * propia rotación de semanas en Notion. Oculto por completo si solo hay
+ * 0 o 1 archivo configurado (ver FileSelector.tsx). --- */
+.file-tabs {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  min-width: 0;
+  padding: 0 1.5rem 1rem;
+}
+
+.file-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.file-tab {
+  flex: 0 0 auto;
+  font-family: inherit;
+  border: 1px solid var(--color-separator);
+  cursor: pointer;
+  padding: 0.35rem 0.85rem;
+  border-radius: 980px;
+  background: transparent;
+  color: var(--color-label-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.file-tab:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.file-tab.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
 /* --- Day row (selector de día + total) --- */
 .day-row {
   display: flex;

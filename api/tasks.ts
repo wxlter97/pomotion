@@ -65,7 +65,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
 
   try {
-    const activePageId = await resolveActivePageId();
+    const fileId = typeof req.query.file === 'string' ? req.query.file : undefined;
+    const activePageId = await resolveActivePageId(fileId);
     const blocks = await listBlockChildren(activePageId);
 
     // 1. Agrupar por heading_1 (semana).
@@ -82,9 +83,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (weeks.length === 0) {
-      return res.status(404).json({
-        error: 'no_weeks_found',
-        message: 'No se encontró ningún heading_1 (semana) en la página activa',
+      // Página activa válida pero sin ninguna semana todavía (ej. un
+      // archivo recién creado). No es un error — antes devolvía 404 y
+      // dejaba sin forma de llegar al botón "+ Agregar semana" (que vive
+      // en la misma fila que solo se renderiza cuando hay `data`), un
+      // callejón sin salida real para el primer uso de un archivo nuevo.
+      return res.status(200).json({
+        week: null,
+        weekSource: 'auto-fallback',
+        isCurrentWeek: false,
+        previousWeekLabel: null,
+        nextWeekLabel: null,
+        availableDays: [],
+        selectedDay: null,
+        dayMatched: true,
+        dayContainerId: null,
+        dayHeadingBlockId: null,
+        tasks: [],
       });
     }
 

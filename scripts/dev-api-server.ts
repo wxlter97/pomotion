@@ -12,6 +12,7 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+import filesHandler from '../api/files';
 import loginHandler from '../api/login';
 import logoutHandler from '../api/logout';
 import sessionHandler from '../api/session';
@@ -30,6 +31,7 @@ const routes: Record<string, Handler> = {
   '/api/task-reorder': taskReorderHandler as Handler,
   '/api/task': taskHandler as Handler,
   '/api/week': weekHandler as Handler,
+  '/api/files': filesHandler as Handler,
 };
 
 const PORT = Number(process.env.API_PORT) || 3000;

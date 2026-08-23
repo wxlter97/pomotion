@@ -102,7 +102,7 @@ export function computeNextWeekRange(
 }
 
 // Acepta tanto un ID crudo (con o sin guiones) como una URL de Notion que lo contenga.
-const UUID_RE = /[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}/i;
+export const UUID_RE = /[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}/i;
 
 export function extractNotionPageId(text: string): string | null {
   const match = text.match(UUID_RE);
@@ -112,4 +112,24 @@ export function extractNotionPageId(text: string): string | null {
   return [raw.slice(0, 8), raw.slice(8, 12), raw.slice(12, 16), raw.slice(16, 20), raw.slice(20)].join(
     '-'
   );
+}
+
+// URL genérica (Notion usa varios dominios según el cliente: notion.so,
+// app.notion.com, etc. — no vale la pena listarlos, cualquier URL en este
+// bloque es la referencia a la página, nunca parte de la etiqueta).
+const URL_RE = /https?:\/\/\S+/gi;
+
+/**
+ * Quita la URL/ID de Notion de un bloque para quedarse solo con la
+ * etiqueta que el usuario escribió junto al link (ej. "Trabajo: <link>"
+ * → "Trabajo"). Usado para armar la lista de archivos a partir de la
+ * página raíz — ver resolveFiles() en notionPage.ts.
+ */
+export function stripNotionReference(text: string): string {
+  return text
+    .replace(URL_RE, '')
+    .replace(UUID_RE, '')
+    .trim()
+    .replace(/[-:|•]+$/, '')
+    .trim();
 }

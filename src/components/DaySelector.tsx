@@ -18,7 +18,7 @@ export default function DaySelector({
   onAddWeek,
   loading,
 }: {
-  week: string;
+  week: string | null;
   days: string[];
   selectedDay: string | null;
   onSelectDay: (day: string) => void;
@@ -54,7 +54,7 @@ export default function DaySelector({
           ‹
         </button>
         <span className="week-label">
-          {week}
+          {week ?? 'Sin semanas todavía'}
           {loading && <Spinner />}
         </span>
         <button
