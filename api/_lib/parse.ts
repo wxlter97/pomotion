@@ -1,4 +1,4 @@
-import type { NotionRichText } from './notion';
+import type { NotionRichText } from './notion.js';
 
 export function plainText(richText: NotionRichText[] | undefined): string {
   if (!richText) return '';

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth';
-import { listBlockChildren, type NotionBlock } from './_lib/notion';
+import { requireAuth } from './_lib/auth.js';
+import { listBlockChildren, type NotionBlock } from './_lib/notion.js';
 import {
   extractNotionPageId,
   isDateInRange,
@@ -10,7 +10,7 @@ import {
   plainText,
   todayDateStringInTz,
   todayWeekdayNameInTz,
-} from './_lib/parse';
+} from './_lib/parse.js';
 
 const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
 

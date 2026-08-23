@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth';
-import { appendBlockChildren, deleteBlock } from './_lib/notion';
+import { requireAuth } from './_lib/auth.js';
+import { appendBlockChildren, deleteBlock } from './_lib/notion.js';
 
 const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
 
