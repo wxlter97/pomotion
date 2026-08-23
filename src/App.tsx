@@ -6,7 +6,7 @@ import TaskList from './components/TaskList';
 import Timer from './components/Timer';
 import type { Session, Task, TasksResponse } from './types';
 
-type AuthState = 'checking' | 'authed' | 'guest';
+type AuthState = 'checking' | 'authed' | 'guest' | 'error';
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
@@ -30,6 +30,9 @@ export default function App() {
         setSelectedTask(null);
       } else {
         setError(err instanceof Error ? err.message : 'Error cargando tareas');
+        // Si el error ocurrió durante la carga inicial (aún no sabemos si hay
+        // sesión válida), no dejar al usuario colgado en "Cargando…".
+        setAuthState((prev) => (prev === 'checking' ? 'error' : prev));
       }
     } finally {
       setLoading(false);
@@ -69,6 +72,20 @@ export default function App() {
 
   if (authState === 'guest') {
     return <Login onLoggedIn={() => void refresh()} />;
+  }
+
+  if (authState === 'error') {
+    return (
+      <div className="login-screen">
+        <div className="login-card">
+          <h1>pomotion</h1>
+          <p className="error">{error ?? 'No se pudo conectar con el servidor'}</p>
+          <button type="button" onClick={() => void refresh()} disabled={loading}>
+            {loading ? 'Reintentando…' : 'Reintentar'}
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
