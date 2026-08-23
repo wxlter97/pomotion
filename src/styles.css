@@ -436,6 +436,16 @@ h3 {
   background: color-mix(in srgb, var(--color-accent) 10%, var(--color-fill));
 }
 
+.task-item.locked {
+  opacity: 0.6;
+}
+
+.task-list li.drag-over {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
 .task-select {
   flex: 1;
   min-width: 0;
@@ -493,6 +503,71 @@ h3 {
   color: var(--color-label-secondary);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.task-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  flex-shrink: 0;
+}
+
+.task-move,
+.task-delete {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 8px;
+  font-family: inherit;
+  flex-shrink: 0;
+}
+
+.task-move:hover:not(:disabled) {
+  background: var(--color-fill-strong);
+  color: var(--color-label);
+}
+
+.task-delete:hover:not(:disabled) {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+}
+
+.task-move:disabled,
+.task-delete:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.task-add-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.task-add-form input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 980px;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.88rem;
+}
+
+.task-add-form input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.task-add-form input:disabled {
+  opacity: 0.6;
 }
 
 .session-list {

@@ -67,3 +67,24 @@ export function updateTaskChecked(blockId: string, checked: boolean) {
     body: JSON.stringify({ block_id: blockId, checked }),
   });
 }
+
+export function createTask(containerId: string, afterBlockId: string, text: string) {
+  return request<{ ok: true; task: { blockId: string; text: string; checked: boolean } }>('/api/task', {
+    method: 'POST',
+    body: JSON.stringify({ container_id: containerId, after_block_id: afterBlockId, text }),
+  });
+}
+
+export function deleteTask(blockId: string) {
+  return request<{ ok: true }>('/api/task', {
+    method: 'DELETE',
+    body: JSON.stringify({ block_id: blockId }),
+  });
+}
+
+export function reorderTask(blockId: string, containerId: string, afterBlockId: string) {
+  return request<{ ok: true; newBlockId: string; warning?: string }>('/api/task-reorder', {
+    method: 'POST',
+    body: JSON.stringify({ block_id: blockId, container_id: containerId, after_block_id: afterBlockId }),
+  });
+}

@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getTasks, logout, UnauthorizedError, updateTaskChecked } from './api';
+import { getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import Login from './components/Login';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
+import { computeAfterBlockId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { Session, Task, TasksResponse, TimerPhase } from './types';
 import { useTheme } from './useTheme';
@@ -45,8 +46,17 @@ export default function App() {
   const [timerPhase, setTimerPhase] = useState<TimerPhase>('idle');
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
   const [theme, toggleTheme] = useTheme();
   const timerRef = useRef<TimerHandle>(null);
+
+  // Mientras haya un timer corriendo, la tarea activa queda con sus
+  // controles de mover/arrastrar/borrar bloqueados — reordenarla o
+  // borrarla le cambiaría (o le quitaría) el blockId por debajo, y
+  // Timer.tsx detecta "cambié de tarea" comparando blockId, lo que
+  // descartaría la sesión en curso sin guardarla. El resto de tareas del
+  // día siguen totalmente editables.
+  const lockedTaskBlockId = timerPhase !== 'idle' ? (selectedTask?.blockId ?? null) : null;
 
   const refresh = useCallback(async (day?: string, week?: string) => {
     setLoading(true);
@@ -207,6 +217,48 @@ export default function App() {
     }
   }
 
+  function handleTaskCreated(task: { blockId: string; text: string; checked: boolean }) {
+    setData((prev) => {
+      if (!prev) return prev;
+      return { ...prev, tasks: [...prev.tasks, { ...task, day: prev.selectedDay ?? '', sessions: [] }] };
+    });
+  }
+
+  function handleTaskDeleted(blockId: string) {
+    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.blockId !== blockId) } : prev));
+    setSelectedTask((prev) => (prev?.blockId === blockId ? null : prev));
+  }
+
+  async function handleReorderTask(task: Task, targetIndex: number) {
+    if (!data?.dayContainerId || !data.dayHeadingBlockId) return;
+    const afterBlockId = computeAfterBlockId(data.tasks, task.blockId, targetIndex, data.dayHeadingBlockId);
+    const originalTasks = data.tasks;
+    const originalIndex = originalTasks.findIndex((t) => t.blockId === task.blockId);
+    if (originalIndex === -1) return;
+
+    // Reorden visual optimista (solo posiciones, sin tocar ids) para que
+    // se sienta instantáneo; se confirma con refresh() al terminar.
+    const reordered = [...originalTasks];
+    reordered.splice(originalIndex, 1);
+    reordered.splice(Math.max(0, Math.min(targetIndex, reordered.length)), 0, task);
+    setData((prev) => (prev ? { ...prev, tasks: reordered } : prev));
+    setBusyTaskIds((prev) => new Set(prev).add(task.blockId));
+
+    try {
+      await reorderTask(task.blockId, data.dayContainerId, afterBlockId);
+      void refresh(data.selectedDay ?? undefined, data.week);
+    } catch (err) {
+      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev)); // revertir
+      setError(err instanceof Error ? err.message : 'No se pudo reordenar la tarea');
+    } finally {
+      setBusyTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.blockId);
+        return next;
+      });
+    }
+  }
+
   async function handleLogout() {
     await logout();
     setAuthState('guest');
@@ -329,6 +381,13 @@ export default function App() {
                   onToggleChecked={(task) => void handleToggleChecked(task)}
                   togglingIds={togglingIds}
                   onSessionDeleted={handleSessionDeleted}
+                  dayContainerId={data.dayContainerId}
+                  dayHeadingBlockId={data.dayHeadingBlockId}
+                  lockedTaskBlockId={lockedTaskBlockId}
+                  busyTaskIds={busyTaskIds}
+                  onTaskCreated={handleTaskCreated}
+                  onTaskDeleted={handleTaskDeleted}
+                  onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
                 />
               </section>
 

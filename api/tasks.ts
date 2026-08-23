@@ -43,6 +43,8 @@ function richTextOf(block: NotionBlock): { plain_text?: string }[] | undefined {
   return content?.rich_text;
 }
 
+type PositionedBlock = { block: NotionBlock; parentId: string };
+
 /**
  * La plantilla real organiza cada semana en columnas de Notion (un
  * `column_list` con un `column` por día), en vez de heading_3/to_do como
@@ -50,21 +52,29 @@ function richTextOf(block: NotionBlock): { plain_text?: string }[] | undefined {
  * agrupado por día funcione igual sin importar cuál de las dos formas use
  * la página. Solo se llama sobre la semana activa (no sobre todo el
  * historial), para no multiplicar las llamadas a la API de Notion.
+ *
+ * Se conserva el `parentId` real de cada bloque (la página, o el `column`
+ * específico) — es el contenedor donde hay que insertar/agregar tareas
+ * nuevas de ese día vía la API de Notion.
  */
-async function expandColumns(blocks: NotionBlock[], depth = 0): Promise<NotionBlock[]> {
-  if (depth > 3) return blocks;
-  const expanded: NotionBlock[] = [];
+async function expandColumns(
+  blocks: NotionBlock[],
+  parentId: string,
+  depth = 0
+): Promise<PositionedBlock[]> {
+  if (depth > 3) return blocks.map((block) => ({ block, parentId }));
+  const expanded: PositionedBlock[] = [];
   for (const block of blocks) {
     if (block.type === 'column_list' && block.has_children) {
       const columns = await listBlockChildren(block.id);
       for (const column of columns) {
         if (column.type === 'column' && column.has_children) {
           const columnChildren = await listBlockChildren(column.id);
-          expanded.push(...(await expandColumns(columnChildren, depth + 1)));
+          expanded.push(...(await expandColumns(columnChildren, column.id, depth + 1)));
         }
       }
     } else {
-      expanded.push(block);
+      expanded.push({ block, parentId });
     }
   }
   return expanded;
@@ -161,16 +171,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 2. Dentro de la semana activa, agrupar to_do por heading_3 (día).
     //    (aplanando columnas si la semana usa layout de columnas por día)
-    const activeWeekBlocks = await expandColumns(activeWeek.blocks);
+    const activeWeekBlocks = await expandColumns(activeWeek.blocks, activePageId);
     const dayOrder: string[] = [];
     const dayBlocks = new Map<string, NotionBlock[]>();
+    // Dónde insertar tareas nuevas/reordenadas de cada día: el contenedor
+    // real (página o columna) y el id del propio heading_3 como ancla para
+    // "insertar al inicio" o cuando el día todavía no tiene ninguna tarea.
+    const dayContainerId = new Map<string, string>();
+    const dayHeadingBlockId = new Map<string, string>();
     let currentDayLabel: string | null = null;
-    for (const block of activeWeekBlocks) {
+    for (const { block, parentId } of activeWeekBlocks) {
       if (block.type === 'heading_3') {
         currentDayLabel = plainText(richTextOf(block));
         if (currentDayLabel && !dayOrder.includes(currentDayLabel)) {
           dayOrder.push(currentDayLabel);
           dayBlocks.set(currentDayLabel, []);
+          dayContainerId.set(currentDayLabel, parentId);
+          dayHeadingBlockId.set(currentDayLabel, block.id);
         }
       } else if (block.type === 'to_do' && currentDayLabel) {
         dayBlocks.get(currentDayLabel)?.push(block);
@@ -190,6 +207,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         availableDays: [],
         selectedDay: null,
         dayMatched: true,
+        dayContainerId: null,
+        dayHeadingBlockId: null,
         tasks: [],
       });
     }
@@ -246,6 +265,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       availableDays: dayOrder,
       selectedDay,
       dayMatched,
+      dayContainerId: dayContainerId.get(selectedDay) ?? null,
+      dayHeadingBlockId: dayHeadingBlockId.get(selectedDay) ?? null,
       tasks,
     });
   } catch (err) {

@@ -26,7 +26,17 @@ async function notionFetch<T>(path: string, init: RequestInit = {}): Promise<T> 
   return (await res.json()) as T;
 }
 
-export type NotionRichText = { plain_text?: string };
+export type NotionRichText = {
+  type?: string;
+  text?: { content: string; link?: { url: string } | null };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  mention?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  equation?: any;
+  annotations?: Record<string, unknown>;
+  plain_text?: string;
+  href?: string | null;
+};
 
 export type NotionBlock = {
   id: string;
@@ -60,15 +70,16 @@ export async function listBlockChildren(blockId: string): Promise<NotionBlock[]>
 export async function appendBlockChildren(
   blockId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  children: Record<string, any>[]
+  children: Record<string, any>[],
+  after?: string
 ): Promise<unknown> {
   return notionFetch(`/blocks/${blockId}/children`, {
     method: 'PATCH',
-    body: JSON.stringify({ children }),
+    body: JSON.stringify(after ? { children, after } : { children }),
   });
 }
 
-/** Archiva (borra) un bloque — usado para quitar una sesión mal registrada. */
+/** Archiva (borra) un bloque — usado para quitar una sesión o tarea. */
 export async function deleteBlock(blockId: string): Promise<unknown> {
   return notionFetch(`/blocks/${blockId}`, { method: 'DELETE' });
 }
@@ -78,5 +89,27 @@ export async function setToDoChecked(blockId: string, checked: boolean): Promise
   return notionFetch(`/blocks/${blockId}`, {
     method: 'PATCH',
     body: JSON.stringify({ to_do: { checked } }),
+  });
+}
+
+/** Trae un bloque por su propio id (a diferencia de listBlockChildren, que lista sus HIJOS). */
+export async function getBlock(blockId: string): Promise<NotionBlock> {
+  return notionFetch<NotionBlock>(`/blocks/${blockId}`);
+}
+
+/**
+ * Reconstruye un array rich_text leído de Notion a la forma que acepta al
+ * crear/actualizar un bloque — allowlist explícita en vez de "restar"
+ * campos, para no arrastrar campos de solo lectura (plain_text, href) al
+ * volver a escribirlo (usado al recrear una tarea en otra posición).
+ */
+export function toRichTextRequest(items: NotionRichText[]): Record<string, unknown>[] {
+  return items.map((item) => {
+    const out: Record<string, unknown> = { type: item.type };
+    if (item.type === 'text') out.text = item.text;
+    else if (item.type === 'mention') out.mention = item.mention;
+    else if (item.type === 'equation') out.equation = item.equation;
+    if (item.annotations) out.annotations = item.annotations;
+    return out;
   });
 }

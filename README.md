@@ -14,6 +14,12 @@ Notion como bloque hijo del `to_do` correspondiente.
 **Además del flujo base (ver spec del proyecto):**
 - Marcar/desmarcar tareas como hechas directo desde la app (actualiza el
   `checked` del `to_do` en Notion, sin tocar el texto).
+- Gestión completa de tareas del día: agregar, eliminar, y reordenar
+  (botones ↑/↓ + drag nativo en desktop). Como Notion no tiene un
+  endpoint para "mover" un bloque, reordenar internamente crea la tarea
+  en la nueva posición (con sus sesiones) y borra la original — mientras
+  haya un timer corriendo, la tarea activa queda con esos controles
+  bloqueados para no arriesgar esa sesión en curso.
 - Total de minutos registrados del día, visible arriba de la lista.
 - Navegación entre semanas (‹ / › y un botón "Hoy" para volver a la actual),
   no solo la semana activa/detectada — útil para revisar historial.

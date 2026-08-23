@@ -1,14 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
-import { setToDoChecked } from './_lib/notion.js';
+import { appendBlockChildren, deleteBlock, setToDoChecked } from './_lib/notion.js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'PATCH') {
-    res.setHeader('Allow', 'PATCH');
-    return res.status(405).json({ error: 'method_not_allowed' });
-  }
-  if (!requireAuth(req, res)) return;
-
+async function handleToggle(req: VercelRequest, res: VercelResponse) {
   const body = (req.body ?? {}) as { block_id?: string; checked?: boolean };
   const { block_id: blockId, checked } = body;
 
@@ -19,9 +13,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'invalid_checked', message: 'checked debe ser booleano' });
   }
 
+  await setToDoChecked(blockId, checked);
+  return res.status(200).json({ ok: true, checked });
+}
+
+async function handleCreate(req: VercelRequest, res: VercelResponse) {
+  const body = (req.body ?? {}) as { container_id?: string; after_block_id?: string; text?: string };
+  const { container_id: containerId, after_block_id: afterBlockId, text } = body;
+
+  if (!containerId || typeof containerId !== 'string') {
+    return res.status(400).json({ error: 'invalid_container_id', message: 'Falta container_id' });
+  }
+  if (!afterBlockId || typeof afterBlockId !== 'string') {
+    return res.status(400).json({ error: 'invalid_after_block_id', message: 'Falta after_block_id' });
+  }
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+  if (!trimmed) {
+    return res.status(400).json({ error: 'invalid_text', message: 'El texto no puede estar vacío' });
+  }
+
+  const result = (await appendBlockChildren(
+    containerId,
+    [{ to_do: { rich_text: [{ type: 'text', text: { content: trimmed } }], checked: false } }],
+    afterBlockId
+  )) as { results?: { id?: string }[] };
+  const blockId = result?.results?.[0]?.id;
+  if (!blockId) {
+    return res.status(502).json({ error: 'notion_no_id', message: 'Notion no devolvió el id del bloque creado' });
+  }
+
+  return res.status(200).json({ ok: true, task: { blockId, text: trimmed, checked: false } });
+}
+
+async function handleDelete(req: VercelRequest, res: VercelResponse) {
+  const body = (req.body ?? {}) as { block_id?: string };
+  const blockId = body.block_id;
+  if (!blockId || typeof blockId !== 'string') {
+    return res.status(400).json({ error: 'invalid_block_id', message: 'Falta block_id' });
+  }
+  await deleteBlock(blockId);
+  return res.status(200).json({ ok: true });
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireAuth(req, res)) return;
+
   try {
-    await setToDoChecked(blockId, checked);
-    return res.status(200).json({ ok: true, checked });
+    if (req.method === 'PATCH') return await handleToggle(req, res);
+    if (req.method === 'POST') return await handleCreate(req, res);
+    if (req.method === 'DELETE') return await handleDelete(req, res);
+    res.setHeader('Allow', 'PATCH, POST, DELETE');
+    return res.status(405).json({ error: 'method_not_allowed' });
   } catch (err) {
     console.error(err);
     const message = err instanceof Error ? err.message : 'Error desconocido';

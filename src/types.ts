@@ -24,6 +24,8 @@ export type TasksResponse = {
   availableDays: string[];
   selectedDay: string | null;
   dayMatched: boolean;
+  dayContainerId: string | null;
+  dayHeadingBlockId: string | null;
   tasks: Task[];
 };
 
