@@ -12,6 +12,8 @@ Notion como bloque hijo del `to_do` correspondiente.
 - **Costo:** $0, todo en tiers gratuitos de Vercel.
 
 **Además del flujo base (ver spec del proyecto):**
+- Marcar/desmarcar tareas como hechas directo desde la app (actualiza el
+  `checked` del `to_do` en Notion, sin tocar el texto).
 - Total de minutos registrados del día, visible arriba de la lista.
 - Navegación entre semanas (‹ / › y un botón "Hoy" para volver a la actual),
   no solo la semana activa/detectada — útil para revisar historial.

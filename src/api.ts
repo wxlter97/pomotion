@@ -60,3 +60,10 @@ export function deleteSession(blockId: string) {
     body: JSON.stringify({ block_id: blockId }),
   });
 }
+
+export function updateTaskChecked(blockId: string, checked: boolean) {
+  return request<{ ok: true; checked: boolean }>('/api/task', {
+    method: 'PATCH',
+    body: JSON.stringify({ block_id: blockId, checked }),
+  });
+}

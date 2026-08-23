@@ -11,11 +11,15 @@ export default function TaskList({
   tasks,
   selectedBlockId,
   onSelect,
+  onToggleChecked,
+  togglingIds,
   onSessionDeleted,
 }: {
   tasks: Task[];
   selectedBlockId: string | null;
   onSelect: (task: Task) => void;
+  onToggleChecked: (task: Task) => void;
+  togglingIds: Set<string>;
   onSessionDeleted: (taskBlockId: string, sessionBlockId: string) => void;
 }) {
   const [pendingDelete, setPendingDelete] = useState<{ taskBlockId: string; sessionBlockId: string } | null>(
@@ -48,19 +52,25 @@ export default function TaskList({
       <ul className="task-list">
         {tasks.map((task) => {
           const total = sumMinutes(task);
+          const isToggling = togglingIds.has(task.blockId);
           return (
             <li key={task.blockId}>
-              <button
-                type="button"
-                className={task.blockId === selectedBlockId ? 'task-item active' : 'task-item'}
-                onClick={() => onSelect(task)}
-              >
-                <span className={task.checked ? 'task-check checked' : 'task-check'}>
-                  {task.checked ? '✓' : ''}
-                </span>
-                <span className="task-text">{task.text || '(sin texto)'}</span>
+              <div className={task.blockId === selectedBlockId ? 'task-item active' : 'task-item'}>
+                <button
+                  type="button"
+                  className={task.checked ? 'task-check checked' : 'task-check'}
+                  onClick={() => onToggleChecked(task)}
+                  disabled={isToggling}
+                  aria-label={task.checked ? 'Marcar como pendiente' : 'Marcar como hecha'}
+                  title={task.checked ? 'Marcar como pendiente' : 'Marcar como hecha'}
+                >
+                  {!isToggling && task.checked ? '✓' : ''}
+                </button>
+                <button type="button" className="task-select" onClick={() => onSelect(task)}>
+                  <span className="task-text">{task.text || '(sin texto)'}</span>
+                </button>
                 {total > 0 && <span className="task-total">{total}m</span>}
-              </button>
+              </div>
               {task.sessions.length > 0 && (
                 <ul className="session-list">
                   {task.sessions.map((s, i) => (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getTasks, logout, UnauthorizedError } from './api';
+import { getTasks, logout, UnauthorizedError, updateTaskChecked } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import Login from './components/Login';
@@ -44,6 +44,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [timerPhase, setTimerPhase] = useState<TimerPhase>('idle');
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [theme, toggleTheme] = useTheme();
   const timerRef = useRef<TimerHandle>(null);
 
@@ -181,6 +182,31 @@ export default function App() {
     });
   }
 
+  function setTaskChecked(blockId: string, checked: boolean) {
+    setData((prev) => {
+      if (!prev) return prev;
+      return { ...prev, tasks: prev.tasks.map((t) => (t.blockId === blockId ? { ...t, checked } : t)) };
+    });
+  }
+
+  async function handleToggleChecked(task: Task) {
+    const nextChecked = !task.checked;
+    setTogglingIds((prev) => new Set(prev).add(task.blockId));
+    setTaskChecked(task.blockId, nextChecked); // optimista
+    try {
+      await updateTaskChecked(task.blockId, nextChecked);
+    } catch (err) {
+      setTaskChecked(task.blockId, task.checked); // revertir
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea en Notion');
+    } finally {
+      setTogglingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.blockId);
+        return next;
+      });
+    }
+  }
+
   async function handleLogout() {
     await logout();
     setAuthState('guest');
@@ -300,6 +326,8 @@ export default function App() {
                   tasks={data.tasks}
                   selectedBlockId={selectedTask?.blockId ?? null}
                   onSelect={guardedSelectTask}
+                  onToggleChecked={(task) => void handleToggleChecked(task)}
+                  togglingIds={togglingIds}
                   onSessionDeleted={handleSessionDeleted}
                 />
               </section>

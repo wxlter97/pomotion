@@ -15,6 +15,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import loginHandler from '../api/login';
 import logoutHandler from '../api/logout';
 import sessionHandler from '../api/session';
+import taskHandler from '../api/task';
 import tasksHandler from '../api/tasks';
 
 type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
@@ -24,6 +25,7 @@ const routes: Record<string, Handler> = {
   '/api/logout': logoutHandler as Handler,
   '/api/tasks': tasksHandler as Handler,
   '/api/session': sessionHandler as Handler,
+  '/api/task': taskHandler as Handler,
 };
 
 const PORT = Number(process.env.API_PORT) || 3000;

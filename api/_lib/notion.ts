@@ -72,3 +72,11 @@ export async function appendBlockChildren(
 export async function deleteBlock(blockId: string): Promise<unknown> {
   return notionFetch(`/blocks/${blockId}`, { method: 'DELETE' });
 }
+
+/** Marca/desmarca un bloque to_do, sin tocar su texto. */
+export async function setToDoChecked(blockId: string, checked: boolean): Promise<unknown> {
+  return notionFetch(`/blocks/${blockId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ to_do: { checked } }),
+  });
+}

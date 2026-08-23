@@ -418,19 +418,16 @@ h3 {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  text-align: left;
   background: var(--color-fill);
   border: 2px solid transparent;
   border-radius: 14px;
-  padding: 0.7rem 0.85rem;
-  font-family: inherit;
+  padding: 0.6rem 0.85rem;
   font-size: 0.92rem;
   color: var(--color-label);
-  cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.task-item:active {
+.task-item:has(.task-select:active) {
   background: var(--color-fill-strong);
 }
 
@@ -439,9 +436,24 @@ h3 {
   background: color-mix(in srgb, var(--color-accent) 10%, var(--color-fill));
 }
 
+.task-select {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0.1rem 0;
+}
+
 .task-check {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: 1.4rem;
+  height: 1.4rem;
   border-radius: 50%;
   border: 1.5px solid var(--color-separator);
   display: flex;
@@ -450,6 +462,19 @@ h3 {
   font-size: 0.75rem;
   flex-shrink: 0;
   color: white;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.task-check:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+.task-check:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .task-check.checked {
