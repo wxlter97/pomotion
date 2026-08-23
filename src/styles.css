@@ -313,6 +313,7 @@ h3 {
   color: var(--color-label-secondary);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
+  margin-right: auto;
 }
 
 .week-today-btn {

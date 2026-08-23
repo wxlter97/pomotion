@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { listBlockChildren, type NotionBlock } from './_lib/notion.js';
+import { resolveActivePageId, richTextOf } from './_lib/notionPage.js';
 import {
-  extractNotionPageId,
   isDateInRange,
   normalize,
   parseSessionText,
@@ -19,29 +19,6 @@ type WeekGroup = {
   range: { start: string; end: string } | null;
   blocks: NotionBlock[];
 };
-
-async function resolveActivePageId(): Promise<string> {
-  const indexPageId = process.env.NOTION_INDEX_PAGE_ID;
-  if (!indexPageId) {
-    throw new Error('NOTION_INDEX_PAGE_ID no está configurada');
-  }
-  const blocks = await listBlockChildren(indexPageId);
-  for (const block of blocks) {
-    const content = block[block.type] as { rich_text?: { plain_text?: string }[] } | undefined;
-    const text = plainText(content?.rich_text);
-    if (!text) continue;
-    const pageId = extractNotionPageId(text);
-    if (pageId) return pageId;
-  }
-  throw new Error(
-    'No se encontró ninguna referencia a una página semanal (URL o ID) en la página índice de Notion'
-  );
-}
-
-function richTextOf(block: NotionBlock): { plain_text?: string }[] | undefined {
-  const content = block[block.type] as { rich_text?: { plain_text?: string }[] } | undefined;
-  return content?.rich_text;
-}
 
 type PositionedBlock = { block: NotionBlock; parentId: string };
 

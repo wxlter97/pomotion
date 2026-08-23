@@ -9,6 +9,7 @@ export default function DaySelector({
   onPreviousWeek,
   onNextWeek,
   onGoToCurrentWeek,
+  onAddWeek,
 }: {
   week: string;
   days: string[];
@@ -20,6 +21,7 @@ export default function DaySelector({
   onPreviousWeek: () => void;
   onNextWeek: () => void;
   onGoToCurrentWeek: () => void;
+  onAddWeek: () => void;
 }) {
   return (
     <div className="day-selector">
@@ -50,6 +52,15 @@ export default function DaySelector({
             Hoy
           </button>
         )}
+        <button
+          type="button"
+          className="btn btn-icon week-add-btn"
+          onClick={onAddWeek}
+          aria-label="Agregar semana"
+          title="Agregar la semana siguiente"
+        >
+          +
+        </button>
       </div>
       <div className="day-tabs">
         {days.map((day) => (

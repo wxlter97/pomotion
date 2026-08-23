@@ -55,6 +55,52 @@ export function parseSessionText(
   return { durationMinutes: Number(minutes), start: start.trim(), end: end.trim() };
 }
 
+/** Suma (o resta, con negativo) días a una fecha "YYYY-MM-DD". En UTC para no
+ *  arrastrar corrimientos de zona horaria en la aritmética de fechas. */
+export function addDaysToDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Día de la semana de una fecha "YYYY-MM-DD" (0=domingo..6=sábado). */
+function weekdayOfDate(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
+/** El lunes siguiente (estrictamente posterior) a una fecha "YYYY-MM-DD". */
+export function nextMondayAfter(dateStr: string): string {
+  let candidate = addDaysToDate(dateStr, 1);
+  while (weekdayOfDate(candidate) !== 1) candidate = addDaysToDate(candidate, 1);
+  return candidate;
+}
+
+/** "2026-08-17" → "2026.08.17", el formato de encabezado de semana ya usado. */
+export function formatWeekDate(dateStr: string): string {
+  return dateStr.replace(/-/g, '.');
+}
+
+export function formatWeekLabel(start: string, end: string): string {
+  return `${formatWeekDate(start)} - ${formatWeekDate(end)}`;
+}
+
+/**
+ * Próxima semana laboral (lunes-viernes) sugerida: el lunes siguiente a la
+ * fecha más tardía entre "hoy" y el fin de la última semana existente (así
+ * nunca sugiere una semana ya pasada si hace tiempo no se agrega una).
+ */
+export function computeNextWeekRange(
+  existingEndDates: string[],
+  todayStr: string
+): { start: string; end: string } {
+  const latestEnd = existingEndDates.reduce((max, d) => (d > max ? d : max), todayStr);
+  const start = nextMondayAfter(latestEnd);
+  const end = addDaysToDate(start, 4);
+  return { start, end };
+}
+
 // Acepta tanto un ID crudo (con o sin guiones) como una URL de Notion que lo contenga.
 const UUID_RE = /[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}/i;
 

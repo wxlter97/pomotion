@@ -23,6 +23,10 @@ Notion como bloque hijo del `to_do` correspondiente.
 - Total de minutos registrados del día, visible arriba de la lista.
 - Navegación entre semanas (‹ / › y un botón "Hoy" para volver a la actual),
   no solo la semana activa/detectada — útil para revisar historial.
+- Botón "+" para agregar la semana siguiente (lunes-viernes calculado
+  automáticamente a partir de la última semana existente), con la misma
+  estructura de columnas por día que usa la plantilla real — lista para
+  agregarle tareas con el flujo de arriba.
 - El timer activo se persiste en `localStorage` (sobrevive un refresh o
   cierre accidental de tab) con limpieza automática si es de un día
   calendario distinto o demasiado viejo.

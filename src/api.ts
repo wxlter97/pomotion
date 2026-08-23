@@ -88,3 +88,14 @@ export function reorderTask(blockId: string, containerId: string, afterBlockId: 
     body: JSON.stringify({ block_id: blockId, container_id: containerId, after_block_id: afterBlockId }),
   });
 }
+
+export function getNextWeekSuggestion() {
+  return request<{ start: string; end: string; label: string }>('/api/week');
+}
+
+export function createWeek(start: string, end: string) {
+  return request<{ ok: true; week: { label: string; start: string; end: string } }>('/api/week', {
+    method: 'POST',
+    body: JSON.stringify({ start, end }),
+  });
+}

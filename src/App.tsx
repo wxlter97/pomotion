@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
+import { createWeek, getNextWeekSuggestion, getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import Login from './components/Login';
@@ -47,6 +47,11 @@ export default function App() {
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
+  const [pendingNewWeek, setPendingNewWeek] = useState<{ start: string; end: string; label: string } | null>(
+    null
+  );
+  const [addingWeek, setAddingWeek] = useState(false);
+  const [addWeekError, setAddWeekError] = useState<string | null>(null);
   const [theme, toggleTheme] = useTheme();
   const timerRef = useRef<TimerHandle>(null);
 
@@ -136,6 +141,32 @@ export default function App() {
   function confirmPendingSwitch() {
     pendingSwitch?.run();
     setPendingSwitch(null);
+  }
+
+  async function handleRequestAddWeek() {
+    setAddWeekError(null);
+    try {
+      const suggestion = await getNextWeekSuggestion();
+      setPendingNewWeek(suggestion);
+    } catch (err) {
+      setAddWeekError(err instanceof Error ? err.message : 'No se pudo calcular la semana siguiente');
+    }
+  }
+
+  async function confirmAddWeek() {
+    if (!pendingNewWeek) return;
+    setAddingWeek(true);
+    setAddWeekError(null);
+    try {
+      const res = await createWeek(pendingNewWeek.start, pendingNewWeek.end);
+      setPendingNewWeek(null);
+      const newLabel = res.week.label;
+      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, newLabel));
+    } catch (err) {
+      setAddWeekError(err instanceof Error ? err.message : 'No se pudo crear la semana');
+    } finally {
+      setAddingWeek(false);
+    }
   }
 
   // Atajos de teclado: espacio inicia/detiene, 1–5 cambia de día,
@@ -329,6 +360,7 @@ export default function App() {
       </header>
 
       {error && <p className="error banner">{error}</p>}
+      {addWeekError && <p className="error banner">{addWeekError}</p>}
       {data && data.weekSource === 'auto-fallback' && (
         <p className="warning banner">
           No pude identificar automáticamente la semana actual por fecha — mostrando "{data.week}".
@@ -355,6 +387,7 @@ export default function App() {
               onPreviousWeek={() => data.previousWeekLabel && guardedGoToWeek(data.previousWeekLabel)}
               onNextWeek={() => data.nextWeekLabel && guardedGoToWeek(data.nextWeekLabel)}
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
+              onAddWeek={() => void handleRequestAddWeek()}
             />
             {totalMinutesToday > 0 && (
               <div className="total-pill" title="Total registrado este día">
@@ -418,6 +451,16 @@ export default function App() {
           destructive
           onConfirm={confirmPendingSwitch}
           onCancel={() => setPendingSwitch(null)}
+        />
+      )}
+
+      {pendingNewWeek && (
+        <ConfirmDialog
+          title="Agregar semana"
+          message={`Se creará la semana "${pendingNewWeek.label}" con los cinco días (Lunes–Viernes) vacíos, lista para agregarle tareas.`}
+          confirmLabel={addingWeek ? 'Creando…' : 'Crear semana'}
+          onConfirm={confirmAddWeek}
+          onCancel={() => setPendingNewWeek(null)}
         />
       )}
     </div>
