@@ -34,9 +34,12 @@ export function logout() {
   return request<{ ok: true }>('/api/logout', { method: 'POST' });
 }
 
-export function getTasks(day?: string) {
-  const query = day ? `?day=${encodeURIComponent(day)}` : '';
-  return request<TasksResponse>(`/api/tasks${query}`);
+export function getTasks(day?: string, week?: string) {
+  const params = new URLSearchParams();
+  if (day) params.set('day', day);
+  if (week) params.set('week', week);
+  const query = params.toString();
+  return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
 
 export function postSession(payload: {

@@ -296,9 +296,28 @@ h3 {
   gap: 0.5rem;
 }
 
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.week-nav .btn-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .week-label {
   color: var(--color-label-secondary);
   font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.week-today-btn {
+  padding: 0.2rem 0.7rem;
+  font-size: 0.76rem;
 }
 
 .day-tabs {
@@ -370,6 +389,12 @@ h3 {
   border-radius: 20px;
   box-shadow: var(--shadow-card);
   padding: 1.25rem;
+}
+
+.empty-week {
+  margin: 0 1.5rem;
+  text-align: center;
+  padding: 2.5rem 1.5rem;
 }
 
 .timer-panel {

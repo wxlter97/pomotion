@@ -107,11 +107,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const hasValidRange = (w: WeekGroup): w is WeekGroup & { range: { start: string; end: string } } =>
       Boolean(w.range) && w.range!.start <= w.range!.end;
 
-    let activeWeek = weeks.find((w) => hasValidRange(w) && isDateInRange(today, w.range.start, w.range.end));
-    const weekMatched = Boolean(activeWeek);
-    if (!activeWeek) {
-      // Sin match exacto (ej. hoy es fin de semana, entre dos semanas):
-      // preferir la semana ya terminada más reciente; si todas las semanas
+    const todayWeek = weeks.find((w) => hasValidRange(w) && isDateInRange(today, w.range.start, w.range.end));
+    const requestedWeek = typeof req.query.week === 'string' ? req.query.week : undefined;
+
+    let activeWeek: WeekGroup;
+    // 'auto-matched': hoy cae exactamente dentro de un heading_1.
+    // 'auto-fallback': no hay match exacto (ej. fin de semana entre dos
+    //   semanas) y se usa una heurística — dispara el aviso en la UI.
+    // 'requested': el usuario navegó explícitamente a otra semana — no
+    //   dispara ningún aviso, fue intencional.
+    let weekSource: 'auto-matched' | 'auto-fallback' | 'requested';
+
+    if (requestedWeek) {
+      const found = weeks.find((w) => w.label === requestedWeek);
+      if (!found) {
+        return res.status(404).json({
+          error: 'week_not_found',
+          message: `No se encontró la semana "${requestedWeek}"`,
+        });
+      }
+      activeWeek = found;
+      weekSource = 'requested';
+    } else if (todayWeek) {
+      activeWeek = todayWeek;
+      weekSource = 'auto-matched';
+    } else {
+      // Preferir la semana ya terminada más reciente; si todas las semanas
       // con rango válido son futuras, la más próxima a empezar; si ninguna
       // semana tiene rango parseable, la primera del documento (por
       // posición, normalmente la más reciente en esta plantilla).
@@ -125,7 +146,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else {
         activeWeek = weeks[0];
       }
+      weekSource = 'auto-fallback';
     }
+
+    // Navegación anterior/siguiente: en orden cronológico (por fecha de
+    // inicio), no por posición en el documento — así funciona sin importar
+    // si la plantilla lista las semanas de más nueva a más vieja o al revés.
+    const navigableWeeks = weeks.filter(hasValidRange).sort((a, b) => (a.range.start < b.range.start ? -1 : a.range.start > b.range.start ? 1 : 0));
+    const activeIndex = navigableWeeks.findIndex((w) => w === activeWeek);
+    const previousWeekLabel = activeIndex > 0 ? navigableWeeks[activeIndex - 1].label : null;
+    const nextWeekLabel =
+      activeIndex >= 0 && activeIndex < navigableWeeks.length - 1 ? navigableWeeks[activeIndex + 1].label : null;
+    const isCurrentWeek = Boolean(todayWeek) && activeWeek === todayWeek;
 
     // 2. Dentro de la semana activa, agrupar to_do por heading_3 (día).
     //    (aplanando columnas si la semana usa layout de columnas por día)
@@ -146,21 +178,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (dayOrder.length === 0) {
-      return res.status(404).json({
-        error: 'no_days_found',
-        message: `No se encontró ningún heading_3 (día) dentro de la semana "${activeWeek.label}"`,
+      // Semana válida pero sin desglose por día (ej. una semana de
+      // vacaciones anotada solo con una nota). No es un error — se navega
+      // ahí con las flechas de semana igual que cualquier otra.
+      return res.status(200).json({
+        week: activeWeek.label,
+        weekSource,
+        isCurrentWeek,
+        previousWeekLabel,
+        nextWeekLabel,
+        availableDays: [],
+        selectedDay: null,
+        dayMatched: true,
+        tasks: [],
       });
     }
 
     const requestedDay = typeof req.query.day === 'string' ? req.query.day : undefined;
     const todayWeekday = todayWeekdayNameInTz(TIMEZONE);
 
-    let selectedDay = requestedDay
-      ? dayOrder.find((d) => normalize(d) === normalize(requestedDay))
-      : undefined;
-    const dayMatched = requestedDay ? Boolean(selectedDay) : true;
-    if (!selectedDay) selectedDay = dayOrder.find((d) => normalize(d) === todayWeekday);
-    const autoDayMatched = Boolean(selectedDay);
+    let selectedDay: string | undefined;
+    let dayMatched: boolean;
+    if (requestedDay) {
+      selectedDay = dayOrder.find((d) => normalize(d) === normalize(requestedDay));
+      dayMatched = Boolean(selectedDay);
+    } else if (weekSource === 'requested') {
+      // Se navegó explícitamente a otra semana: no tiene sentido buscar "el
+      // día de hoy" ahí — se cae directo al primer día sin marcar como
+      // "no encontrado".
+      dayMatched = true;
+    } else {
+      selectedDay = dayOrder.find((d) => normalize(d) === todayWeekday);
+      dayMatched = Boolean(selectedDay);
+    }
     if (!selectedDay) selectedDay = dayOrder[0];
 
     const todoBlocks = dayBlocks.get(selectedDay) ?? [];
@@ -189,10 +239,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json({
       week: activeWeek.label,
-      weekMatched,
+      weekSource,
+      isCurrentWeek,
+      previousWeekLabel,
+      nextWeekLabel,
       availableDays: dayOrder,
       selectedDay,
-      dayMatched: requestedDay ? dayMatched : autoDayMatched,
+      dayMatched,
       tasks,
     });
   } catch (err) {

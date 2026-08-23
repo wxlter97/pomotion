@@ -13,14 +13,17 @@ Notion como bloque hijo del `to_do` correspondiente.
 
 **Además del flujo base (ver spec del proyecto):**
 - Total de minutos registrados del día, visible arriba de la lista.
+- Navegación entre semanas (‹ / › y un botón "Hoy" para volver a la actual),
+  no solo la semana activa/detectada — útil para revisar historial.
 - El timer activo se persiste en `localStorage` (sobrevive un refresh o
   cierre accidental de tab) con limpieza automática si es de un día
   calendario distinto o demasiado viejo.
-- Confirmación antes de cancelar un timer activo al cambiar de tarea o de día.
+- Confirmación antes de cancelar un timer activo al cambiar de tarea, día o
+  semana.
 - Botón para eliminar una sesión mal registrada (borra el bloque en Notion).
 - Título de la pestaña con el countdown en vivo, anillo de progreso visual.
-- Atajos de teclado: `espacio` inicia/detiene, `1`–`5` cambia de día, `T`
-  cambia el tema.
+- Atajos de teclado: `espacio` inicia/detiene, `1`–`5` cambia de día,
+  `[`/`]` cambia de semana, `T` cambia el tema.
 - Favicon + manifest básico (ícono generado con
   [scripts/gen-icons.mjs](scripts/gen-icons.mjs), sin dependencias).
 

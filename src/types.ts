@@ -13,11 +13,16 @@ export type Task = {
   sessions: Session[];
 };
 
+export type WeekSource = 'auto-matched' | 'auto-fallback' | 'requested';
+
 export type TasksResponse = {
   week: string;
-  weekMatched: boolean;
+  weekSource: WeekSource;
+  isCurrentWeek: boolean;
+  previousWeekLabel: string | null;
+  nextWeekLabel: string | null;
   availableDays: string[];
-  selectedDay: string;
+  selectedDay: string | null;
   dayMatched: boolean;
   tasks: Task[];
 };

@@ -10,7 +10,7 @@ import type { Session, Task, TasksResponse, TimerPhase } from './types';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'error';
-type PendingSwitch = { type: 'task'; task: Task } | { type: 'day'; day: string };
+type PendingSwitch = { message: string; run: () => void };
 
 function formatTotal(minutes: number): string {
   if (minutes < 60) return `${minutes}m`;
@@ -47,11 +47,11 @@ export default function App() {
   const [theme, toggleTheme] = useTheme();
   const timerRef = useRef<TimerHandle>(null);
 
-  const refresh = useCallback(async (day?: string) => {
+  const refresh = useCallback(async (day?: string, week?: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getTasks(day);
+      const res = await getTasks(day, week);
       setData(res);
       setAuthState('authed');
       setSelectedTask((prev) => {
@@ -85,36 +85,50 @@ export default function App() {
     void refresh();
   }, [refresh]);
 
-  const guardedSelectTask = useCallback(
-    (task: Task) => {
-      if (timerPhase !== 'idle' && task.blockId !== selectedTask?.blockId) {
-        setPendingSwitch({ type: 'task', task });
+  const guardIfRunning = useCallback(
+    (message: string, run: () => void) => {
+      if (timerPhase !== 'idle') {
+        setPendingSwitch({ message, run });
       } else {
-        setSelectedTask(task);
+        run();
       }
     },
-    [timerPhase, selectedTask]
+    [timerPhase]
+  );
+
+  const guardedSelectTask = useCallback(
+    (task: Task) => {
+      if (task.blockId === selectedTask?.blockId) return;
+      guardIfRunning('Cambiar de tarea lo cancela sin guardar esa sesión.', () => setSelectedTask(task));
+    },
+    [selectedTask, guardIfRunning]
   );
 
   const guardedSelectDay = useCallback(
     (day: string) => {
-      if (timerPhase !== 'idle' && day !== data?.selectedDay) {
-        setPendingSwitch({ type: 'day', day });
-      } else {
-        void refresh(day);
-      }
+      if (day === data?.selectedDay) return;
+      // Mantener la misma semana que se está viendo (no volver a "hoy" al
+      // cambiar de día dentro de una semana pasada/futura).
+      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () => void refresh(day, data?.week));
     },
-    [timerPhase, data, refresh]
+    [data, refresh, guardIfRunning]
+  );
+
+  // weekLabel === undefined => volver a la semana actual (auto-detección).
+  const guardedGoToWeek = useCallback(
+    (weekLabel: string | undefined) => {
+      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, weekLabel));
+    },
+    [refresh, guardIfRunning]
   );
 
   function confirmPendingSwitch() {
-    if (!pendingSwitch) return;
-    if (pendingSwitch.type === 'task') setSelectedTask(pendingSwitch.task);
-    else void refresh(pendingSwitch.day);
+    pendingSwitch?.run();
     setPendingSwitch(null);
   }
 
-  // Atajos de teclado: espacio inicia/detiene, 1–5 cambia de día, T cambia el tema.
+  // Atajos de teclado: espacio inicia/detiene, 1–5 cambia de día,
+  // [ / ] cambia de semana, T cambia el tema.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -131,11 +145,15 @@ export default function App() {
       } else if (/^[1-5]$/.test(e.key) && data) {
         const day = data.availableDays[Number(e.key) - 1];
         if (day) guardedSelectDay(day);
+      } else if (e.key === '[' && data?.previousWeekLabel) {
+        guardedGoToWeek(data.previousWeekLabel);
+      } else if (e.key === ']' && data?.nextWeekLabel) {
+        guardedGoToWeek(data.nextWeekLabel);
       }
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay]);
+  }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(blockId: string, session: Session) {
     setData((prev) => {
@@ -218,7 +236,12 @@ export default function App() {
         <h1>pomotion</h1>
         <div className="header-actions">
           {themeToggleButton}
-          <button type="button" className="btn btn-plain" onClick={() => void refresh(data?.selectedDay)} disabled={loading}>
+          <button
+            type="button"
+            className="btn btn-plain"
+            onClick={() => void refresh(data?.selectedDay ?? undefined, data?.week)}
+            disabled={loading}
+          >
             {loading ? 'Actualizando…' : 'Actualizar'}
           </button>
           <button type="button" className="btn btn-plain" onClick={() => void handleLogout()}>
@@ -228,7 +251,7 @@ export default function App() {
       </header>
 
       {error && <p className="error banner">{error}</p>}
-      {data && !data.weekMatched && (
+      {data && data.weekSource === 'auto-fallback' && (
         <p className="warning banner">
           No pude identificar automáticamente la semana actual por fecha — mostrando "{data.week}".
           Revisa el formato del encabezado en Notion si esto no es correcto.
@@ -247,7 +270,13 @@ export default function App() {
               week={data.week}
               days={data.availableDays}
               selectedDay={data.selectedDay}
-              onSelect={guardedSelectDay}
+              onSelectDay={guardedSelectDay}
+              isCurrentWeek={data.isCurrentWeek}
+              hasPreviousWeek={Boolean(data.previousWeekLabel)}
+              hasNextWeek={Boolean(data.nextWeekLabel)}
+              onPreviousWeek={() => data.previousWeekLabel && guardedGoToWeek(data.previousWeekLabel)}
+              onNextWeek={() => data.nextWeekLabel && guardedGoToWeek(data.nextWeekLabel)}
+              onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
             />
             {totalMinutesToday > 0 && (
               <div className="total-pill" title="Total registrado este día">
@@ -257,24 +286,38 @@ export default function App() {
             )}
           </div>
 
-          <div className="main-grid">
-            <section className="tasks-panel card">
-              <TaskList
-                tasks={data.tasks}
-                selectedBlockId={selectedTask?.blockId ?? null}
-                onSelect={guardedSelectTask}
-                onSessionDeleted={handleSessionDeleted}
-              />
-            </section>
+          {data.availableDays.length === 0 ? (
+            <div className="empty-week card">
+              <p className="muted">
+                Esta semana no tiene tareas desglosadas por día en Notion (ej. una semana de
+                vacaciones o feriados). Usa las flechas de arriba para ver otra semana.
+              </p>
+            </div>
+          ) : (
+            <div className="main-grid">
+              <section className="tasks-panel card">
+                <TaskList
+                  tasks={data.tasks}
+                  selectedBlockId={selectedTask?.blockId ?? null}
+                  onSelect={guardedSelectTask}
+                  onSessionDeleted={handleSessionDeleted}
+                />
+              </section>
 
-            <section className="timer-panel card">
-              <Timer ref={timerRef} task={selectedTask} onSessionLogged={handleSessionLogged} onPhaseChange={setTimerPhase} />
-            </section>
-          </div>
+              <section className="timer-panel card">
+                <Timer
+                  ref={timerRef}
+                  task={selectedTask}
+                  onSessionLogged={handleSessionLogged}
+                  onPhaseChange={setTimerPhase}
+                />
+              </section>
+            </div>
+          )}
 
           <footer className="shortcuts-hint">
             <kbd>espacio</kbd> inicia/detiene · <kbd>1</kbd>–<kbd>5</kbd> cambia de día ·{' '}
-            <kbd>T</kbd> cambia el tema
+            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>T</kbd> cambia el tema
           </footer>
         </>
       )}
@@ -282,11 +325,7 @@ export default function App() {
       {pendingSwitch && (
         <ConfirmDialog
           title="¿Cancelar el timer en curso?"
-          message={
-            pendingSwitch.type === 'task'
-              ? `Tienes un timer corriendo. Cambiar de tarea lo cancela sin guardar esa sesión.`
-              : `Tienes un timer corriendo. Cambiar de día lo cancela sin guardar esa sesión.`
-          }
+          message={`Tienes un timer corriendo. ${pendingSwitch.message}`}
           confirmLabel="Cancelar timer y cambiar"
           cancelLabel="Seguir con el timer"
           destructive
