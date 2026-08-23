@@ -1,3 +1,9 @@
+import { useEffect, useRef } from 'react';
+
+function Spinner() {
+  return <span className="spinner" aria-hidden="true" />;
+}
+
 export default function DaySelector({
   week,
   days,
@@ -10,6 +16,7 @@ export default function DaySelector({
   onNextWeek,
   onGoToCurrentWeek,
   onAddWeek,
+  loading,
 }: {
   week: string;
   days: string[];
@@ -22,7 +29,17 @@ export default function DaySelector({
   onNextWeek: () => void;
   onGoToCurrentWeek: () => void;
   onAddWeek: () => void;
+  loading?: boolean;
 }) {
+  const tabsRef = useRef<HTMLDivElement>(null);
+  const activeTabRef = useRef<HTMLButtonElement>(null);
+
+  // Al cambiar de día seleccionado (incluye la carga inicial), centrarlo en
+  // el scroll horizontal si el contenedor no cabe en una sola línea.
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [selectedDay]);
+
   return (
     <div className="day-selector">
       <div className="week-nav">
@@ -30,25 +47,33 @@ export default function DaySelector({
           type="button"
           className="btn btn-icon"
           onClick={onPreviousWeek}
-          disabled={!hasPreviousWeek}
+          disabled={!hasPreviousWeek || loading}
           aria-label="Semana anterior"
           title="Semana anterior ([)"
         >
           ‹
         </button>
-        <span className="week-label">{week}</span>
+        <span className="week-label">
+          {week}
+          {loading && <Spinner />}
+        </span>
         <button
           type="button"
           className="btn btn-icon"
           onClick={onNextWeek}
-          disabled={!hasNextWeek}
+          disabled={!hasNextWeek || loading}
           aria-label="Semana siguiente"
           title="Semana siguiente (])"
         >
           ›
         </button>
         {!isCurrentWeek && (
-          <button type="button" className="btn btn-tinted week-today-btn" onClick={onGoToCurrentWeek}>
+          <button
+            type="button"
+            className="btn btn-tinted week-today-btn"
+            onClick={onGoToCurrentWeek}
+            disabled={loading}
+          >
             Hoy
           </button>
         )}
@@ -56,18 +81,21 @@ export default function DaySelector({
           type="button"
           className="btn btn-icon week-add-btn"
           onClick={onAddWeek}
+          disabled={loading}
           aria-label="Agregar semana"
           title="Agregar la semana siguiente"
         >
           +
         </button>
       </div>
-      <div className="day-tabs">
+      <div className="day-tabs" ref={tabsRef}>
         {days.map((day) => (
           <button
             key={day}
+            ref={day === selectedDay ? activeTabRef : undefined}
             className={day === selectedDay ? 'day-tab active' : 'day-tab'}
             onClick={() => onSelectDay(day)}
+            disabled={loading}
             type="button"
           >
             {day}

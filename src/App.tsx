@@ -3,6 +3,7 @@ import { createWeek, getNextWeekSuggestion, getTasks, logout, reorderTask, Unaut
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import DismissibleBanner from './components/DismissibleBanner';
+import Footer from './components/Footer';
 import Login from './components/Login';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
@@ -53,6 +54,25 @@ function SoundOffIcon() {
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 9v6h4l5 4V5L8 9H4Z" />
       <path d="M16 9l5 6M21 9l-5 6" />
+    </svg>
+  );
+}
+
+function RefreshIcon({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg
+      className={spinning ? 'icon-spin' : undefined}
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3.5 12a8.5 8.5 0 0 1 14.5-6M20.5 12a8.5 8.5 0 0 1-14.5 6" />
+      <path d="M18 3v4h-4M6 21v-4h4" />
     </svg>
   );
 }
@@ -367,7 +387,10 @@ export default function App() {
   if (authState === 'checking') {
     return (
       <div className="center-screen">
-        <p className="muted">Cargando…</p>
+        <div className="screen-content">
+          <p className="muted">Cargando…</p>
+        </div>
+        <Footer />
       </div>
     );
   }
@@ -379,13 +402,16 @@ export default function App() {
   if (authState === 'error') {
     return (
       <div className="login-screen">
-        <div className="login-card">
-          <h1>pomotion</h1>
-          <p className="error">{error ?? 'No se pudo conectar con el servidor'}</p>
-          <button type="button" className="btn btn-filled" onClick={() => void refresh()} disabled={loading}>
-            {loading ? 'Reintentando…' : 'Reintentar'}
-          </button>
+        <div className="screen-content">
+          <div className="login-card">
+            <h1>pomotion</h1>
+            <p className="error">{error ?? 'No se pudo conectar con el servidor'}</p>
+            <button type="button" className="btn btn-filled" onClick={() => void refresh()} disabled={loading}>
+              {loading ? 'Reintentando…' : 'Reintentar'}
+            </button>
+          </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -403,11 +429,13 @@ export default function App() {
           {themeToggleButton}
           <button
             type="button"
-            className="btn btn-plain"
+            className="btn btn-icon"
             onClick={() => void refresh(data?.selectedDay ?? undefined, data?.week)}
             disabled={loading}
+            title="Actualizar"
+            aria-label="Actualizar"
           >
-            {loading ? 'Actualizando…' : 'Actualizar'}
+            <RefreshIcon spinning={loading} />
           </button>
           <button type="button" className="btn btn-plain" onClick={() => void handleLogout()}>
             Salir
@@ -447,6 +475,7 @@ export default function App() {
               onNextWeek={() => data.nextWeekLabel && guardedGoToWeek(data.nextWeekLabel)}
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
               onAddWeek={() => void handleRequestAddWeek()}
+              loading={loading}
             />
             {totalMinutesToday > 0 && (
               <div className="total-pill" title="Total registrado este día">
@@ -504,6 +533,8 @@ export default function App() {
           </footer>
         </>
       )}
+
+      <Footer />
 
       {pendingSwitch && (
         <ConfirmDialog

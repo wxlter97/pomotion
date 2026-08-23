@@ -239,14 +239,22 @@ h3 {
 
 /* --- Login --- */
 .center-screen {
-  height: 100%;
+  min-height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
 }
 
 .login-screen {
-  height: 100%;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Contenido centrado que deja lugar abajo para el footer, en pantallas de
+ * un solo bloque (login, error, cargando) que hoy centraban con
+ * align-items/justify-content directo en el contenedor de altura completa. */
+.screen-content {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -361,10 +369,21 @@ h3 {
 .day-tabs {
   display: flex;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Un poco de aire a los lados para que el tab centrado no quede pegado
+   * al borde del contenedor con scroll. */
+  padding: 0.15rem 0.05rem;
+}
+
+.day-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .day-tab {
+  flex: 0 0 auto;
   font-family: inherit;
   border: none;
   cursor: pointer;
@@ -375,6 +394,11 @@ h3 {
   font-size: 0.85rem;
   font-weight: 500;
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.day-tab:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .day-tab.active {
@@ -883,6 +907,42 @@ kbd {
   padding: 0.08rem 0.4rem;
   font-family: inherit;
   font-size: 0.74rem;
+}
+
+/* --- Footer (nombre de la app, en todas las pantallas) --- */
+.app-footer {
+  text-align: center;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  color: var(--color-label-secondary);
+  font-size: 0.72rem;
+  opacity: 0.7;
+}
+
+/* --- Ícono de refrescar girando mientras carga --- */
+.icon-spin {
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- Spinner pequeño junto a la etiqueta de semana mientras carga --- */
+.spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-left: 0.4rem;
+  border: 1.5px solid var(--color-separator);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: icon-spin 0.7s linear infinite;
+  vertical-align: middle;
 }
 
 @media (prefers-reduced-motion: reduce) {

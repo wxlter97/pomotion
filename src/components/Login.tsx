@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { login } from '../api';
+import Footer from './Footer';
 
 export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [password, setPassword] = useState('');
@@ -38,22 +39,25 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
 
   return (
     <div className="login-screen">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <h1>pomotion</h1>
-        <p className="muted">Ingresa la contraseña para continuar</p>
-        <input
-          type="password"
-          autoFocus
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Contraseña"
-        />
-        {error && <p className="error">{error}</p>}
-        <button type="submit" className="btn btn-filled btn-large" disabled={loading || password.length === 0}>
-          {loading ? 'Entrando…' : 'Entrar'}
-        </button>
-      </form>
+      <div className="screen-content">
+        <form className="login-card" onSubmit={handleSubmit}>
+          <h1>pomotion</h1>
+          <p className="muted">Ingresa la contraseña para continuar</p>
+          <input
+            type="password"
+            autoFocus
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Contraseña"
+          />
+          {error && <p className="error">{error}</p>}
+          <button type="submit" className="btn btn-filled btn-large" disabled={loading || password.length === 0}>
+            {loading ? 'Entrando…' : 'Entrar'}
+          </button>
+        </form>
+      </div>
+      <Footer />
     </div>
   );
 }
