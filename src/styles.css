@@ -339,6 +339,13 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  /* Sin min-width:0 un flex item no se encoge por debajo del ancho
+   * intrínseco de su contenido — con muchos días, .day-tabs empujaría
+   * todo el layout (y la página entera) más ancho que el viewport en
+   * vez de quedarse dentro del ancho de las cards de abajo y scrollear
+   * internamente. */
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .week-nav {
@@ -373,6 +380,7 @@ h3 {
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  min-width: 0;
   /* Un poco de aire a los lados para que el tab centrado no quede pegado
    * al borde del contenedor con scroll. */
   padding: 0.15rem 0.05rem;
