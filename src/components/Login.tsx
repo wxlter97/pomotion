@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { login } from '../api';
 
 export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
@@ -6,8 +6,8 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function performLogin() {
+    if (loading || password.length === 0) return;
     setLoading(true);
     setError(null);
     try {
@@ -17,6 +17,22 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
       setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    void performLogin();
+  }
+
+  // No depender solo del submit implícito del navegador al presionar Enter
+  // (poco fiable entre navegadores/teclados/autocompletado) — se maneja
+  // explícito acá, y se cancela el default para no disparar el submit del
+  // form dos veces.
+  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void performLogin();
     }
   }
 
@@ -30,6 +46,7 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
           autoFocus
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Contraseña"
         />
         {error && <p className="error">{error}</p>}
