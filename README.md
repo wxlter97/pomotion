@@ -51,6 +51,10 @@ Formato esperado dentro de esa página (ver spec del proyecto):
 - `heading_3`: encabezado de día, ej. `Lunes`, `Martes`
 - `to_do`: cada tarea
 
+Los días pueden estar como hermanos planos del `heading_1`, o metidos en un
+layout de columnas de Notion (un `column_list` con un `column` por día,
+cada uno con su `heading_3` + `to_do` adentro) — la app soporta ambos casos.
+
 ## 4. Variables de entorno
 
 Copia `.env.example` a `.env` para desarrollo local, y configura las mismas
@@ -67,15 +71,23 @@ en Vercel (**Project Settings → Environment Variables**) para producción:
 
 ```bash
 npm install
-npm i -g vercel   # si no lo tienes
-vercel dev        # sirve /api en :3000 (usa tu .env)
+npm run dev:api     # sirve /api en :3000 (lee .env con dotenv)
 ```
 
 En otra terminal:
 
 ```bash
-npm run dev        # sirve el frontend en :5173, con proxy de /api → :3000
+npm run dev          # sirve el frontend en :5173, con proxy de /api → :3000
 ```
+
+`dev:api` levanta un servidor local mínimo ([scripts/dev-api-server.ts](scripts/dev-api-server.ts))
+que monta los mismos archivos de `/api` sin pasar por el CLI de Vercel —
+evita tener que loguearte a una cuenta de Vercel solo para desarrollar
+localmente. En producción Vercel enruta cada archivo de `/api`
+directamente; este script no se usa ahí.
+
+Alternativa: si prefieres probar con el runtime real de Vercel,
+`npm i -g vercel && vercel dev` funciona igual de bien (requiere login).
 
 Abre `http://localhost:5173`.
 

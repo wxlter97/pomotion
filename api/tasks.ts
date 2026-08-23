@@ -43,6 +43,33 @@ function richTextOf(block: NotionBlock): { plain_text?: string }[] | undefined {
   return content?.rich_text;
 }
 
+/**
+ * La plantilla real organiza cada semana en columnas de Notion (un
+ * `column_list` con un `column` por día), en vez de heading_3/to_do como
+ * hermanos planos. Esto "aplana" esa estructura recursivamente para que el
+ * agrupado por día funcione igual sin importar cuál de las dos formas use
+ * la página. Solo se llama sobre la semana activa (no sobre todo el
+ * historial), para no multiplicar las llamadas a la API de Notion.
+ */
+async function expandColumns(blocks: NotionBlock[], depth = 0): Promise<NotionBlock[]> {
+  if (depth > 3) return blocks;
+  const expanded: NotionBlock[] = [];
+  for (const block of blocks) {
+    if (block.type === 'column_list' && block.has_children) {
+      const columns = await listBlockChildren(block.id);
+      for (const column of columns) {
+        if (column.type === 'column' && column.has_children) {
+          const columnChildren = await listBlockChildren(column.id);
+          expanded.push(...(await expandColumns(columnChildren, depth + 1)));
+        }
+      }
+    } else {
+      expanded.push(block);
+    }
+  }
+  return expanded;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -75,19 +102,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const today = todayDateStringInTz(TIMEZONE);
-    let activeWeek = weeks.find((w) => w.range && isDateInRange(today, w.range.start, w.range.end));
+    // Un rango solo es válido si start <= end (protege contra encabezados con
+    // typos, ej. "2026.08.03 - 2026.03.07").
+    const hasValidRange = (w: WeekGroup): w is WeekGroup & { range: { start: string; end: string } } =>
+      Boolean(w.range) && w.range!.start <= w.range!.end;
+
+    let activeWeek = weeks.find((w) => hasValidRange(w) && isDateInRange(today, w.range.start, w.range.end));
     const weekMatched = Boolean(activeWeek);
     if (!activeWeek) {
-      // Fallback transparente: la más reciente que tenga rango parseable, o la última si ninguna lo tiene.
-      activeWeek =
-        [...weeks].reverse().find((w) => w.range) ?? weeks[weeks.length - 1];
+      // Sin match exacto (ej. hoy es fin de semana, entre dos semanas):
+      // preferir la semana ya terminada más reciente; si todas las semanas
+      // con rango válido son futuras, la más próxima a empezar; si ninguna
+      // semana tiene rango parseable, la primera del documento (por
+      // posición, normalmente la más reciente en esta plantilla).
+      const validRanged = weeks.filter(hasValidRange);
+      const past = validRanged.filter((w) => w.range.end < today);
+      const future = validRanged.filter((w) => w.range.start > today);
+      if (past.length > 0) {
+        activeWeek = past.reduce((a, b) => (a.range.end > b.range.end ? a : b));
+      } else if (future.length > 0) {
+        activeWeek = future.reduce((a, b) => (a.range.start < b.range.start ? a : b));
+      } else {
+        activeWeek = weeks[0];
+      }
     }
 
     // 2. Dentro de la semana activa, agrupar to_do por heading_3 (día).
+    //    (aplanando columnas si la semana usa layout de columnas por día)
+    const activeWeekBlocks = await expandColumns(activeWeek.blocks);
     const dayOrder: string[] = [];
     const dayBlocks = new Map<string, NotionBlock[]>();
     let currentDayLabel: string | null = null;
-    for (const block of activeWeek.blocks) {
+    for (const block of activeWeekBlocks) {
       if (block.type === 'heading_3') {
         currentDayLabel = plainText(richTextOf(block));
         if (currentDayLabel && !dayOrder.includes(currentDayLabel)) {
