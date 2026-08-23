@@ -1,4 +1,5 @@
 export type Session = {
+  blockId: string | undefined;
   durationMinutes: number;
   start: string;
   end: string;
@@ -22,3 +23,6 @@ export type TasksResponse = {
 };
 
 export type TimerMode = 'pomodoro' | 'free';
+export type TimerPhase = 'idle' | 'work' | 'break';
+
+export type Theme = 'light' | 'dark';

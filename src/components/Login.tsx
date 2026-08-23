@@ -33,7 +33,7 @@ export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
           placeholder="Contraseña"
         />
         {error && <p className="error">{error}</p>}
-        <button type="submit" disabled={loading || password.length === 0}>
+        <button type="submit" className="btn btn-filled btn-large" disabled={loading || password.length === 0}>
           {loading ? 'Entrando…' : 'Entrar'}
         </button>
       </form>

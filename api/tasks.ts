@@ -172,11 +172,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const text = plainText(content?.rich_text);
         const checked = Boolean(content?.checked);
 
-        let sessions: { durationMinutes: number; start: string; end: string }[] = [];
+        let sessions: { blockId: string; durationMinutes: number; start: string; end: string }[] = [];
         if (block.has_children) {
           const children = await listBlockChildren(block.id);
           sessions = children
-            .map((child) => parseSessionText(plainText(richTextOf(child))))
+            .map((child) => {
+              const parsed = parseSessionText(plainText(richTextOf(child)));
+              return parsed ? { ...parsed, blockId: child.id } : null;
+            })
             .filter((s): s is NonNullable<typeof s> => s !== null);
         }
 

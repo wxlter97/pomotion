@@ -56,7 +56,7 @@ const server = http.createServer(async (req, res) => {
   });
 
   const body =
-    req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT'
+    req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' || req.method === 'DELETE'
       ? await readJsonBody(req)
       : undefined;
 

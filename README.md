@@ -4,11 +4,25 @@ Timer (pomodoro y libre) que jala las tareas del día/semana actual desde una
 plantilla de Notion, y al detener el timer escribe la sesión de vuelta a
 Notion como bloque hijo del `to_do` correspondiente.
 
-- **Frontend:** React + Vite.
+- **Frontend:** React + Vite, con un diseño inspirado en Apple HIG (botones
+  pill, segmented control, sheets con blur, tema claro/oscuro).
 - **Backend:** funciones serverless de Vercel (`/api`) que actúan de proxy
   hacia la API de Notion — el token nunca se expone al cliente.
 - **Auth:** contraseña compartida simple (cookie de sesión firmada).
 - **Costo:** $0, todo en tiers gratuitos de Vercel.
+
+**Además del flujo base (ver spec del proyecto):**
+- Total de minutos registrados del día, visible arriba de la lista.
+- El timer activo se persiste en `localStorage` (sobrevive un refresh o
+  cierre accidental de tab) con limpieza automática si es de un día
+  calendario distinto o demasiado viejo.
+- Confirmación antes de cancelar un timer activo al cambiar de tarea o de día.
+- Botón para eliminar una sesión mal registrada (borra el bloque en Notion).
+- Título de la pestaña con el countdown en vivo, anillo de progreso visual.
+- Atajos de teclado: `espacio` inicia/detiene, `1`–`5` cambia de día, `T`
+  cambia el tema.
+- Favicon + manifest básico (ícono generado con
+  [scripts/gen-icons.mjs](scripts/gen-icons.mjs), sin dependencias).
 
 ## 1. Crear la integración de Notion
 

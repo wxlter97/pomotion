@@ -1,15 +1,47 @@
-:root {
-  --bg: #0f1115;
-  --surface: #171a21;
-  --surface-2: #1e222b;
-  --border: #2a2f3a;
-  --text: #e8eaed;
-  --text-muted: #8a8f9c;
-  --accent: #ff6b4a;
-  --accent-2: #4ade80;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+/* ---------------------------------------------------------------------
+ * Tokens — inspirados en las paletas semánticas de Apple HIG
+ * (systemBackground, label, systemFill, systemOrange/Red/Green, etc).
+ * Definidos en :root (claro, default) y sobreescritos en [data-theme=dark].
+ * El tema se decide en JS (useTheme.ts) + un script inline en index.html
+ * para evitar el flash antes de que React monte.
+ * ------------------------------------------------------------------- */
+
+:root,
+:root[data-theme='light'] {
+  --color-bg: #f2f2f7;
+  --color-bg-elevated: #ffffff;
+  --color-fill: #e9e9ee;
+  --color-fill-strong: #dcdce2;
+  --color-label: #1c1c1e;
+  --color-label-secondary: #6c6c70;
+  --color-separator: rgba(60, 60, 67, 0.29);
+  --color-accent: #ff5f3d;
+  --color-accent-contrast: #ffffff;
+  --color-destructive: #ff3b30;
+  --color-success: #34c759;
+  --color-warning-bg: #fff2d6;
+  --color-warning-fg: #a15c00;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --shadow-sheet: 0 24px 60px rgba(0, 0, 0, 0.25);
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #000000;
+  --color-bg-elevated: #1c1c1e;
+  --color-fill: #2c2c2e;
+  --color-fill-strong: #3a3a3c;
+  --color-label: #f5f5f7;
+  --color-label-secondary: rgba(235, 235, 245, 0.6);
+  --color-separator: rgba(84, 84, 88, 0.6);
+  --color-accent: #ff7a52;
+  --color-accent-contrast: #1c1c1e;
+  --color-destructive: #ff453a;
+  --color-success: #30d158;
+  --color-warning-bg: #3a2c00;
+  --color-warning-fg: #ffd60a;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-sheet: 0 24px 60px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 
@@ -25,70 +57,147 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--color-bg);
+  color: var(--color-label);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', 'Helvetica Neue',
+    Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 0.5rem 0.9rem;
-  font-size: 0.9rem;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-button:hover:not(:disabled) {
-  border-color: var(--accent);
-}
-
-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-button.danger {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: white;
-}
-
-input {
-  font-family: inherit;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 0.6rem 0.8rem;
-  font-size: 1rem;
+h1,
+h2,
+h3 {
+  letter-spacing: -0.01em;
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--color-label-secondary);
 }
 
 .error {
-  color: var(--danger);
+  color: var(--color-destructive);
 }
 
 .banner {
-  padding: 0.6rem 1rem;
-  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  border-radius: 14px;
   margin: 0 1.5rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
 
 .error.banner {
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+  color: var(--color-destructive);
 }
 
 .warning.banner {
-  background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.3);
-  color: #fbbf24;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-fg);
+}
+
+/* ---------------------------------------------------------------------
+ * Botones — estilos "filled / tinted / plain / destructive / icon",
+ * como los button styles de HIG. Pill-shaped (border-radius 980px).
+ * ------------------------------------------------------------------- */
+
+.btn {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 980px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: transform 0.1s ease, opacity 0.15s ease, background-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-filled {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.btn-tinted {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+}
+
+.btn-plain {
+  background: transparent;
+  color: var(--color-accent);
+  padding: 0.55rem 0.8rem;
+}
+
+.btn-destructive {
+  background: var(--color-destructive);
+  color: white;
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--color-fill);
+  color: var(--color-label);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-large {
+  padding: 0.9rem 2rem;
+  font-size: 1.02rem;
+  min-width: 180px;
+}
+
+/* ---------------------------------------------------------------------
+ * Segmented control (modo Pomodoro/Libre) — estilo UISegmentedControl.
+ * ------------------------------------------------------------------- */
+
+.segmented-control {
+  display: inline-flex;
+  background: var(--color-fill);
+  border-radius: 11px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.segment {
+  border: none;
+  background: transparent;
+  padding: 0.45rem 1.15rem;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-label-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.segment.active {
+  background: var(--color-bg-elevated);
+  color: var(--color-label);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.segment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* --- Login --- */
@@ -108,65 +217,88 @@ input {
 }
 
 .login-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2rem;
+  background: var(--color-bg-elevated);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
+  padding: 2.25rem 2rem;
   width: 100%;
   max-width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0.85rem;
+  text-align: center;
 }
 
 .login-card h1 {
   margin: 0;
-  color: var(--accent);
+  color: var(--color-accent);
+  font-size: 1.6rem;
 }
 
-.login-card button {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  font-weight: 600;
+.login-card input {
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.login-card input:focus {
+  outline: none;
+  border-color: var(--color-accent);
 }
 
 /* --- App shell --- */
 .app {
-  max-width: 960px;
+  max-width: 980px;
   margin: 0 auto;
-  padding-bottom: 3rem;
+  padding-bottom: 2rem;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 .app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.25rem 1.5rem;
+  padding: calc(1.25rem + env(safe-area-inset-top)) 1.5rem 1.25rem;
 }
 
 .app-header h1 {
-  color: var(--accent);
+  color: var(--color-accent);
   margin: 0;
   font-size: 1.4rem;
+  font-weight: 700;
 }
 
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
-/* --- Day selector --- */
-.day-selector {
+/* --- Day row (selector de día + total) --- */
+.day-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
   padding: 0 1.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+.day-selector {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
 .week-label {
-  color: var(--text-muted);
-  font-size: 0.85rem;
+  color: var(--color-label-secondary);
+  font-size: 0.82rem;
 }
 
 .day-tabs {
@@ -175,17 +307,55 @@ input {
   flex-wrap: wrap;
 }
 
+.day-tab {
+  font-family: inherit;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem 0.9rem;
+  border-radius: 980px;
+  background: var(--color-fill);
+  color: var(--color-label);
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
 .day-tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+.total-pill {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  background: var(--color-fill);
+  padding: 0.4rem 0.9rem;
+  border-radius: 980px;
+  white-space: nowrap;
+}
+
+.total-pill-label {
+  font-size: 0.68rem;
+  color: var(--color-label-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.total-pill-value {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- Layout --- */
 .main-grid {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
-  gap: 1.5rem;
+  gap: 1.25rem;
   padding: 0 1.5rem;
 }
 
@@ -195,11 +365,10 @@ input {
   }
 }
 
-.tasks-panel,
-.timer-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+.card {
+  background: var(--color-bg-elevated);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
   padding: 1.25rem;
 }
 
@@ -225,30 +394,42 @@ input {
   align-items: center;
   gap: 0.6rem;
   text-align: left;
-  background: var(--surface-2);
+  background: var(--color-fill);
+  border: 2px solid transparent;
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--color-label);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.task-item:active {
+  background: var(--color-fill-strong);
 }
 
 .task-item.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-fill));
 }
 
 .task-check {
-  width: 1.2rem;
-  height: 1.2rem;
-  border-radius: 5px;
-  border: 1px solid var(--border);
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-separator);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   flex-shrink: 0;
+  color: white;
 }
 
 .task-check.checked {
-  background: var(--accent-2);
-  border-color: var(--accent-2);
-  color: #06280f;
+  background: var(--color-success);
+  border-color: var(--color-success);
 }
 
 .task-text {
@@ -257,20 +438,46 @@ input {
 }
 
 .task-total {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-label-secondary);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .session-list {
-  margin: 0.2rem 0 0.6rem 2.4rem;
+  margin: 0.25rem 0 0.6rem 2.6rem;
   padding: 0;
   list-style: none;
-  color: var(--text-muted);
+  color: var(--color-label-secondary);
   font-size: 0.78rem;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+}
+
+.session-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.session-delete {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  font-family: inherit;
+}
+
+.session-delete:hover {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
 }
 
 /* --- Timer --- */
@@ -278,51 +485,155 @@ input {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   text-align: center;
 }
 
-.timer-mode {
+.timer-dial {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  max-width: 100%;
   display: flex;
-  gap: 0.4rem;
+  align-items: center;
+  justify-content: center;
 }
 
-.mode-tab.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+.progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.progress-ring-track {
+  stroke: var(--color-fill);
+}
+
+.progress-ring-fill {
+  stroke: var(--color-accent);
+  transition: stroke-dashoffset 0.25s linear;
+}
+
+.progress-ring-pulse .progress-ring-fill {
+  animation: ring-pulse 2.2s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes ring-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .timer-clock {
-  font-size: 3.2rem;
+  font-size: 2.6rem;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  letter-spacing: 0.02em;
-}
-
-.timer-clock.phase-work {
-  color: var(--accent);
-}
-
-.timer-clock.phase-break {
-  color: var(--accent-2);
+  letter-spacing: -0.02em;
+  color: var(--color-label);
 }
 
 .timer-phase-label {
-  color: var(--text-muted);
+  color: var(--color-label-secondary);
   font-size: 0.85rem;
   min-height: 1.2em;
   word-break: break-word;
+  max-width: 260px;
 }
 
-.timer-actions button {
-  font-size: 1rem;
-  padding: 0.6rem 1.4rem;
-  font-weight: 600;
+.timer-actions {
+  display: flex;
+  justify-content: center;
 }
 
-.timer-actions button:not(.danger) {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
+/* --- Confirm dialog / sheet --- */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 100;
+  animation: fade-in 0.15s ease;
+}
+
+.sheet {
+  background: var(--color-bg-elevated);
+  border-radius: 20px;
+  padding: 1.5rem;
+  max-width: 340px;
+  width: 100%;
+  box-shadow: var(--shadow-sheet);
+  animation: sheet-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.sheet h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.sheet p {
+  margin: 0 0 1.35rem;
+  color: var(--color-label-secondary);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Shortcuts footer --- */
+.shortcuts-hint {
+  text-align: center;
+  padding: 1.75rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  color: var(--color-label-secondary);
+  font-size: 0.76rem;
+}
+
+kbd {
+  background: var(--color-fill);
+  border: 1px solid var(--color-separator);
+  border-radius: 5px;
+  padding: 0.08rem 0.4rem;
+  font-family: inherit;
+  font-size: 0.74rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

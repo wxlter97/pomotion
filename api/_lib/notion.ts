@@ -67,3 +67,8 @@ export async function appendBlockChildren(
     body: JSON.stringify({ children }),
   });
 }
+
+/** Archiva (borra) un bloque — usado para quitar una sesión mal registrada. */
+export async function deleteBlock(blockId: string): Promise<unknown> {
+  return notionFetch(`/blocks/${blockId}`, { method: 'DELETE' });
+}

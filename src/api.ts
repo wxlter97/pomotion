@@ -45,8 +45,15 @@ export function postSession(payload: {
   start_time: string;
   end_time: string;
 }) {
-  return request<{ ok: true; session: { durationMinutes: number; start: string; end: string } }>(
-    '/api/session',
-    { method: 'POST', body: JSON.stringify(payload) }
-  );
+  return request<{
+    ok: true;
+    session: { blockId?: string; durationMinutes: number; start: string; end: string };
+  }>('/api/session', { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function deleteSession(blockId: string) {
+  return request<{ ok: true }>('/api/session', {
+    method: 'DELETE',
+    body: JSON.stringify({ block_id: blockId }),
+  });
 }

@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { postSession } from '../api';
-import type { Session, Task, TimerMode } from '../types';
+import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
+import type { Session, Task, TimerMode, TimerPhase } from '../types';
+import ProgressRing from './ProgressRing';
 
 const WORK_MS = 25 * 60 * 1000;
 const BREAK_MS = 5 * 60 * 1000;
 const MIN_LOGGABLE_MS = 30 * 1000; // ignora arranques accidentales de <30s
-
-type Phase = 'idle' | 'work' | 'break';
 
 function formatClock(ms: number): string {
   const clamped = Math.max(0, ms);
@@ -16,29 +16,50 @@ function formatClock(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-export default function Timer({
-  task,
-  onSessionLogged,
-}: {
-  task: Task | null;
-  onSessionLogged: (blockId: string, session: Session) => void;
-}) {
+export type TimerHandle = {
+  start: () => void;
+  stop: () => void;
+};
+
+const Timer = forwardRef<
+  TimerHandle,
+  {
+    task: Task | null;
+    onSessionLogged: (blockId: string, session: Session) => void;
+    onPhaseChange?: (phase: TimerPhase) => void;
+  }
+>(function Timer({ task, onSessionLogged, onPhaseChange }, ref) {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
 
   const taskRef = useRef(task);
+  const restoredRef = useRef(false);
+
+  // Restaura un timer en curso guardado en localStorage (refresh, tab
+  // cerrada por accidente, celular que se bloqueó) apenas la tarea
+  // correspondiente esté disponible. Solo se intenta una vez.
+  useEffect(() => {
+    if (restoredRef.current || !task) return;
+    restoredRef.current = true;
+    const persisted = loadActiveTimer();
+    if (persisted && persisted.taskBlockId === task.blockId) {
+      setMode(persisted.mode);
+      setPhase(persisted.phase);
+      setStartedAt(persisted.startedAt);
+      setNow(Date.now());
+    }
+  }, [task]);
+
   useEffect(() => {
     const prev = taskRef.current;
     taskRef.current = task;
     if (phase !== 'idle' && prev?.blockId !== task?.blockId) {
       setPhase('idle');
       setStartedAt(null);
-      setInfo('Timer cancelado: cambiaste de tarea sin guardar la sesión en curso.');
     }
   }, [task, phase]);
 
@@ -47,6 +68,35 @@ export default function Timer({
     const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [phase]);
+
+  // Persistir/limpiar el timer activo en localStorage.
+  useEffect(() => {
+    if (task && startedAt != null && (phase === 'work' || phase === 'break')) {
+      saveActiveTimer({ taskBlockId: task.blockId, taskText: task.text, mode, phase, startedAt, day: task.day });
+    } else if (phase === 'idle') {
+      clearActiveTimer();
+    }
+  }, [task, phase, startedAt, mode]);
+
+  // Título de la pestaña con el countdown, para ver el progreso sin cambiar de tab.
+  useEffect(() => {
+    if (phase === 'idle') {
+      document.title = 'pomotion';
+      return;
+    }
+    const elapsed = startedAt != null ? now - startedAt : 0;
+    const remaining = mode === 'pomodoro' ? (phase === 'work' ? WORK_MS : BREAK_MS) - elapsed : elapsed;
+    const label = mode === 'pomodoro' ? formatClock(remaining) : formatClock(elapsed);
+    const icon = phase === 'break' ? '☕' : '⏱';
+    document.title = `${icon} ${label} · pomotion`;
+    return () => {
+      document.title = 'pomotion';
+    };
+  }, [phase, now, startedAt, mode]);
+
+  useEffect(() => {
+    onPhaseChange?.(phase);
+  }, [phase, onPhaseChange]);
 
   async function finishWork(natural: boolean) {
     const currentTask = taskRef.current;
@@ -67,7 +117,6 @@ export default function Timer({
     const durationMinutes = Math.max(1, Math.round(elapsedMs / 60000));
     setPosting(true);
     setError(null);
-    setInfo(null);
     try {
       const res = await postSession({
         block_id: currentTask.blockId,
@@ -75,7 +124,12 @@ export default function Timer({
         start_time: new Date(startedAt).toISOString(),
         end_time: new Date(endedAt).toISOString(),
       });
-      onSessionLogged(currentTask.blockId, res.session);
+      onSessionLogged(currentTask.blockId, {
+        blockId: res.session.blockId,
+        durationMinutes: res.session.durationMinutes,
+        start: res.session.start,
+        end: res.session.end,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar la sesión en Notion');
     } finally {
@@ -107,7 +161,6 @@ export default function Timer({
   function start() {
     if (!task || phase !== 'idle') return;
     setError(null);
-    setInfo(null);
     setPhase('work');
     setStartedAt(Date.now());
     setNow(Date.now());
@@ -122,22 +175,22 @@ export default function Timer({
     }
   }
 
+  useImperativeHandle(ref, () => ({ start, stop }));
+
   const elapsed = startedAt != null ? now - startedAt : 0;
-  const displayMs =
-    mode === 'pomodoro'
-      ? phase === 'work'
-        ? WORK_MS - elapsed
-        : phase === 'break'
-          ? BREAK_MS - elapsed
-          : WORK_MS
-      : elapsed;
+  const totalMs = mode === 'pomodoro' ? (phase === 'break' ? BREAK_MS : WORK_MS) : 0;
+  const remainingMs = totalMs - elapsed;
+  const displayMs = mode === 'pomodoro' ? (phase === 'idle' ? WORK_MS : remainingMs) : elapsed;
+  const ringProgress = mode === 'pomodoro' ? (phase === 'idle' ? 1 : Math.max(0, remainingMs / totalMs)) : 1;
 
   return (
     <div className="timer">
-      <div className="timer-mode">
+      <div className="segmented-control" role="tablist" aria-label="Modo de timer">
         <button
           type="button"
-          className={mode === 'pomodoro' ? 'mode-tab active' : 'mode-tab'}
+          role="tab"
+          aria-selected={mode === 'pomodoro'}
+          className={mode === 'pomodoro' ? 'segment active' : 'segment'}
           disabled={phase !== 'idle'}
           onClick={() => setMode('pomodoro')}
         >
@@ -145,7 +198,9 @@ export default function Timer({
         </button>
         <button
           type="button"
-          className={mode === 'free' ? 'mode-tab active' : 'mode-tab'}
+          role="tab"
+          aria-selected={mode === 'free'}
+          className={mode === 'free' ? 'segment active' : 'segment'}
           disabled={phase !== 'idle'}
           onClick={() => setMode('free')}
         >
@@ -153,33 +208,38 @@ export default function Timer({
         </button>
       </div>
 
-      <div className={`timer-clock phase-${phase}`}>{formatClock(displayMs)}</div>
+      <div className="timer-dial">
+        <ProgressRing progress={ringProgress} pulse={mode === 'free' && phase === 'work'} />
+        <div className={`timer-clock phase-${phase}`}>{formatClock(displayMs)}</div>
+      </div>
+
       <p className="timer-phase-label">
         {phase === 'idle' && (task ? 'Listo para iniciar' : 'Selecciona una tarea')}
-        {phase === 'work' && (task ? `Trabajando en: ${task.text}` : 'Trabajando')}
+        {phase === 'work' && (task ? task.text : 'Trabajando')}
         {phase === 'break' && 'Descanso'}
       </p>
 
       <div className="timer-actions">
         {phase === 'idle' && (
-          <button type="button" onClick={start} disabled={!task}>
+          <button type="button" className="btn btn-filled btn-large" onClick={start} disabled={!task}>
             Iniciar
           </button>
         )}
         {phase === 'work' && (
-          <button type="button" className="danger" onClick={stop} disabled={posting}>
+          <button type="button" className="btn btn-destructive btn-large" onClick={stop} disabled={posting}>
             {posting ? 'Guardando…' : 'Detener'}
           </button>
         )}
         {phase === 'break' && (
-          <button type="button" onClick={stop}>
+          <button type="button" className="btn btn-tinted btn-large" onClick={stop}>
             Saltar descanso
           </button>
         )}
       </div>
 
       {error && <p className="error">{error}</p>}
-      {info && <p className="muted">{info}</p>}
     </div>
   );
-}
+});
+
+export default Timer;
