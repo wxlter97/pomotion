@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createWeek, getNextWeekSuggestion, getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
+import DismissibleBanner from './components/DismissibleBanner';
 import Login from './components/Login';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
@@ -417,15 +418,18 @@ export default function App() {
       {error && <p className="error banner">{error}</p>}
       {addWeekError && <p className="error banner">{addWeekError}</p>}
       {data && data.weekSource === 'auto-fallback' && (
-        <p className="warning banner">
-          No pude identificar automáticamente la semana actual por fecha — mostrando "{data.week}".
-          Revisa el formato del encabezado en Notion si esto no es correcto.
-        </p>
+        <DismissibleBanner
+          key={`week-fallback-${data.week}`}
+          tone="warning"
+          message={`No pude identificar automáticamente la semana actual por fecha — mostrando "${data.week}". Revisa el formato del encabezado en Notion si esto no es correcto.`}
+        />
       )}
       {data && !data.dayMatched && (
-        <p className="warning banner">
-          No encontré el día de hoy en esta semana — mostrando "{data.selectedDay}" por defecto.
-        </p>
+        <DismissibleBanner
+          key={`day-fallback-${data.week}-${data.selectedDay}`}
+          tone="warning"
+          message={`No encontré el día de hoy en esta semana — mostrando "${data.selectedDay}" por defecto.`}
+        />
       )}
 
       {data && (

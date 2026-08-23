@@ -98,6 +98,38 @@ h3 {
   color: var(--color-warning-fg);
 }
 
+.dismissible-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.dismissible-banner.fading {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.banner-dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.banner-dismiss:hover {
+  opacity: 1;
+}
+
 /* ---------------------------------------------------------------------
  * Botones — estilos "filled / tinted / plain / destructive / icon",
  * como los button styles de HIG. Pill-shaped (border-radius 980px).
