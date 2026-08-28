@@ -7,6 +7,7 @@ import {
   updateSession,
   updateTaskText,
 } from '../api';
+import { addMinutesToTime, nowAsHHMM, parseDurationToMinutes } from '../duration';
 import type { Session, Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 
@@ -212,11 +213,11 @@ export default function TaskList({
   }
 
   function validateDraft(draft: SessionDraft): { duration: number; start: string; end: string } | null {
-    const duration = Number(draft.duration);
+    const duration = parseDurationToMinutes(draft.duration);
     const start = draft.start.trim();
     const end = draft.end.trim();
-    if (!Number.isFinite(duration) || duration <= 0) {
-      setError('La duración debe ser un número mayor a 0');
+    if (duration === null || duration <= 0) {
+      setError('La duración debe ser un número mayor a 0 o un formato tipo "1h 30m 45s"');
       return null;
     }
     if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
@@ -224,6 +225,33 @@ export default function TaskList({
       return null;
     }
     return { duration, start, end };
+  }
+
+  // Calcula la hora de fin a partir de inicio + duración; devuelve null si
+  // todavía no hay suficiente información válida para calcularla (para que
+  // el llamador deje el campo `end` tal cual estaba, sin pisarlo).
+  function deriveEnd(start: string, durationInput: string): string | null {
+    const minutes = parseDurationToMinutes(durationInput);
+    if (minutes === null || minutes <= 0) return null;
+    const trimmedStart = start.trim();
+    if (!TIME_RE.test(trimmedStart)) return null;
+    return addMinutesToTime(trimmedStart, minutes);
+  }
+
+  function handleSessionDurationChange(value: string) {
+    setSessionDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
+  }
+
+  function handleSessionStartChange(value: string) {
+    setSessionDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
+  }
+
+  function handleManualDurationChange(value: string) {
+    setManualDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
+  }
+
+  function handleManualStartChange(value: string) {
+    setManualDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
   }
 
   async function submitSessionEdit(taskBlockId: string, sessionBlockId: string) {
@@ -244,7 +272,7 @@ export default function TaskList({
 
   function openManualEntry(task: Task) {
     setManualEntryTaskId(task.blockId);
-    setManualDraft({ duration: '', start: '', end: '' });
+    setManualDraft({ duration: '', start: nowAsHHMM(), end: '' });
   }
 
   async function submitManualEntry(task: Task) {
@@ -398,11 +426,11 @@ export default function TaskList({
                             {isEditingSession ? (
                               <div className="session-edit-form">
                                 <input
-                                  type="number"
-                                  min="1"
+                                  type="text"
+                                  placeholder="90 o 1h 30m"
                                   className="session-edit-duration"
                                   value={sessionDraft.duration}
-                                  onChange={(e) => setSessionDraft((d) => ({ ...d, duration: e.target.value }))}
+                                  onChange={(e) => handleSessionDurationChange(e.target.value)}
                                   disabled={savingSession}
                                   autoFocus
                                 />
@@ -412,7 +440,7 @@ export default function TaskList({
                                   placeholder="HH:MM"
                                   className="session-edit-time"
                                   value={sessionDraft.start}
-                                  onChange={(e) => setSessionDraft((d) => ({ ...d, start: e.target.value }))}
+                                  onChange={(e) => handleSessionStartChange(e.target.value)}
                                   disabled={savingSession}
                                 />
                                 <span>–</span>
@@ -423,6 +451,7 @@ export default function TaskList({
                                   value={sessionDraft.end}
                                   onChange={(e) => setSessionDraft((d) => ({ ...d, end: e.target.value }))}
                                   disabled={savingSession}
+                                  title="Se calcula a partir de inicio + duración, pero puedes editarla"
                                 />
                                 <span>)</span>
                                 <button
@@ -486,12 +515,11 @@ export default function TaskList({
                   {manualEntryTaskId === task.blockId ? (
                     <div className="manual-session-form">
                       <input
-                        type="number"
-                        min="1"
-                        placeholder="min"
+                        type="text"
+                        placeholder="90 o 1h 30m"
                         className="session-edit-duration"
                         value={manualDraft.duration}
-                        onChange={(e) => setManualDraft((d) => ({ ...d, duration: e.target.value }))}
+                        onChange={(e) => handleManualDurationChange(e.target.value)}
                         disabled={addingManualSession}
                         autoFocus
                       />
@@ -500,7 +528,7 @@ export default function TaskList({
                         placeholder="HH:MM"
                         className="session-edit-time"
                         value={manualDraft.start}
-                        onChange={(e) => setManualDraft((d) => ({ ...d, start: e.target.value }))}
+                        onChange={(e) => handleManualStartChange(e.target.value)}
                         disabled={addingManualSession}
                       />
                       <span>–</span>
@@ -511,6 +539,7 @@ export default function TaskList({
                         value={manualDraft.end}
                         onChange={(e) => setManualDraft((d) => ({ ...d, end: e.target.value }))}
                         disabled={addingManualSession}
+                        title="Se calcula a partir de inicio + duración, pero puedes editarla"
                       />
                       <button
                         type="button"
