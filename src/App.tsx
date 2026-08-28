@@ -546,8 +546,14 @@ export default function App() {
             />
             {totalSecondsToday > 0 && (
               <div className="total-pill" title="Total registrado este día">
-                <span className="total-pill-label">Total</span>
+                <span className="total-pill-label">Día</span>
                 <span className="total-pill-value">{formatDurationLabel(totalSecondsToday)}</span>
+              </div>
+            )}
+            {data.weekTotalSeconds > 0 && (
+              <div className="total-pill" title="Total registrado esta semana">
+                <span className="total-pill-label">Semana</span>
+                <span className="total-pill-value">{formatDurationLabel(data.weekTotalSeconds)}</span>
               </div>
             )}
           </div>

@@ -34,6 +34,7 @@ export type TasksResponse = {
   dayContainerId: string | null;
   dayHeadingBlockId: string | null;
   tasks: Task[];
+  weekTotalSeconds: number;
 };
 
 export type TimerMode = 'pomodoro' | 'free';
