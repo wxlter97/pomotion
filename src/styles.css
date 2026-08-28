@@ -80,6 +80,11 @@ h3 {
   color: var(--color-destructive);
 }
 
+.warning {
+  color: var(--color-warning-fg);
+  font-size: 0.85rem;
+}
+
 .banner {
   padding: 0.7rem 1rem;
   border-radius: 14px;

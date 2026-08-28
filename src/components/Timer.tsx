@@ -116,19 +116,19 @@ const Timer = forwardRef<
       return;
     }
 
-    const durationMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+    const durationSeconds = Math.max(1, Math.round(elapsedMs / 1000));
     setPosting(true);
     setError(null);
     try {
       const res = await postSession({
         block_id: currentTask.blockId,
-        duration_minutes: durationMinutes,
+        duration_seconds: durationSeconds,
         start_time: new Date(startedAt).toISOString(),
         end_time: new Date(endedAt).toISOString(),
       });
       onSessionLogged(currentTask.blockId, {
         blockId: res.session.blockId,
-        durationMinutes: res.session.durationMinutes,
+        durationSeconds: res.session.durationSeconds,
         start: res.session.start,
         end: res.session.end,
       });

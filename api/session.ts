@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { appendBlockChildren, deleteBlock, updateParagraphText } from './_lib/notion.js';
+import { formatDurationLabel, isValidTimeLabel, roundDurationSeconds } from '../shared/duration.js';
 
 const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
-const TIME_RE = /^\d{1,2}:\d{2}$/;
 
 function formatTime(iso: string): string {
   const date = new Date(iso);
@@ -18,15 +18,14 @@ function formatTime(iso: string): string {
   }).format(date);
 }
 
-function formatSessionText(durationMinutes: number, start: string, end: string): string {
-  const rounded = Math.max(1, Math.round(durationMinutes));
-  return `⏱ ${rounded}m (${start}–${end})`;
+function formatSessionText(durationSeconds: number, start: string, end: string): string {
+  return `⏱ ${formatDurationLabel(durationSeconds)} (${start}–${end})`;
 }
 
 async function handleCreate(req: VercelRequest, res: VercelResponse) {
   const body = (req.body ?? {}) as {
     block_id?: string;
-    duration_minutes?: number;
+    duration_seconds?: number;
     // Timer en vivo: horas completas ISO, se formatean con la zona horaria configurada.
     start_time?: string;
     end_time?: string;
@@ -36,7 +35,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   };
   const {
     block_id: blockId,
-    duration_minutes: durationMinutes,
+    duration_seconds: durationSeconds,
     start_time: startTime,
     end_time: endTime,
     start,
@@ -46,8 +45,8 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
   if (!blockId || typeof blockId !== 'string') {
     return res.status(400).json({ error: 'invalid_block_id', message: 'Falta block_id' });
   }
-  if (typeof durationMinutes !== 'number' || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-    return res.status(400).json({ error: 'invalid_duration', message: 'duration_minutes inválido' });
+  if (typeof durationSeconds !== 'number' || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return res.status(400).json({ error: 'invalid_duration', message: 'duration_seconds inválido' });
   }
 
   let startLabel: string;
@@ -56,7 +55,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     startLabel = formatTime(startTime);
     endLabel = formatTime(endTime);
   } else if (start && end) {
-    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+    if (!isValidTimeLabel(start) || !isValidTimeLabel(end)) {
       return res.status(400).json({ error: 'invalid_time', message: 'start/end deben ser "HH:MM"' });
     }
     startLabel = start;
@@ -67,8 +66,8 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
       .json({ error: 'missing_time_range', message: 'Faltan start_time/end_time o start/end' });
   }
 
-  const roundedMinutes = Math.max(1, Math.round(durationMinutes));
-  const text = formatSessionText(roundedMinutes, startLabel, endLabel);
+  const roundedSeconds = roundDurationSeconds(durationSeconds);
+  const text = formatSessionText(roundedSeconds, startLabel, endLabel);
 
   const result = (await appendBlockChildren(blockId, [
     { paragraph: { rich_text: [{ type: 'text', text: { content: text } }] } },
@@ -77,34 +76,34 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
 
   return res.status(200).json({
     ok: true,
-    session: { blockId: sessionBlockId, durationMinutes: roundedMinutes, start: startLabel, end: endLabel },
+    session: { blockId: sessionBlockId, durationSeconds: roundedSeconds, start: startLabel, end: endLabel },
   });
 }
 
 async function handleUpdate(req: VercelRequest, res: VercelResponse) {
   const body = (req.body ?? {}) as {
     block_id?: string;
-    duration_minutes?: number;
+    duration_seconds?: number;
     start?: string;
     end?: string;
   };
-  const { block_id: blockId, duration_minutes: durationMinutes, start, end } = body;
+  const { block_id: blockId, duration_seconds: durationSeconds, start, end } = body;
 
   if (!blockId || typeof blockId !== 'string') {
     return res.status(400).json({ error: 'invalid_block_id', message: 'Falta block_id' });
   }
-  if (typeof durationMinutes !== 'number' || !Number.isFinite(durationMinutes) || durationMinutes <= 0) {
-    return res.status(400).json({ error: 'invalid_duration', message: 'duration_minutes inválido' });
+  if (typeof durationSeconds !== 'number' || !Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+    return res.status(400).json({ error: 'invalid_duration', message: 'duration_seconds inválido' });
   }
-  if (!start || !end || !TIME_RE.test(start) || !TIME_RE.test(end)) {
+  if (!start || !end || !isValidTimeLabel(start) || !isValidTimeLabel(end)) {
     return res.status(400).json({ error: 'invalid_time', message: 'start/end deben ser "HH:MM"' });
   }
 
-  const roundedMinutes = Math.max(1, Math.round(durationMinutes));
-  const text = formatSessionText(roundedMinutes, start, end);
+  const roundedSeconds = roundDurationSeconds(durationSeconds);
+  const text = formatSessionText(roundedSeconds, start, end);
   await updateParagraphText(blockId, text);
 
-  return res.status(200).json({ ok: true, session: { durationMinutes: roundedMinutes, start, end } });
+  return res.status(200).json({ ok: true, session: { durationSeconds: roundedSeconds, start, end } });
 }
 
 async function handleDelete(req: VercelRequest, res: VercelResponse) {

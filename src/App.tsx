@@ -8,6 +8,7 @@ import Footer from './components/Footer';
 import Login from './components/Login';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
+import { formatDurationLabel } from './duration';
 import { computeAfterBlockId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
@@ -18,13 +19,6 @@ type AuthState = 'checking' | 'authed' | 'guest' | 'error';
 type PendingSwitch = { message: string; run: () => void };
 
 const FILE_STORAGE_KEY = 'pomotion:file';
-
-function formatTotal(minutes: number): string {
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-}
 
 function SunIcon() {
   return (
@@ -482,8 +476,8 @@ export default function App() {
     );
   }
 
-  const totalMinutesToday = data
-    ? data.tasks.reduce((sum, t) => sum + t.sessions.reduce((s, ses) => s + ses.durationMinutes, 0), 0)
+  const totalSecondsToday = data
+    ? data.tasks.reduce((sum, t) => sum + t.sessions.reduce((s, ses) => s + ses.durationSeconds, 0), 0)
     : 0;
 
   return (
@@ -550,10 +544,10 @@ export default function App() {
               onAddWeek={() => void handleRequestAddWeek()}
               loading={loading}
             />
-            {totalMinutesToday > 0 && (
+            {totalSecondsToday > 0 && (
               <div className="total-pill" title="Total registrado este día">
                 <span className="total-pill-label">Total</span>
-                <span className="total-pill-value">{formatTotal(totalMinutesToday)}</span>
+                <span className="total-pill-value">{formatDurationLabel(totalSecondsToday)}</span>
               </div>
             )}
           </div>

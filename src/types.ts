@@ -1,6 +1,6 @@
 export type Session = {
   blockId: string | undefined;
-  durationMinutes: number;
+  durationSeconds: number;
   start: string;
   end: string;
 };

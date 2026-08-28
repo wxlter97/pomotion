@@ -1,36 +1,17 @@
-// Helpers puros para el registro de sesiones manuales: parseo de duración
-// (número plano de minutos o formato tipo Jira, ej. "1h 30m 45s") y cálculo
-// de la hora de fin a partir de inicio + duración.
+// Helpers de duración/hora específicos del cliente. Las reglas compartidas
+// con el servidor (parseo de duración, formato, TIME_RE) viven en
+// ../shared/duration — este módulo las reexporta y agrega lo que solo
+// tiene sentido en el navegador: la hora actual y la aritmética sobre
+// horas "HH:MM" para el auto-cálculo de la hora de fin.
+export {
+  TIME_RE,
+  formatDurationLabel,
+  isValidTimeLabel,
+  parseDurationToSeconds,
+  roundDurationSeconds,
+} from '../shared/duration';
 
-const PLAIN_NUMBER_RE = /^\d+(\.\d+)?$/;
-const JIRA_DURATION_RE = /^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?\s*(?:(\d+(?:\.\d+)?)\s*s)?$/i;
-
-/**
- * Convierte un string de duración a minutos totales.
- * - Número plano ("90", "1.5"): se interpreta como minutos, sin redondear
- *   (idéntico al comportamiento previo, que hacía `Number(draft.duration)`).
- * - Formato tipo Jira ("1h 30m 45s", "1h30m", "45s", "2h", ...): se suman
- *   las partes y se redondea una sola vez al final.
- * Devuelve `null` si el string está vacío o no matchea ningún formato.
- */
-export function parseDurationToMinutes(input: string): number | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-
-  if (PLAIN_NUMBER_RE.test(trimmed)) {
-    return Number(trimmed);
-  }
-
-  const match = trimmed.replace(/\s+/g, ' ').match(JIRA_DURATION_RE);
-  if (!match) return null;
-  const [, h, m, s] = match;
-  if (h === undefined && m === undefined && s === undefined) return null;
-
-  const totalMinutes = Number(h ?? 0) * 60 + Number(m ?? 0) + Number(s ?? 0) / 60;
-  return Math.round(totalMinutes);
-}
-
-/** Hora actual del navegador, formato "HH:MM" (24h, con padding de ceros). */
+/** Hora actual del navegador, "HH:MM" (24h, con padding de ceros). */
 export function nowAsHHMM(): string {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
