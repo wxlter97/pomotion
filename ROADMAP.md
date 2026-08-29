@@ -352,13 +352,14 @@ mergea** — se saca de referencia:
 
 Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migración.
 
-### Tier 1 — alto valor, bajo costo
-- **Vista mensual**: grilla calendario, tareas + total por día. 1 query por rango.
-- **Heatmap de foco**: cuadradito por día, intensidad = horas registradas.
-- **Carry-over**: botón "mover pendientes de días pasados a hoy" (y opción de que corra
-  solo al abrir la app).
-- **Recurrentes automáticas**: `recurring_rules` se materializan al abrir la semana
-  (o un cron de Vercel), en vez del "Aplicar" manual.
+### Tier 1 — alto valor, bajo costo ✅ COMPLETO
+
+- ~~**Vista mensual**~~ ✅ PR #23 — grilla del mes, tareas + horas por día, salto a la semana.
+- ~~**Heatmap de foco**~~ ✅ PR #24 — grilla estilo GitHub, intensidad = horas registradas.
+- ~~**Carry-over**~~ ✅ PR #22 — botón "traer a hoy" + modo automático al abrir la app.
+- ~~**Recurrentes automáticas**~~ ✅ PR #25 — `recurring_rules` se materializan al abrir la
+  semana (tabla `recurring_runs` marca cada semana/contexto, una sola vez). El "Aplicar"
+  manual queda como override para reglas agregadas a mitad de semana.
 
 ### Tier 2 — requiere UI nueva, schema ya listo
 - **Tags/proyectos**: alta de tags, asignar a tareas, filtrar la vista, reporte por tag.

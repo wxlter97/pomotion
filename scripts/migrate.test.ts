@@ -7,6 +7,7 @@ const SCHEMA_TABLES = [
   'auth_sessions',
   'oauth_state',
   'recurring_rules',
+  'recurring_runs',
   'tasks',
   'work_sessions',
   'tags',
@@ -25,6 +26,7 @@ describe('runMigrations', () => {
     const applied = await runMigrations(db, { log: () => {} });
 
     expect(applied).toContain('001_init.sql');
+    expect(applied).toContain('002_recurring_runs.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });
