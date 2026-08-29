@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createWeek, getFiles, getNextWeekSuggestion, getTasks, logout, reorderTask, UnauthorizedError, updateTaskChecked } from './api';
+import {
+  createWeek,
+  getAuthStatus,
+  getFiles,
+  getNextWeekSuggestion,
+  getTasks,
+  logout,
+  PendingApprovalError,
+  reorderTask,
+  UnauthorizedError,
+  updateTaskChecked,
+} from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import DismissibleBanner from './components/DismissibleBanner';
 import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
+import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import type { MoveTarget } from './components/MoveTaskMenu';
@@ -19,7 +31,7 @@ import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
 
-type AuthState = 'checking' | 'authed' | 'guest' | 'error';
+type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
 type PendingSwitch = { message: string; run: () => void };
 
 const FILE_STORAGE_KEY = 'pomotion:file';
@@ -117,6 +129,7 @@ function RefreshIcon({ spinning }: { spinning?: boolean }) {
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
+  const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [data, setData] = useState<TasksResponse | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,6 +221,10 @@ export default function App() {
         setAuthState('guest');
         setData(null);
         setSelectedTask(null);
+      } else if (err instanceof PendingApprovalError) {
+        setAuthState('pending');
+        setData(null);
+        setSelectedTask(null);
       } else {
         setError(err instanceof Error ? err.message : 'Error cargando tareas');
         // No dejar datos de un día/semana/archivo distinto detrás del
@@ -235,8 +252,31 @@ export default function App() {
     []
   );
 
+  // Al montar: resolver el estado de login antes de pedir datos, para
+  // distinguir "sin sesión" de "cuenta pendiente de aprobación".
   useEffect(() => {
-    void refresh();
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await getAuthStatus();
+        if (cancelled) return;
+        if (!status.authed) {
+          setAuthState('guest');
+          return;
+        }
+        setAuthEmail(status.user.email);
+        if (!status.approved) {
+          setAuthState('pending');
+          return;
+        }
+        void refresh();
+      } catch {
+        if (!cancelled) setAuthState('error');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [refresh]);
 
   const guardIfRunning = useCallback(
@@ -505,8 +545,13 @@ export default function App() {
   }
 
   async function handleLogout() {
-    await logout();
+    try {
+      await logout();
+    } catch {
+      // aunque falle el borrado server-side, sacamos al usuario igual
+    }
     setAuthState('guest');
+    setAuthEmail(null);
     setData(null);
     setSelectedTask(null);
     filesLoadedRef.current = false;
@@ -569,7 +614,11 @@ export default function App() {
   }
 
   if (authState === 'guest') {
-    return <Login onLoggedIn={() => void refresh()} />;
+    return <Login />;
+  }
+
+  if (authState === 'pending') {
+    return <PendingApproval email={authEmail} onLogout={() => void handleLogout()} />;
   }
 
   if (authState === 'error') {

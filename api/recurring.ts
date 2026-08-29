@@ -1,11 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
+import { withAuth } from './_lib/handler.js';
 import { notionStore } from './_lib/notionStore.js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (!requireAuth(req, res)) return;
-
+async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'GET') {
       const fileId = typeof req.query.file === 'string' ? req.query.file : undefined;
@@ -27,3 +25,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return sendError(res, err);
   }
 }
+
+export default withAuth(handler);

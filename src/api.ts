@@ -1,6 +1,8 @@
 import type { FileEntry, TasksResponse } from './types';
 
 export class UnauthorizedError extends Error {}
+/** La sesión existe pero la cuenta todavía no está aprobada (403). */
+export class PendingApprovalError extends Error {}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -10,28 +12,39 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     let message = `Error ${res.status}`;
+    let code: string | undefined;
     try {
       const body = await res.json();
       message = body.message || body.error || message;
+      code = typeof body.error === 'string' ? body.error : undefined;
     } catch {
       // respuesta sin JSON, ignorar
     }
     if (res.status === 401) throw new UnauthorizedError(message);
+    if (res.status === 403 && code === 'pending_approval') throw new PendingApprovalError(message);
     throw new Error(message);
   }
 
   return (await res.json()) as T;
 }
 
-export function login(password: string) {
-  return request<{ ok: true }>('/api/login', {
-    method: 'POST',
-    body: JSON.stringify({ password }),
-  });
+export type AuthUser = {
+  email: string;
+  name: string | null;
+  pictureUrl: string | null;
+  isAdmin: boolean;
+};
+export type AuthStatus = { authed: false } | { authed: true; approved: boolean; user: AuthUser };
+
+export function getAuthStatus() {
+  return request<AuthStatus>('/api/auth/status');
 }
 
+/** URL a la que navega el botón "Continuar con Google". */
+export const googleLoginUrl = '/api/auth/google/start';
+
 export function logout() {
-  return request<{ ok: true }>('/api/logout', { method: 'POST' });
+  return request<{ ok: true }>('/api/auth/logout', { method: 'POST' });
 }
 
 export function getFiles() {

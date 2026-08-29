@@ -1,51 +1,11 @@
-import crypto from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getUserBySessionToken, type UserRow } from './authRepo.js';
 
-const COOKIE_NAME = 'pomotion_session';
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
-
-function getSecret(): string {
-  const secret = process.env.APP_PASSWORD;
-  if (!secret) {
-    throw new Error('APP_PASSWORD no está configurada');
-  }
-  return secret;
-}
-
-function sign(value: string): string {
-  return crypto.createHmac('sha256', getSecret()).update(value).digest('hex');
-}
+const SESSION_COOKIE = 'pomotion_session';
+const SESSION_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 días
 
 function isProdRequest(): boolean {
   return process.env.VERCEL === '1' || process.env.NODE_ENV === 'production';
-}
-
-/** Password comparado en tiempo constante para evitar timing attacks. */
-export function passwordMatches(candidate: string): boolean {
-  const expected = getSecret();
-  const a = Buffer.from(candidate);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
-}
-
-export function buildSessionCookie(): string {
-  const expiresAt = Date.now() + SESSION_TTL_MS;
-  const payload = String(expiresAt);
-  const token = `${payload}.${sign(payload)}`;
-  const parts = [
-    `${COOKIE_NAME}=${token}`,
-    'Path=/',
-    'HttpOnly',
-    'SameSite=Lax',
-    `Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
-  ];
-  if (isProdRequest()) parts.push('Secure');
-  return parts.join('; ');
-}
-
-export function buildLogoutCookie(): string {
-  return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
 }
 
 function parseCookies(header?: string): Record<string, string> {
@@ -54,40 +14,43 @@ function parseCookies(header?: string): Record<string, string> {
   for (const pair of header.split(';')) {
     const idx = pair.indexOf('=');
     if (idx === -1) continue;
-    const key = pair.slice(0, idx).trim();
-    const value = pair.slice(idx + 1).trim();
-    out[key] = decodeURIComponent(value);
+    out[pair.slice(0, idx).trim()] = decodeURIComponent(pair.slice(idx + 1).trim());
   }
   return out;
 }
 
-export function isAuthenticated(req: VercelRequest): boolean {
-  const cookies = parseCookies(req.headers.cookie);
-  const token = cookies[COOKIE_NAME];
-  if (!token) return false;
-  const [payload, signature] = token.split('.');
-  if (!payload || !signature) return false;
-
-  let expected: string;
-  try {
-    expected = sign(payload);
-  } catch {
-    return false;
-  }
-  const a = Buffer.from(signature);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
-
-  const expiresAt = Number(payload);
-  if (!Number.isFinite(expiresAt) || Date.now() > expiresAt) return false;
-  return true;
+/** Agrega un `Set-Cookie` sin pisar los que ya haya puesto el handler. */
+function appendSetCookie(res: VercelResponse, cookie: string): void {
+  const prev = res.getHeader('Set-Cookie');
+  if (!prev) res.setHeader('Set-Cookie', cookie);
+  else if (Array.isArray(prev)) res.setHeader('Set-Cookie', [...prev, cookie]);
+  else res.setHeader('Set-Cookie', [String(prev), cookie]);
 }
 
-/** Devuelve false (y ya respondió 401) si la request no está autenticada. */
-export function requireAuth(req: VercelRequest, res: VercelResponse): boolean {
-  if (!isAuthenticated(req)) {
-    res.status(401).json({ error: 'unauthorized' });
-    return false;
-  }
-  return true;
+export function getSessionToken(req: VercelRequest): string | undefined {
+  return parseCookies(req.headers.cookie)[SESSION_COOKIE];
+}
+
+export function setSessionCookie(res: VercelResponse, rawToken: string): void {
+  const parts = [
+    `${SESSION_COOKIE}=${rawToken}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${SESSION_TTL_SECONDS}`,
+  ];
+  if (isProdRequest()) parts.push('Secure');
+  appendSetCookie(res, parts.join('; '));
+}
+
+export function clearSessionCookie(res: VercelResponse): void {
+  appendSetCookie(res, `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+}
+
+/** La fila del usuario de la sesión actual, o null (cookie ausente,
+ *  inválida, expirada, o el usuario ya no existe). */
+export function getAuthedUser(req: VercelRequest): Promise<UserRow | null> {
+  const token = getSessionToken(req);
+  if (!token) return Promise.resolve(null);
+  return getUserBySessionToken(token);
 }

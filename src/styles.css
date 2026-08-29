@@ -210,6 +210,25 @@ h3 {
   font-size: 0.78rem;
 }
 
+/* Botón "Continuar con Google" (es un <a>, no un <button>). Fondo claro con
+ * borde, como recomienda el branding de Google — el logo multicolor no
+ * contrasta bien sobre el naranja. */
+.google-btn,
+.google-btn:hover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  background: var(--color-bg-elevated);
+  color: var(--color-label);
+  border: 1px solid var(--color-separator);
+}
+
+.google-btn svg {
+  flex-shrink: 0;
+}
+
 /* ---------------------------------------------------------------------
  * Segmented control (modo Pomodoro/Libre) — estilo UISegmentedControl.
  * ------------------------------------------------------------------- */

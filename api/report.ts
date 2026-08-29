@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
+import { withAuth } from './_lib/handler.js';
 import { notionStore } from './_lib/notionStore.js';
 import { formatDurationLabel } from '../shared/duration.js';
 import type { SessionRow } from './_lib/store.js';
@@ -30,12 +30,11 @@ function toCsv(rows: SessionRow[]): string {
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'method_not_allowed' });
   }
-  if (!requireAuth(req, res)) return;
 
   try {
     const from = typeof req.query.from === 'string' ? req.query.from : undefined;
@@ -55,3 +54,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return sendError(res, err);
   }
 }
+
+export default withAuth(handler);

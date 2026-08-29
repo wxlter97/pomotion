@@ -12,9 +12,11 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+import googleCallbackHandler from '../api/auth/google/callback';
+import googleStartHandler from '../api/auth/google/start';
+import authLogoutHandler from '../api/auth/logout';
+import authStatusHandler from '../api/auth/status';
 import filesHandler from '../api/files';
-import loginHandler from '../api/login';
-import logoutHandler from '../api/logout';
 import recurringHandler from '../api/recurring';
 import reportHandler from '../api/report';
 import sessionHandler from '../api/session';
@@ -26,8 +28,10 @@ import weekHandler from '../api/week';
 type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
 
 const routes: Record<string, Handler> = {
-  '/api/login': loginHandler as Handler,
-  '/api/logout': logoutHandler as Handler,
+  '/api/auth/google/start': googleStartHandler as Handler,
+  '/api/auth/google/callback': googleCallbackHandler as Handler,
+  '/api/auth/status': authStatusHandler as Handler,
+  '/api/auth/logout': authLogoutHandler as Handler,
   '/api/tasks': tasksHandler as Handler,
   '/api/session': sessionHandler as Handler,
   '/api/task-reorder': taskReorderHandler as Handler,
@@ -76,10 +80,11 @@ const server = http.createServer(async (req, res) => {
 
   let statusCode = 200;
   const vercelRes = {
-    setHeader: (name: string, value: string) => {
+    setHeader: (name: string, value: string | string[]) => {
       res.setHeader(name, value);
       return vercelRes;
     },
+    getHeader: (name: string) => res.getHeader(name),
     status(code: number) {
       statusCode = code;
       return vercelRes;
@@ -93,6 +98,13 @@ const server = http.createServer(async (req, res) => {
     send(body: unknown) {
       res.statusCode = statusCode;
       res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
+      return vercelRes;
+    },
+    redirect(code: number, location?: string) {
+      const [status, url] = typeof code === 'number' ? [code, location] : [302, code as unknown as string];
+      res.statusCode = status;
+      res.setHeader('Location', url ?? '/');
+      res.end();
       return vercelRes;
     },
   } as unknown as VercelResponse;
