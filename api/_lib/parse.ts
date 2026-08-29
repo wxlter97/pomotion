@@ -27,6 +27,16 @@ export function isDateInRange(date: string, start: string, end: string): boolean
   return date >= start && date <= end;
 }
 
+/** ¿Se solapan dos rangos de fechas "YYYY-MM-DD" (inclusivo en ambos extremos)? */
+export function dateRangesOverlap(
+  aStart: string,
+  aEnd: string,
+  bStart: string,
+  bEnd: string
+): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
 /** "YYYY-MM-DD" de "hoy" en una zona horaria dada. */
 export function todayDateStringInTz(timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', {

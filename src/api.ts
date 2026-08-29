@@ -132,3 +132,32 @@ export function createWeek(start: string, end: string, fileId?: string) {
     body: JSON.stringify({ start, end, file: fileId }),
   });
 }
+
+export type ReportRow = {
+  date: string;
+  day: string;
+  week: string;
+  task: string;
+  durationSeconds: number;
+  start: string;
+  end: string;
+};
+
+function reportParams(from: string, to: string, fileId?: string, extra?: Record<string, string>) {
+  const params = new URLSearchParams({ from, to, ...extra });
+  if (fileId) params.set('file', fileId);
+  return params.toString();
+}
+
+export function getReport(from: string, to: string, fileId?: string) {
+  return request<{ rows: ReportRow[]; totalSeconds: number }>(
+    `/api/report?${reportParams(from, to, fileId)}`
+  );
+}
+
+/** URL de descarga directa del CSV (navegación normal del navegador — la
+ *  cookie de sesión viaja sola y el header Content-Disposition fuerza la
+ *  descarga). */
+export function reportCsvUrl(from: string, to: string, fileId?: string) {
+  return `/api/report?${reportParams(from, to, fileId, { format: 'csv' })}`;
+}

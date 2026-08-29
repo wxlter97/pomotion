@@ -6,6 +6,7 @@ import DismissibleBanner from './components/DismissibleBanner';
 import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
+import Report from './components/Report';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
@@ -55,6 +56,14 @@ function SoundOffIcon() {
   );
 }
 
+function ReportIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+    </svg>
+  );
+}
+
 function RefreshIcon({ spinning }: { spinning?: boolean }) {
   return (
     <svg
@@ -89,6 +98,7 @@ export default function App() {
   );
   const [addingWeek, setAddingWeek] = useState(false);
   const [addWeekError, setAddWeekError] = useState<string | null>(null);
+  const [showReport, setShowReport] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const timerRef = useRef<TimerHandle>(null);
@@ -485,6 +495,15 @@ export default function App() {
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-icon"
+            onClick={() => setShowReport(true)}
+            title="Reporte de tiempo"
+            aria-label="Reporte de tiempo"
+          >
+            <ReportIcon />
+          </button>
           {soundToggleButton}
           {themeToggleButton}
           <button
@@ -609,6 +628,8 @@ export default function App() {
       )}
 
       <Footer />
+
+      {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
 
       {pendingSwitch && (
         <ConfirmDialog

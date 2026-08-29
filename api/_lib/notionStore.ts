@@ -22,8 +22,11 @@ import {
 } from './notionClient.js';
 import { BadRequestError, ConflictError, NotFoundError, UpstreamError } from './errors.js';
 import {
+  addDaysToDate,
   computeNextWeekRange,
+  dateRangesOverlap,
   formatWeekLabel,
+  isDateInRange,
   parseWeekRange,
   plainText,
   todayDateStringInTz,
@@ -31,7 +34,14 @@ import {
 } from './parse.js';
 import { formatSessionText, parseSessionText } from './sessionText.js';
 import { resolveActivePageId, resolveFiles, richTextOf } from './notionPage.js';
-import { computeWeekNav, selectActiveWeek, selectDay, type WeekSummary } from './weekModel.js';
+import {
+  computeWeekNav,
+  hasValidRange,
+  selectActiveWeek,
+  selectDay,
+  weekdayOffset,
+  type WeekSummary,
+} from './weekModel.js';
 import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
 import type {
   CreateTaskInput,
@@ -41,7 +51,9 @@ import type {
   LogSessionInput,
   ReorderResult,
   ReorderTaskInput,
+  ReportInput,
   Session,
+  SessionRow,
   Store,
   Task,
   TaskFieldsUpdate,
@@ -265,6 +277,60 @@ async function getWeekView(opts: GetWeekViewInput): Promise<WeekView> {
     tasks,
     weekTotalSeconds,
   };
+}
+
+// --- Reporte de tiempo por rango de fechas ---
+
+async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
+  const { from, to, fileId } = input;
+  if (!from || !DATE_RE.test(from)) {
+    throw new BadRequestError('invalid_from', 'from debe ser "YYYY-MM-DD"');
+  }
+  if (!to || !DATE_RE.test(to)) {
+    throw new BadRequestError('invalid_to', 'to debe ser "YYYY-MM-DD"');
+  }
+  if (to < from) {
+    throw new BadRequestError('invalid_range', 'to no puede ser antes que from');
+  }
+
+  const activePageId = await resolveActivePageId(fileId);
+  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId));
+
+  const rows: SessionRow[] = [];
+  for (const week of weekGroups) {
+    // Solo las semanas con rango parseable que se solapan con [from, to] —
+    // cada sesión se fecha por su semana (lunes) + su día.
+    if (!hasValidRange(week)) continue;
+    const weekRange = week.range;
+    if (!dateRangesOverlap(weekRange.start, weekRange.end, from, to)) continue;
+
+    const positioned = await expandColumns(week.blocks, activePageId);
+    const { dayOrder, dayBlocks } = groupPositionedBlocksByDay(positioned);
+
+    for (const day of dayOrder) {
+      const date = addDaysToDate(weekRange.start, weekdayOffset(day) ?? 0);
+      if (!isDateInRange(date, from, to)) continue;
+
+      for (const block of dayBlocks.get(day) ?? []) {
+        const content = block.to_do as { rich_text?: { plain_text?: string }[] };
+        const task = plainText(content?.rich_text);
+        for (const session of await readSessions(block)) {
+          rows.push({
+            date,
+            day,
+            week: week.label,
+            task,
+            durationSeconds: session.durationSeconds,
+            start: session.start,
+            end: session.end,
+          });
+        }
+      }
+    }
+  }
+
+  rows.sort((a, b) => (a.date === b.date ? a.start.localeCompare(b.start) : a.date.localeCompare(b.date)));
+  return rows;
 }
 
 // --- Semanas ---
@@ -608,6 +674,7 @@ async function deleteSession(blockId?: string): Promise<void> {
 
 export const notionStore: Store = {
   getWeekView,
+  getSessionsInRange,
   suggestNextWeek,
   createWeek,
   listFiles,
