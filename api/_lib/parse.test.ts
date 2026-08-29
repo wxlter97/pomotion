@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDaysToDate,
   computeNextWeekRange,
+  dateRangesOverlap,
   extractNotionPageId,
   formatWeekLabel,
   isDateInRange,
@@ -66,6 +67,19 @@ describe('isDateInRange', () => {
   it('deja afuera lo que cae fuera del rango', () => {
     expect(isDateInRange('2026-08-16', '2026-08-17', '2026-08-21')).toBe(false);
     expect(isDateInRange('2026-08-22', '2026-08-17', '2026-08-21')).toBe(false);
+  });
+});
+
+describe('dateRangesOverlap', () => {
+  it('detecta solapamiento parcial, contención y bordes que se tocan', () => {
+    expect(dateRangesOverlap('2026-08-10', '2026-08-20', '2026-08-15', '2026-08-25')).toBe(true);
+    expect(dateRangesOverlap('2026-08-10', '2026-08-31', '2026-08-15', '2026-08-16')).toBe(true);
+    expect(dateRangesOverlap('2026-08-10', '2026-08-15', '2026-08-15', '2026-08-20')).toBe(true);
+  });
+
+  it('es false cuando los rangos no se tocan', () => {
+    expect(dateRangesOverlap('2026-08-10', '2026-08-14', '2026-08-15', '2026-08-20')).toBe(false);
+    expect(dateRangesOverlap('2026-09-01', '2026-09-05', '2026-08-01', '2026-08-31')).toBe(false);
   });
 });
 

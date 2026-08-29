@@ -20,6 +20,21 @@ export function hasValidRange(week: WeekSummary): week is WeekSummary & { range:
   return week.range !== null && week.range.start <= week.range.end;
 }
 
+// Días laborales normalizados (sin acentos, minúsculas), en orden. La
+// plantilla arma las semanas con estas etiquetas, una columna por día.
+const WEEKDAY_LABELS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
+
+/**
+ * Offset en días desde el inicio de la semana (lunes) para una etiqueta de
+ * día, o null si no es un día laboral reconocible. Insensible a acentos y
+ * mayúsculas. Se usa para fechar las sesiones de un día dentro de su semana
+ * (las sesiones solo guardan "HH:MM", la fecha sale de semana + día).
+ */
+export function weekdayOffset(dayLabel: string): number | null {
+  const idx = WEEKDAY_LABELS.indexOf(normalize(dayLabel));
+  return idx === -1 ? null : idx;
+}
+
 /** Índice de la semana cuyo rango contiene `today`, o -1. */
 export function findTodayWeekIndex(weeks: WeekSummary[], today: string): number {
   return weeks.findIndex(

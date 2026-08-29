@@ -44,6 +44,20 @@ export type WeekView = {
 
 export type FileEntry = { id: string; label: string };
 
+/** Una sesión registrada, ya fechada (la fecha sale de su semana + día) y
+ *  con el texto de su tarea — la unidad de fila del reporte de tiempo. */
+export type SessionRow = {
+  date: string;
+  day: string;
+  week: string;
+  task: string;
+  durationSeconds: number;
+  start: string;
+  end: string;
+};
+
+export type ReportInput = { from?: string; to?: string; fileId?: string };
+
 export type WeekSuggestion = { start: string; end: string; label: string };
 export type WeekRef = { label: string; start: string; end: string };
 export type TaskRef = { blockId: string; text: string; checked: false };
@@ -74,6 +88,9 @@ export type UpdateSessionInput = {
 
 export interface Store {
   getWeekView(input: GetWeekViewInput): Promise<WeekView>;
+  /** Todas las sesiones registradas cuya fecha cae en [from, to], ordenadas
+   *  por fecha y hora de inicio. */
+  getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   suggestNextWeek(fileId?: string): Promise<WeekSuggestion>;
   createWeek(input: CreateWeekInput): Promise<WeekRef>;
   listFiles(): Promise<FileEntry[]>;

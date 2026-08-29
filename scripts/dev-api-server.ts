@@ -15,6 +15,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import filesHandler from '../api/files';
 import loginHandler from '../api/login';
 import logoutHandler from '../api/logout';
+import reportHandler from '../api/report';
 import sessionHandler from '../api/session';
 import taskHandler from '../api/task';
 import taskReorderHandler from '../api/task-reorder';
@@ -32,6 +33,7 @@ const routes: Record<string, Handler> = {
   '/api/task': taskHandler as Handler,
   '/api/week': weekHandler as Handler,
   '/api/files': filesHandler as Handler,
+  '/api/report': reportHandler as Handler,
 };
 
 const PORT = Number(process.env.API_PORT) || 3000;
@@ -84,6 +86,11 @@ const server = http.createServer(async (req, res) => {
       res.statusCode = statusCode;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(payload));
+      return vercelRes;
+    },
+    send(body: unknown) {
+      res.statusCode = statusCode;
+      res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
       return vercelRes;
     },
   } as unknown as VercelResponse;

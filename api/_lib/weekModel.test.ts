@@ -5,6 +5,7 @@ import {
   hasValidRange,
   selectActiveWeek,
   selectDay,
+  weekdayOffset,
   type WeekSummary,
 } from './weekModel';
 
@@ -140,6 +141,23 @@ describe('computeWeekNav', () => {
   it('semana activa sin rango válido: no entra en la navegación', () => {
     const weeks = [w('A', '2026-08-10', '2026-08-14'), w('nota'), w('C', '2026-08-24', '2026-08-28')];
     expect(computeWeekNav(weeks, 1)).toEqual({ previousWeekLabel: null, nextWeekLabel: null });
+  });
+});
+
+describe('weekdayOffset', () => {
+  it('mapea lunes..viernes a 0..4, insensible a acentos y mayúsculas', () => {
+    expect(weekdayOffset('Lunes')).toBe(0);
+    expect(weekdayOffset('MARTES')).toBe(1);
+    expect(weekdayOffset('miércoles')).toBe(2);
+    expect(weekdayOffset('Miercoles')).toBe(2);
+    expect(weekdayOffset('jueves')).toBe(3);
+    expect(weekdayOffset('  Viernes  ')).toBe(4);
+  });
+
+  it('devuelve null para etiquetas que no son un día laboral', () => {
+    expect(weekdayOffset('Sábado')).toBeNull();
+    expect(weekdayOffset('Feriado')).toBeNull();
+    expect(weekdayOffset('')).toBeNull();
   });
 });
 
