@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { postSession } from '../api';
 import { formatDurationLabel } from '../duration';
+import { notifyPhaseChange } from '../notify';
 import { playChime, unlockAudio } from '../sound';
 import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
 import { overrunElapsedHours, shouldWarnOverrun } from '../timerOverrun';
@@ -31,8 +32,9 @@ const Timer = forwardRef<
     onSessionLogged: (blockId: string, session: Session) => void;
     onPhaseChange?: (phase: TimerPhase) => void;
     soundsEnabled: boolean;
+    notificationsEnabled: boolean;
   }
->(function Timer({ task, onSessionLogged, onPhaseChange, soundsEnabled }, ref) {
+>(function Timer({ task, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled }, ref) {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
   const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -149,6 +151,7 @@ const Timer = forwardRef<
 
     if (mode === 'pomodoro' && natural) {
       if (soundsEnabled) playChime('work-done');
+      if (notificationsEnabled) notifyPhaseChange('work-done');
       setPhase('break');
       setStartedAt(Date.now());
     } else {
@@ -165,6 +168,7 @@ const Timer = forwardRef<
       void finishWork(true);
     } else if (mode === 'pomodoro' && phase === 'break' && elapsed >= BREAK_MS) {
       if (soundsEnabled) playChime('break-done');
+      if (notificationsEnabled) notifyPhaseChange('break-done');
       setPhase('idle');
       setStartedAt(null);
     }
