@@ -46,6 +46,8 @@ export type WeekView = {
   tasks: Task[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
+  /** Tareas pendientes (sin sesiones) de días pasados, candidatas a "traer a hoy". */
+  carryOverCount: number;
 };
 
 /** Fila del reporte de tiempo. */
@@ -126,6 +128,8 @@ export interface TaskStore {
   updateTask(input: UpdateTaskInput): Promise<{ done?: boolean; text?: string }>;
   deleteTask(taskId?: string): Promise<void>;
   updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id: string }>;
+  /** Trae a hoy las tareas pendientes sin sesiones de días pasados. */
+  carryOverToToday(input: { fileId?: string }): Promise<{ moved: number }>;
 
   logSession(input: LogSessionInput): Promise<Session>;
   updateSession(input: UpdateSessionInput): Promise<Session>;

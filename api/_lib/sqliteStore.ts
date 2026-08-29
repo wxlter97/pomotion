@@ -15,6 +15,7 @@ import {
   mondayOf,
   resolveWeekStart,
   selectDay,
+  toWeekday,
   weekDates,
   weekLabelOf,
   weekdayIndex,
@@ -220,7 +221,70 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     tasks,
     dayTotalSeconds,
     weekTotalSeconds,
+    carryOverCount: await countCarryOver(userId, input.fileId),
   };
+}
+
+// Ventana de "arrastre": solo tareas de los últimos 14 días cuentan como
+// "se me pasó". Más viejas = abandonadas, no se traen.
+const CARRY_OVER_WINDOW_DAYS = 14;
+
+/** Tareas pendientes (done=0, sin sesiones) de un día anterior a hoy dentro
+ *  de la ventana: las candidatas a "traer a hoy". */
+async function countCarryOver(userId: string, fileId: string | undefined): Promise<number> {
+  const f = fileFilter(fileId);
+  const target = toWeekday(todayDateStringInTz(TIMEZONE));
+  const row = (
+    await getDb().execute({
+      sql: `SELECT count(*) AS c FROM tasks t
+            WHERE t.user_id = ? AND ${f.clause} AND t.done = 0 AND t.date IS NOT NULL
+              AND t.date < ? AND t.date >= ?
+              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id)`,
+      args: [userId, ...f.args, target, addDaysToDate(target, -CARRY_OVER_WINDOW_DAYS)],
+    })
+  ).rows[0];
+  return Number(row?.c ?? 0);
+}
+
+/** Mueve a hoy las tareas pendientes sin sesiones de los últimos
+ *  CARRY_OVER_WINDOW_DAYS, preservando su orden relativo (más viejas primero). */
+async function carryOverToToday(input: { fileId?: string }): Promise<{ moved: number }> {
+  const userId = currentUserId();
+  // Si hoy es fin de semana, se traen al lunes siguiente (la vista es Lun–Vie).
+  const target = toWeekday(todayDateStringInTz(TIMEZONE));
+  const f = fileFilter(input.fileId);
+  const db = getDb();
+
+  const rows = (
+    await db.execute({
+      sql: `SELECT t.id FROM tasks t
+            WHERE t.user_id = ? AND ${f.clause} AND t.done = 0 AND t.date IS NOT NULL
+              AND t.date < ? AND t.date >= ?
+              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id)
+            ORDER BY t.date, t."order", t.created_at`,
+      args: [userId, ...f.args, target, addDaysToDate(target, -CARRY_OVER_WINDOW_DAYS)],
+    })
+  ).rows;
+  if (rows.length === 0) return { moved: 0 };
+
+  const maxOrder = Number(
+    (
+      await db.execute({
+        sql: `SELECT max("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
+        args: [userId, ...f.args, target],
+      })
+    ).rows[0]?.o ?? 0
+  );
+
+  const now = new Date().toISOString();
+  await db.batch(
+    rows.map((r, i) => ({
+      sql: 'UPDATE tasks SET date = ?, "order" = ?, updated_at = ? WHERE id = ? AND user_id = ?',
+      args: [target, maxOrder + i + 1, now, String(r.id), userId],
+    })),
+    'write'
+  );
+  return { moved: rows.length };
 }
 
 // --- Reporte ---
@@ -616,6 +680,7 @@ export const sqliteStore: TaskStore = {
   updateTask,
   deleteTask,
   updateTaskPosition,
+  carryOverToToday,
   logSession,
   updateSession,
   deleteSession,

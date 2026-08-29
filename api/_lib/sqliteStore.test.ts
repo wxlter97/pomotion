@@ -117,6 +117,38 @@ describe('updateTaskPosition (mover entre días)', () => {
   });
 });
 
+describe('carry-over', () => {
+  it('trae a hoy las pendientes sin sesiones de días pasados', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z')); // hoy = miércoles 26
+
+    const carried = await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'pendiente vieja' });
+      const h = await sqliteStore.createTask({ date: '2026-08-24', text: 'ya hecha' });
+      await sqliteStore.updateTask({ taskId: h.id, done: true });
+      const cs = await sqliteStore.createTask({ date: '2026-08-25', text: 'con sesión' });
+      await sqliteStore.logSession({ taskId: cs.id, durationSeconds: 60, start: '09:00', end: '09:01' });
+      await sqliteStore.createTask({ date: '2026-08-28', text: 'futura' });
+      await sqliteStore.createTask({ date: '2026-08-01', text: 'vieja abandonada' }); // >14 días
+      return sqliteStore.carryOverToToday({});
+    });
+    expect(carried.moved).toBe(1);
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(view.tasks.map((t) => t.name)).toEqual(['pendiente vieja']);
+    expect(view.carryOverCount).toBe(0);
+
+    // las otras no se movieron
+    const lunes = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(lunes.tasks.map((t) => t.name)).toEqual(['ya hecha']);
+    vi.useRealTimers();
+  });
+});
+
 describe('sesiones + totales', () => {
   it('logSession suma al total del día y de la semana', async () => {
     const view = await as(USER, async () => {
