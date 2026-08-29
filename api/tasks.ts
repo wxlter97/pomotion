@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
-import { getWeekView } from './_lib/notionStore.js';
+import { notionStore } from './_lib/notionStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -11,7 +11,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
 
   try {
-    const view = await getWeekView({
+    const view = await notionStore.getWeekView({
       fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
       week: typeof req.query.week === 'string' ? req.query.week : undefined,
       day: typeof req.query.day === 'string' ? req.query.day : undefined,

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
-import { deleteSession, logSession, updateSession } from './_lib/notionStore.js';
+import { notionStore } from './_lib/notionStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         start?: string;
         end?: string;
       };
-      const session = await logSession({
+      const session = await notionStore.logSession({
         blockId: body.block_id,
         durationSeconds: body.duration_seconds,
         startTime: body.start_time,
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         start?: string;
         end?: string;
       };
-      const session = await updateSession({
+      const session = await notionStore.updateSession({
         blockId: body.block_id,
         durationSeconds: body.duration_seconds,
         start: body.start,
@@ -45,7 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (req.method === 'DELETE') {
       const body = (req.body ?? {}) as { block_id?: string };
-      await deleteSession(body.block_id);
+      await notionStore.deleteSession(body.block_id);
       return res.status(200).json({ ok: true });
     }
     res.setHeader('Allow', 'POST, PATCH, DELETE');

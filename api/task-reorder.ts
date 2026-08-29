@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
-import { reorderTask } from './_lib/notionStore.js';
+import { notionStore } from './_lib/notionStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -16,7 +16,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       container_id?: string;
       after_block_id?: string;
     };
-    const result = await reorderTask({
+    const result = await notionStore.reorderTask({
       blockId: body.block_id,
       containerId: body.container_id,
       afterBlockId: body.after_block_id,
