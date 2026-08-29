@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  createWeek,
   getAuthStatus,
   getFiles,
-  getNextWeekSuggestion,
   getTasks,
   logout,
+  moveTask,
   PendingApprovalError,
-  reorderTask,
   UnauthorizedError,
-  updateTaskChecked,
+  updateTaskDone,
 } from './api';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
@@ -24,7 +22,7 @@ import type { MoveTarget } from './components/MoveTaskMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
-import { computeAfterBlockId } from './taskReorder';
+import { computeAfterId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
 import { useNotificationSetting } from './useNotificationSetting';
@@ -138,11 +136,6 @@ export default function App() {
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
-  const [pendingNewWeek, setPendingNewWeek] = useState<{ start: string; end: string; label: string } | null>(
-    null
-  );
-  const [addingWeek, setAddingWeek] = useState(false);
-  const [addWeekError, setAddWeekError] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
@@ -151,44 +144,26 @@ export default function App() {
   const notifications = useNotificationSetting();
   const timerRef = useRef<TimerHandle>(null);
 
-  // Selector de archivo (Trabajo/Casa/Hábitos, etc.). `files` queda vacío
-  // si no hay NOTION_FILES_INDEX_PAGE_ID configurada — modo de un solo
-  // archivo, retrocompatible, el selector ni aparece. selectedFileIdRef
-  // espeja el estado para que `refresh` pueda leerlo sin necesitar la
-  // dependencia (mismo patrón que ya usa day/week: se pasan explícitos).
+  // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
+  // tareas con `file` → modo de un solo contexto, el selector no aparece.
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const selectedFileIdRef = useRef<string | null>(null);
-  const filesRef = useRef<FileEntry[]>([]);
   const filesLoadedRef = useRef(false);
-  // El server cachea la vista semanal ~30s. Tras cualquier mutación
-  // optimista (que no re-fetchea), el próximo refresh debe pedir datos
-  // frescos para que el cambio no "desaparezca" al navegar entre días.
-  const pendingFreshRef = useRef(false);
 
   // Mientras haya un timer corriendo, la tarea activa queda con sus
-  // controles de mover/arrastrar/borrar bloqueados — reordenarla o
-  // borrarla le cambiaría (o le quitaría) el blockId por debajo, y
-  // Timer.tsx detecta "cambié de tarea" comparando blockId, lo que
-  // descartaría la sesión en curso sin guardarla. El resto de tareas del
-  // día siguen totalmente editables.
-  const lockedTaskBlockId = timerPhase !== 'idle' ? (selectedTask?.blockId ?? null) : null;
+  // controles de mover/borrar bloqueados — Timer.tsx detecta "cambié de
+  // tarea" comparando el id, y moverla se lo cambiaría.
+  const lockedTaskId = timerPhase !== 'idle' ? (selectedTask?.id ?? null) : null;
 
-  const refresh = useCallback(
-    async (day?: string, week?: string, fileIdParam?: string, opts?: { fresh?: boolean }) => {
+  const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
     setLoading(true);
     setError(null);
-    const fresh = opts?.fresh === true || pendingFreshRef.current;
     try {
       let fileId = fileIdParam ?? selectedFileIdRef.current ?? undefined;
-      // Solo la primera vez: resuelve la lista de archivos y, si hay más
-      // de uno configurado, la selección persistida (o el primero por
-      // defecto) — antes de pedir las tareas, para no hacer un segundo
-      // round-trip visible al usuario.
       if (!filesLoadedRef.current) {
         const filesRes = await getFiles();
         filesLoadedRef.current = true;
-        filesRef.current = filesRes.files;
         setFiles(filesRes.files);
         if (filesRes.files.length > 0 && !fileId) {
           const stored = localStorage.getItem(FILE_STORAGE_KEY);
@@ -199,19 +174,15 @@ export default function App() {
           selectedFileIdRef.current = fileId;
         }
       }
-      const res = await getTasks(day, week, fileId, fresh);
-      pendingFreshRef.current = false; // consumido con éxito
+      const res = await getTasks(day, week, fileId);
       setData(res);
       setAuthState('authed');
       setSelectedTask((prev) => {
-        const matchByPrev = res.tasks.find((t) => t.blockId === prev?.blockId);
+        const matchByPrev = res.tasks.find((t) => t.id === prev?.id);
         if (matchByPrev) return matchByPrev;
-        // Sin selección previa (primera carga / cambio de día): si hay un
-        // timer restaurable de localStorage para una tarea de este día,
-        // seleccionarla para que el timer pueda retomarlo.
         const persisted = loadActiveTimer();
         if (persisted) {
-          const match = res.tasks.find((t) => t.blockId === persisted.taskBlockId);
+          const match = res.tasks.find((t) => t.id === persisted.taskId);
           if (match) return match;
         }
         return null;
@@ -227,30 +198,12 @@ export default function App() {
         setSelectedTask(null);
       } else {
         setError(err instanceof Error ? err.message : 'Error cargando tareas');
-        // No dejar datos de un día/semana/archivo distinto detrás del
-        // banner de error — ej. al cambiar a un archivo sin ninguna
-        // semana todavía, antes quedaban visibles (y parcialmente
-        // editables) las tareas del archivo anterior.
-        setData(null);
-        setSelectedTask(null);
-        setAuthState((prev) => {
-          if (prev !== 'checking') return prev;
-          // Si hay más de un archivo configurado, no escalar a la
-          // pantalla de error de página completa (sin forma de volver al
-          // selector) — mejor mostrar el shell de la app con el banner de
-          // error, para poder cambiar a otro archivo que sí funcione. Solo
-          // sin alternativa (modo de un solo archivo, o si ni siquiera se
-          // pudo resolver la lista de archivos) se muestra el error
-          // bloqueante de siempre.
-          return filesRef.current.length === 0 ? 'error' : 'authed';
-        });
+        setAuthState((prev) => (prev === 'checking' ? 'error' : prev));
       }
     } finally {
       setLoading(false);
     }
-  },
-    []
-  );
+  }, []);
 
   // Al montar: resolver el estado de login antes de pedir datos, para
   // distinguir "sin sesión" de "cuenta pendiente de aprobación".
@@ -281,18 +234,15 @@ export default function App() {
 
   const guardIfRunning = useCallback(
     (message: string, run: () => void) => {
-      if (timerPhase !== 'idle') {
-        setPendingSwitch({ message, run });
-      } else {
-        run();
-      }
+      if (timerPhase !== 'idle') setPendingSwitch({ message, run });
+      else run();
     },
     [timerPhase]
   );
 
   const guardedSelectTask = useCallback(
     (task: Task) => {
-      if (task.blockId === selectedTask?.blockId) return;
+      if (task.id === selectedTask?.id) return;
       guardIfRunning('Cambiar de tarea lo cancela sin guardar esa sesión.', () => setSelectedTask(task));
     },
     [selectedTask, guardIfRunning]
@@ -301,17 +251,19 @@ export default function App() {
   const guardedSelectDay = useCallback(
     (day: string) => {
       if (day === data?.selectedDay) return;
-      // Mantener la misma semana que se está viendo (no volver a "hoy" al
-      // cambiar de día dentro de una semana pasada/futura).
-      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () => void refresh(day, data?.week ?? undefined));
+      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () =>
+        void refresh(day, data?.week)
+      );
     },
     [data, refresh, guardIfRunning]
   );
 
-  // weekLabel === undefined => volver a la semana actual (auto-detección).
+  // weekLabel === undefined => volver a la semana actual (hoy).
   const guardedGoToWeek = useCallback(
     (weekLabel: string | undefined) => {
-      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, weekLabel));
+      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () =>
+        void refresh(undefined, weekLabel)
+      );
     },
     [refresh, guardIfRunning]
   );
@@ -323,9 +275,6 @@ export default function App() {
         setSelectedFileId(fileId);
         selectedFileIdRef.current = fileId;
         localStorage.setItem(FILE_STORAGE_KEY, fileId);
-        // Sin día/semana explícitos: cada archivo tiene su propia rotación
-        // de semanas, así que se vuelve a auto-detectar "hoy" en el nuevo
-        // archivo en vez de arrastrar la semana/día que se estaba viendo.
         void refresh(undefined, undefined, fileId);
       });
     },
@@ -337,33 +286,6 @@ export default function App() {
     setPendingSwitch(null);
   }
 
-  async function handleRequestAddWeek() {
-    setAddWeekError(null);
-    try {
-      const suggestion = await getNextWeekSuggestion(selectedFileId ?? undefined);
-      setPendingNewWeek(suggestion);
-    } catch (err) {
-      setAddWeekError(err instanceof Error ? err.message : 'No se pudo calcular la semana siguiente');
-    }
-  }
-
-  async function confirmAddWeek() {
-    if (!pendingNewWeek) return;
-    setAddingWeek(true);
-    setAddWeekError(null);
-    try {
-      const res = await createWeek(pendingNewWeek.start, pendingNewWeek.end, selectedFileId ?? undefined);
-      setPendingNewWeek(null);
-      pendingFreshRef.current = true;
-      const newLabel = res.week.label;
-      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, newLabel));
-    } catch (err) {
-      setAddWeekError(err instanceof Error ? err.message : 'No se pudo crear la semana');
-    } finally {
-      setAddingWeek(false);
-    }
-  }
-
   // Atajos de teclado: espacio inicia/detiene, 1–5 cambia de día,
   // [ / ] cambia de semana, T cambia el tema.
   useEffect(() => {
@@ -371,7 +293,7 @@ export default function App() {
       const target = e.target as HTMLElement | null;
       const isTyping =
         target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-      if (isTyping || pendingSwitch || authState !== 'authed') return;
+      if (isTyping || pendingSwitch || authState !== 'authed' || !data) return;
 
       if (e.key === ' ') {
         e.preventDefault();
@@ -379,12 +301,12 @@ export default function App() {
         else timerRef.current?.stop();
       } else if (e.key === 't' || e.key === 'T') {
         toggleTheme();
-      } else if (/^[1-5]$/.test(e.key) && data) {
-        const day = data.availableDays[Number(e.key) - 1];
+      } else if (/^[1-5]$/.test(e.key)) {
+        const day = data.days[Number(e.key) - 1]?.day;
         if (day) guardedSelectDay(day);
-      } else if (e.key === '[' && data?.previousWeekLabel) {
+      } else if (e.key === '[') {
         guardedGoToWeek(data.previousWeekLabel);
-      } else if (e.key === ']' && data?.nextWeekLabel) {
+      } else if (e.key === ']') {
         guardedGoToWeek(data.nextWeekLabel);
       }
     }
@@ -392,154 +314,161 @@ export default function App() {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
-  function handleSessionLogged(blockId: string, session: Session) {
-    pendingFreshRef.current = true;
+  function handleSessionLogged(taskId: string, session: Session) {
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            tasks: prev.tasks.map((t) =>
+              t.id === taskId ? { ...t, sessions: [...t.sessions, session] } : t
+            ),
+            dayTotalSeconds: prev.dayTotalSeconds + session.durationSeconds,
+            weekTotalSeconds: prev.weekTotalSeconds + session.durationSeconds,
+          }
+        : prev
+    );
+  }
+
+  function handleSessionDeleted(taskId: string, sessionId: string) {
     setData((prev) => {
       if (!prev) return prev;
+      const removed = prev.tasks
+        .find((t) => t.id === taskId)
+        ?.sessions.find((s) => s.id === sessionId)?.durationSeconds ?? 0;
       return {
         ...prev,
         tasks: prev.tasks.map((t) =>
-          t.blockId === blockId ? { ...t, sessions: [...t.sessions, session] } : t
+          t.id === taskId ? { ...t, sessions: t.sessions.filter((s) => s.id !== sessionId) } : t
         ),
+        dayTotalSeconds: prev.dayTotalSeconds - removed,
+        weekTotalSeconds: prev.weekTotalSeconds - removed,
       };
     });
   }
 
-  function handleSessionDeleted(taskBlockId: string, sessionBlockId: string) {
-    pendingFreshRef.current = true;
-    setData((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        tasks: prev.tasks.map((t) =>
-          t.blockId === taskBlockId
-            ? { ...t, sessions: t.sessions.filter((s) => s.blockId !== sessionBlockId) }
-            : t
-        ),
-      };
-    });
+  function setTaskDone(id: string, done: boolean) {
+    setData((prev) =>
+      prev ? { ...prev, tasks: prev.tasks.map((t) => (t.id === id ? { ...t, done } : t)) } : prev
+    );
   }
 
-  function setTaskChecked(blockId: string, checked: boolean) {
-    setData((prev) => {
-      if (!prev) return prev;
-      return { ...prev, tasks: prev.tasks.map((t) => (t.blockId === blockId ? { ...t, checked } : t)) };
-    });
-  }
-
-  async function handleToggleChecked(task: Task) {
-    const nextChecked = !task.checked;
-    pendingFreshRef.current = true;
-    setTogglingIds((prev) => new Set(prev).add(task.blockId));
-    setTaskChecked(task.blockId, nextChecked); // optimista
+  async function handleToggleDone(task: Task) {
+    const next = !task.done;
+    setTogglingIds((prev) => new Set(prev).add(task.id));
+    setTaskDone(task.id, next); // optimista
     try {
-      await updateTaskChecked(task.blockId, nextChecked);
+      await updateTaskDone(task.id, next);
     } catch (err) {
-      setTaskChecked(task.blockId, task.checked); // revertir
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea en Notion');
+      setTaskDone(task.id, task.done); // revertir
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea');
     } finally {
       setTogglingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(task.blockId);
-        return next;
+        const s = new Set(prev);
+        s.delete(task.id);
+        return s;
       });
     }
   }
 
-  function handleTaskCreated(task: { blockId: string; text: string; checked: boolean }) {
-    pendingFreshRef.current = true;
-    setData((prev) => {
-      if (!prev) return prev;
-      return { ...prev, tasks: [...prev.tasks, { ...task, day: prev.selectedDay ?? '', sessions: [] }] };
-    });
+  function handleTaskCreated(task: Task) {
+    setData((prev) => (prev ? { ...prev, tasks: [...prev.tasks, task] } : prev));
   }
 
-  function handleTaskDeleted(blockId: string) {
-    pendingFreshRef.current = true;
-    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.blockId !== blockId) } : prev));
-    setSelectedTask((prev) => (prev?.blockId === blockId ? null : prev));
-  }
-
-  function handleTaskTextUpdated(blockId: string, text: string) {
-    pendingFreshRef.current = true;
+  function handleTaskDeleted(id: string) {
     setData((prev) => {
       if (!prev) return prev;
-      return { ...prev, tasks: prev.tasks.map((t) => (t.blockId === blockId ? { ...t, text } : t)) };
-    });
-    setSelectedTask((prev) => (prev?.blockId === blockId ? { ...prev, text } : prev));
-  }
-
-  function handleSessionUpdated(taskBlockId: string, session: Session) {
-    pendingFreshRef.current = true;
-    setData((prev) => {
-      if (!prev) return prev;
+      const removed = prev.tasks
+        .find((t) => t.id === id)
+        ?.sessions.reduce((s, ses) => s + ses.durationSeconds, 0) ?? 0;
       return {
         ...prev,
-        tasks: prev.tasks.map((t) =>
-          t.blockId === taskBlockId
-            ? { ...t, sessions: t.sessions.map((s) => (s.blockId === session.blockId ? session : s)) }
-            : t
-        ),
+        tasks: prev.tasks.filter((t) => t.id !== id),
+        dayTotalSeconds: prev.dayTotalSeconds - removed,
+        weekTotalSeconds: prev.weekTotalSeconds - removed,
+      };
+    });
+    setSelectedTask((prev) => (prev?.id === id ? null : prev));
+  }
+
+  function handleTaskTextUpdated(id: string, name: string) {
+    setData((prev) =>
+      prev ? { ...prev, tasks: prev.tasks.map((t) => (t.id === id ? { ...t, name } : t)) } : prev
+    );
+    setSelectedTask((prev) => (prev?.id === id ? { ...prev, name } : prev));
+  }
+
+  function handleSessionUpdated(taskId: string, session: Session) {
+    setData((prev) => {
+      if (!prev) return prev;
+      let delta = 0;
+      const tasks = prev.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          sessions: t.sessions.map((s) => {
+            if (s.id !== session.id) return s;
+            delta = session.durationSeconds - s.durationSeconds;
+            return session;
+          }),
+        };
+      });
+      return {
+        ...prev,
+        tasks,
+        dayTotalSeconds: prev.dayTotalSeconds + delta,
+        weekTotalSeconds: prev.weekTotalSeconds + delta,
       };
     });
   }
 
   async function handleReorderTask(task: Task, targetIndex: number) {
-    if (!data?.dayContainerId || !data.dayHeadingBlockId) return;
-    pendingFreshRef.current = true;
-    const afterBlockId = computeAfterBlockId(data.tasks, task.blockId, targetIndex, data.dayHeadingBlockId);
+    if (!data) return;
+    const afterId = computeAfterId(data.tasks, task.id, targetIndex);
     const originalTasks = data.tasks;
-    const originalIndex = originalTasks.findIndex((t) => t.blockId === task.blockId);
+    const originalIndex = originalTasks.findIndex((t) => t.id === task.id);
     if (originalIndex === -1) return;
 
-    // Reorden visual optimista (solo posiciones, sin tocar ids) para que
-    // se sienta instantáneo; se confirma con refresh() al terminar.
     const reordered = [...originalTasks];
     reordered.splice(originalIndex, 1);
     reordered.splice(Math.max(0, Math.min(targetIndex, reordered.length)), 0, task);
     setData((prev) => (prev ? { ...prev, tasks: reordered } : prev));
-    setBusyTaskIds((prev) => new Set(prev).add(task.blockId));
+    setBusyTaskIds((prev) => new Set(prev).add(task.id));
 
     try {
-      await reorderTask(task.blockId, data.dayContainerId, afterBlockId);
-      void refresh(data.selectedDay ?? undefined, data.week ?? undefined);
+      await moveTask(task.id, { afterId });
+      void refresh(data.selectedDay, data.week);
     } catch (err) {
-      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev)); // revertir
+      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
       setError(err instanceof Error ? err.message : 'No se pudo reordenar la tarea');
     } finally {
       setBusyTaskIds((prev) => {
-        const next = new Set(prev);
-        next.delete(task.blockId);
-        return next;
+        const s = new Set(prev);
+        s.delete(task.id);
+        return s;
       });
     }
   }
 
   async function handleMoveTask(task: Task, target: MoveTarget) {
     if (!data) return;
-    pendingFreshRef.current = true;
     const originalTasks = data.tasks;
-    const originalDay = data.selectedDay ?? undefined;
-    const originalWeek = data.week ?? undefined;
+    const { selectedDay, week } = data;
 
-    // Optimista: la tarea desaparece del día actual; se confirma con refresh.
-    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.blockId !== task.blockId) } : prev));
-    setSelectedTask((prev) => (prev?.blockId === task.blockId ? null : prev));
-    setBusyTaskIds((prev) => new Set(prev).add(task.blockId));
+    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.id !== task.id) } : prev));
+    setSelectedTask((prev) => (prev?.id === task.id ? null : prev));
+    setBusyTaskIds((prev) => new Set(prev).add(task.id));
 
     try {
-      // Misma mecánica que reordenar (crear en destino + copiar sesiones +
-      // borrar original); solo cambia el contenedor destino.
-      await reorderTask(task.blockId, target.containerId, target.afterBlockId);
-      void refresh(originalDay, originalWeek);
+      await moveTask(task.id, { date: target.date });
+      void refresh(selectedDay, week);
     } catch (err) {
-      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev)); // revertir
+      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
       setError(err instanceof Error ? err.message : `No se pudo mover la tarea a ${target.destLabel}`);
     } finally {
       setBusyTaskIds((prev) => {
-        const next = new Set(prev);
-        next.delete(task.blockId);
-        return next;
+        const s = new Set(prev);
+        s.delete(task.id);
+        return s;
       });
     }
   }
@@ -581,8 +510,6 @@ export default function App() {
     </button>
   );
 
-  // El botón de notificaciones solo aparece si el navegador soporta la
-  // Notification API (en iOS/Safari fuera de una PWA no existe).
   const notificationsTitle =
     notifications.permission === 'denied'
       ? 'Notificaciones bloqueadas en el navegador'
@@ -631,7 +558,7 @@ export default function App() {
             <button
               type="button"
               className="btn btn-filled"
-              onClick={() => void refresh(undefined, undefined, undefined, { fresh: true })}
+              onClick={() => void refresh()}
               disabled={loading}
             >
               {loading ? 'Reintentando…' : 'Reintentar'}
@@ -642,10 +569,6 @@ export default function App() {
       </div>
     );
   }
-
-  const totalSecondsToday = data
-    ? data.tasks.reduce((sum, t) => sum + t.sessions.reduce((s, ses) => s + ses.durationSeconds, 0), 0)
-    : 0;
 
   return (
     <div className="app">
@@ -676,9 +599,7 @@ export default function App() {
           <button
             type="button"
             className="btn btn-icon"
-            onClick={() =>
-              void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined, undefined, { fresh: true })
-            }
+            onClick={() => void refresh(data?.selectedDay, data?.week)}
             disabled={loading}
             title="Actualizar"
             aria-label="Actualizar"
@@ -699,27 +620,8 @@ export default function App() {
       />
 
       {error && <p className="error banner">{error}</p>}
-      {addWeekError && <p className="error banner">{addWeekError}</p>}
       {recurringNotice && (
-        <DismissibleBanner
-          key={recurringNotice.n}
-          tone="success"
-          message={recurringNotice.text}
-        />
-      )}
-      {data && data.week && data.weekSource === 'auto-fallback' && (
-        <DismissibleBanner
-          key={`week-fallback-${data.week}`}
-          tone="warning"
-          message={`No pude identificar automáticamente la semana actual por fecha — mostrando "${data.week}". Revisa el formato del encabezado en Notion si esto no es correcto.`}
-        />
-      )}
-      {data && !data.dayMatched && (
-        <DismissibleBanner
-          key={`day-fallback-${data.week}-${data.selectedDay}`}
-          tone="warning"
-          message={`No encontré el día de hoy en esta semana — mostrando "${data.selectedDay}" por defecto.`}
-        />
+        <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
       )}
 
       {data && (
@@ -727,22 +629,19 @@ export default function App() {
           <div className="day-row">
             <DaySelector
               week={data.week}
-              days={data.availableDays}
+              days={data.days.map((d) => d.day)}
               selectedDay={data.selectedDay}
               onSelectDay={guardedSelectDay}
               isCurrentWeek={data.isCurrentWeek}
-              hasPreviousWeek={Boolean(data.previousWeekLabel)}
-              hasNextWeek={Boolean(data.nextWeekLabel)}
-              onPreviousWeek={() => data.previousWeekLabel && guardedGoToWeek(data.previousWeekLabel)}
-              onNextWeek={() => data.nextWeekLabel && guardedGoToWeek(data.nextWeekLabel)}
+              onPreviousWeek={() => guardedGoToWeek(data.previousWeekLabel)}
+              onNextWeek={() => guardedGoToWeek(data.nextWeekLabel)}
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
-              onAddWeek={() => void handleRequestAddWeek()}
               loading={loading}
             />
-            {totalSecondsToday > 0 && (
+            {data.dayTotalSeconds > 0 && (
               <div className="total-pill" title="Total registrado este día">
                 <span className="total-pill-label">Día</span>
-                <span className="total-pill-value">{formatDurationLabel(totalSecondsToday)}</span>
+                <span className="total-pill-value">{formatDurationLabel(data.dayTotalSeconds)}</span>
               </div>
             )}
             {data.weekTotalSeconds > 0 && (
@@ -753,55 +652,44 @@ export default function App() {
             )}
           </div>
 
-          {data.availableDays.length === 0 ? (
-            <div className="empty-week card">
-              <p className="muted">
-                {data.week === null
-                  ? 'Este archivo todavía no tiene ninguna semana. Usa el botón "+" de arriba para crear la primera.'
-                  : 'Esta semana no tiene tareas desglosadas por día en Notion (ej. una semana de vacaciones o feriados). Usa las flechas de arriba para ver otra semana.'}
-              </p>
-            </div>
-          ) : (
-            <div className="main-grid">
-              <section className="tasks-panel card">
-                <TaskList
-                  tasks={data.tasks}
-                  selectedBlockId={selectedTask?.blockId ?? null}
-                  onSelect={guardedSelectTask}
-                  onToggleChecked={(task) => void handleToggleChecked(task)}
-                  togglingIds={togglingIds}
-                  onSessionDeleted={handleSessionDeleted}
-                  dayContainerId={data.dayContainerId}
-                  dayHeadingBlockId={data.dayHeadingBlockId}
-                  dayContainers={data.dayContainers}
-                  selectedDay={data.selectedDay}
-                  previousWeekLabel={data.previousWeekLabel}
-                  nextWeekLabel={data.nextWeekLabel}
-                  fileId={selectedFileId}
-                  lockedTaskBlockId={lockedTaskBlockId}
-                  busyTaskIds={busyTaskIds}
-                  onTaskCreated={handleTaskCreated}
-                  onTaskDeleted={handleTaskDeleted}
-                  onTaskTextUpdated={handleTaskTextUpdated}
-                  onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
-                  onMoveTask={(task, target) => void handleMoveTask(task, target)}
-                  onSessionUpdated={handleSessionUpdated}
-                  onManualSessionAdded={handleSessionLogged}
-                />
-              </section>
+          <div className="main-grid">
+            <section className="tasks-panel card">
+              <TaskList
+                tasks={data.tasks}
+                selectedTaskId={selectedTask?.id ?? null}
+                onSelect={guardedSelectTask}
+                onToggleDone={(task) => void handleToggleDone(task)}
+                togglingIds={togglingIds}
+                onSessionDeleted={handleSessionDeleted}
+                selectedDay={data.selectedDay}
+                selectedDate={data.selectedDate}
+                days={data.days}
+                previousWeekLabel={data.previousWeekLabel}
+                nextWeekLabel={data.nextWeekLabel}
+                fileId={selectedFileId}
+                lockedTaskId={lockedTaskId}
+                busyTaskIds={busyTaskIds}
+                onTaskCreated={handleTaskCreated}
+                onTaskDeleted={handleTaskDeleted}
+                onTaskTextUpdated={handleTaskTextUpdated}
+                onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
+                onMoveTask={(task, target) => void handleMoveTask(task, target)}
+                onSessionUpdated={handleSessionUpdated}
+                onManualSessionAdded={handleSessionLogged}
+              />
+            </section>
 
-              <section className="timer-panel card">
-                <Timer
-                  ref={timerRef}
-                  task={selectedTask}
-                  onSessionLogged={handleSessionLogged}
-                  onPhaseChange={setTimerPhase}
-                  soundsEnabled={soundsEnabled}
-                  notificationsEnabled={notifications.enabled}
-                />
-              </section>
-            </div>
-          )}
+            <section className="timer-panel card">
+              <Timer
+                ref={timerRef}
+                task={selectedTask}
+                onSessionLogged={handleSessionLogged}
+                onPhaseChange={setTimerPhase}
+                soundsEnabled={soundsEnabled}
+                notificationsEnabled={notifications.enabled}
+              />
+            </section>
+          </div>
 
           <footer className="shortcuts-hint">
             <kbd>espacio</kbd> inicia/detiene · <kbd>1</kbd>–<kbd>5</kbd> cambia de día ·{' '}
@@ -814,21 +702,20 @@ export default function App() {
 
       {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
 
-      {showRecurring && (
+      {showRecurring && data && (
         <RecurringTasksDialog
           fileId={selectedFileId}
-          currentWeek={data?.week ?? null}
+          currentWeek={data.week}
           onClose={() => setShowRecurring(false)}
           onApplied={(added) => {
             setRecurringNotice((prev) => ({
               n: (prev?.n ?? 0) + 1,
               text:
                 added === 0
-                  ? 'Las tareas recurrentes ya estaban en todos los días de esta semana.'
-                  : `${added} ${added === 1 ? 'tarea recurrente agregada' : 'tareas recurrentes agregadas'} a la semana.`,
+                  ? 'Las recurrentes ya estaban en la semana.'
+                  : `${added} ${added === 1 ? 'tarea recurrente agregada' : 'tareas recurrentes agregadas'}.`,
             }));
-            pendingFreshRef.current = true;
-            void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined);
+            void refresh(data.selectedDay, data.week);
           }}
         />
       )}
@@ -842,16 +729,6 @@ export default function App() {
           destructive
           onConfirm={confirmPendingSwitch}
           onCancel={() => setPendingSwitch(null)}
-        />
-      )}
-
-      {pendingNewWeek && (
-        <ConfirmDialog
-          title="Agregar semana"
-          message={`Se creará la semana "${pendingNewWeek.label}" con los cinco días (Lunes–Viernes) vacíos, lista para agregarle tareas.`}
-          confirmLabel={addingWeek ? 'Creando…' : 'Crear semana'}
-          onConfirm={confirmAddWeek}
-          onCancel={() => setPendingNewWeek(null)}
         />
       )}
     </div>

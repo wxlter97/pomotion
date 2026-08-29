@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sendError } from './_lib/errors.js';
 import { withAuth } from './_lib/handler.js';
-import { notionStore } from './_lib/notionStore.js';
+import { sqliteStore } from './_lib/sqliteStore.js';
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -10,15 +10,11 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = (req.body ?? {}) as {
-      block_id?: string;
-      container_id?: string;
-      after_block_id?: string;
-    };
-    const result = await notionStore.reorderTask({
-      blockId: body.block_id,
-      containerId: body.container_id,
-      afterBlockId: body.after_block_id,
+    const body = (req.body ?? {}) as { id?: string; date?: string; after_id?: string | null };
+    const result = await sqliteStore.updateTaskPosition({
+      taskId: body.id,
+      date: body.date,
+      afterId: body.after_id,
     });
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {

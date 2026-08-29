@@ -29,7 +29,7 @@ const Timer = forwardRef<
   TimerHandle,
   {
     task: Task | null;
-    onSessionLogged: (blockId: string, session: Session) => void;
+    onSessionLogged: (taskId: string, session: Session) => void;
     onPhaseChange?: (phase: TimerPhase) => void;
     soundsEnabled: boolean;
     notificationsEnabled: boolean;
@@ -55,7 +55,7 @@ const Timer = forwardRef<
     if (restoredRef.current || !task) return;
     restoredRef.current = true;
     const persisted = loadActiveTimer();
-    if (persisted && persisted.taskBlockId === task.blockId) {
+    if (persisted && persisted.taskId === task.id) {
       setMode(persisted.mode);
       setPhase(persisted.phase);
       setStartedAt(persisted.startedAt);
@@ -66,7 +66,7 @@ const Timer = forwardRef<
   useEffect(() => {
     const prev = taskRef.current;
     taskRef.current = task;
-    if (phase !== 'idle' && prev?.blockId !== task?.blockId) {
+    if (phase !== 'idle' && prev?.id !== task?.id) {
       setPhase('idle');
       setStartedAt(null);
     }
@@ -81,7 +81,7 @@ const Timer = forwardRef<
   // Persistir/limpiar el timer activo en localStorage.
   useEffect(() => {
     if (task && startedAt != null && (phase === 'work' || phase === 'break')) {
-      saveActiveTimer({ taskBlockId: task.blockId, taskText: task.text, mode, phase, startedAt, day: task.day });
+      saveActiveTimer({ taskId: task.id, taskName: task.name, mode, phase, startedAt, date: task.date });
     } else if (phase === 'idle') {
       clearActiveTimer();
     }
@@ -132,19 +132,14 @@ const Timer = forwardRef<
     setError(null);
     try {
       const res = await postSession({
-        block_id: currentTask.blockId,
+        task_id: currentTask.id,
         duration_seconds: durationSeconds,
         start_time: new Date(startedAt).toISOString(),
         end_time: new Date(endedAt).toISOString(),
       });
-      onSessionLogged(currentTask.blockId, {
-        blockId: res.session.blockId,
-        durationSeconds: res.session.durationSeconds,
-        start: res.session.start,
-        end: res.session.end,
-      });
+      onSessionLogged(currentTask.id, res.session);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la sesión en Notion');
+      setError(err instanceof Error ? err.message : 'No se pudo guardar la sesión');
     } finally {
       setPosting(false);
     }
@@ -242,7 +237,7 @@ const Timer = forwardRef<
 
       <p className="timer-phase-label">
         {phase === 'idle' && (task ? 'Listo para iniciar' : 'Selecciona una tarea')}
-        {phase === 'work' && (task ? task.text : 'Trabajando')}
+        {phase === 'work' && (task ? task.name : 'Trabajando')}
         {phase === 'break' && 'Descanso'}
       </p>
 

@@ -2,10 +2,9 @@ import { useEffect, useRef } from 'react';
 import type { FileEntry } from '../types';
 
 /**
- * Selector de "archivo" (Trabajo/Casa/Hábitos, etc.) — cada uno es una
- * página índice independiente en Notion, con su propia rotación de
- * semanas. Se oculta por completo si solo hay 0 o 1 archivo configurado
- * (modo de un solo archivo, el comportamiento de siempre).
+ * Selector de "archivo" (Trabajo/Casa/Hábitos, etc.) — un contexto,
+ * el valor de `tasks.file`. Se oculta si hay 0 o 1 archivo (modo de un
+ * solo contexto).
  */
 export default function FileSelector({
   files,

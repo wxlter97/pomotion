@@ -15,7 +15,7 @@ import {
   nowAsHHMM,
   parseDurationToSeconds,
 } from '../duration';
-import type { DayContainer, Session, Task } from '../types';
+import type { DayColumn, Session, Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 import MoveTaskMenu, { type MoveTarget } from './MoveTaskMenu';
 
@@ -44,12 +44,11 @@ function rangesOverlap(a: [number, number], b: [number, number]): boolean {
 }
 
 // Aviso (no bloqueante) de solapamiento: compara contra cualquier otra
-// sesión ya registrada ese día, en cualquier tarea — no se puede estar
-// trabajando en dos cosas a la vez. `excludeSessionBlockId` deja afuera la
-// sesión que se está editando, para que no se solape "consigo misma".
+// sesión ya registrada ese día, en cualquier tarea. `excludeSessionId` deja
+// afuera la sesión que se está editando.
 function findOverlap(
   allTasks: Task[],
-  excludeSessionBlockId: string | null,
+  excludeSessionId: string | null,
   start: string,
   end: string
 ): { task: Task; session: Session } | null {
@@ -57,7 +56,7 @@ function findOverlap(
   const candidate = timeRangeMinutes(start, end);
   for (const t of allTasks) {
     for (const s of t.sessions) {
-      if (!s.blockId || s.blockId === excludeSessionBlockId) continue;
+      if (s.id === excludeSessionId) continue;
       if (!isValidTimeLabel(s.start) || !isValidTimeLabel(s.end)) continue;
       if (rangesOverlap(candidate, timeRangeMinutes(s.start, s.end))) {
         return { task: t, session: s };
@@ -69,19 +68,18 @@ function findOverlap(
 
 export default function TaskList({
   tasks,
-  selectedBlockId,
+  selectedTaskId,
   onSelect,
-  onToggleChecked,
+  onToggleDone,
   togglingIds,
   onSessionDeleted,
-  dayContainerId,
-  dayHeadingBlockId,
-  dayContainers,
   selectedDay,
+  selectedDate,
+  days,
   previousWeekLabel,
   nextWeekLabel,
   fileId,
-  lockedTaskBlockId,
+  lockedTaskId,
   busyTaskIds,
   onTaskCreated,
   onTaskDeleted,
@@ -92,31 +90,28 @@ export default function TaskList({
   onManualSessionAdded,
 }: {
   tasks: Task[];
-  selectedBlockId: string | null;
+  selectedTaskId: string | null;
   onSelect: (task: Task) => void;
-  onToggleChecked: (task: Task) => void;
+  onToggleDone: (task: Task) => void;
   togglingIds: Set<string>;
-  onSessionDeleted: (taskBlockId: string, sessionBlockId: string) => void;
-  dayContainerId: string | null;
-  dayHeadingBlockId: string | null;
-  dayContainers: DayContainer[];
-  selectedDay: string | null;
-  previousWeekLabel: string | null;
-  nextWeekLabel: string | null;
+  onSessionDeleted: (taskId: string, sessionId: string) => void;
+  selectedDay: string;
+  selectedDate: string;
+  days: DayColumn[];
+  previousWeekLabel: string;
+  nextWeekLabel: string;
   fileId: string | null;
-  lockedTaskBlockId: string | null;
+  lockedTaskId: string | null;
   busyTaskIds: Set<string>;
-  onTaskCreated: (task: { blockId: string; text: string; checked: boolean }) => void;
-  onTaskDeleted: (blockId: string) => void;
-  onTaskTextUpdated: (blockId: string, text: string) => void;
+  onTaskCreated: (task: Task) => void;
+  onTaskDeleted: (id: string) => void;
+  onTaskTextUpdated: (id: string, name: string) => void;
   onReorderTask: (task: Task, targetIndex: number) => void;
   onMoveTask: (task: Task, target: MoveTarget) => void;
-  onSessionUpdated: (taskBlockId: string, session: Session) => void;
-  onManualSessionAdded: (taskBlockId: string, session: Session) => void;
+  onSessionUpdated: (taskId: string, session: Session) => void;
+  onManualSessionAdded: (taskId: string, session: Session) => void;
 }) {
-  const [pendingDelete, setPendingDelete] = useState<{ taskBlockId: string; sessionBlockId: string } | null>(
-    null
-  );
+  const [pendingDelete, setPendingDelete] = useState<{ taskId: string; sessionId: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +122,7 @@ export default function TaskList({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const [dragBlockId, setDragBlockId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -147,8 +142,8 @@ export default function TaskList({
     setDeleting(true);
     setError(null);
     try {
-      await deleteSession(pendingDelete.sessionBlockId);
-      onSessionDeleted(pendingDelete.taskBlockId, pendingDelete.sessionBlockId);
+      await deleteSession(pendingDelete.sessionId);
+      onSessionDeleted(pendingDelete.taskId, pendingDelete.sessionId);
       setPendingDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la sesión');
@@ -162,8 +157,8 @@ export default function TaskList({
     setDeletingTask(true);
     setError(null);
     try {
-      await deleteTask(pendingTaskDelete.blockId);
-      onTaskDeleted(pendingTaskDelete.blockId);
+      await deleteTask(pendingTaskDelete.id);
+      onTaskDeleted(pendingTaskDelete.id);
       setPendingTaskDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo eliminar la tarea');
@@ -174,12 +169,11 @@ export default function TaskList({
 
   async function submitAdd() {
     const trimmed = newTaskText.trim();
-    const afterBlockId = tasks.length > 0 ? tasks[tasks.length - 1].blockId : dayHeadingBlockId;
-    if (!trimmed || !dayContainerId || !afterBlockId) return;
+    if (!trimmed) return;
     setAdding(true);
     setAddError(null);
     try {
-      const res = await createTask(dayContainerId, afterBlockId, trimmed);
+      const res = await createTask(selectedDate, trimmed, fileId ?? undefined);
       onTaskCreated(res.task);
       setNewTaskText('');
     } catch (err) {
@@ -194,9 +188,6 @@ export default function TaskList({
     void submitAdd();
   }
 
-  // No depender solo del submit implícito del navegador al presionar Enter
-  // (misma lección que Login.tsx) — se maneja explícito y se cancela el
-  // default para no disparar el submit del form dos veces.
   function handleAddKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -204,10 +195,10 @@ export default function TaskList({
     }
   }
 
-  function handleDragStart(e: DragEvent<HTMLLIElement>, blockId: string) {
-    setDragBlockId(blockId);
+  function handleDragStart(e: DragEvent<HTMLLIElement>, id: string) {
+    setDragId(id);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', blockId); // Firefox exige setData para iniciar el drag
+    e.dataTransfer.setData('text/plain', id); // Firefox exige setData para iniciar el drag
   }
 
   function handleDragOver(e: DragEvent<HTMLLIElement>, index: number) {
@@ -218,36 +209,36 @@ export default function TaskList({
 
   function handleDrop(e: DragEvent<HTMLLIElement>, index: number) {
     e.preventDefault();
-    const blockId = dragBlockId;
-    setDragBlockId(null);
+    const id = dragId;
+    setDragId(null);
     setDragOverIndex(null);
-    if (!blockId) return;
-    const task = tasks.find((t) => t.blockId === blockId);
+    if (!id) return;
+    const task = tasks.find((t) => t.id === id);
     if (task) onReorderTask(task, index);
   }
 
   function handleDragEnd() {
-    setDragBlockId(null);
+    setDragId(null);
     setDragOverIndex(null);
   }
 
   function startEditTask(task: Task) {
-    setEditingTaskId(task.blockId);
-    setEditingTaskText(task.text);
+    setEditingTaskId(task.id);
+    setEditingTaskText(task.name);
   }
 
   async function submitTaskTextEdit(task: Task) {
     const trimmed = editingTaskText.trim();
     if (!trimmed) return;
-    if (trimmed === task.text) {
+    if (trimmed === task.name) {
       setEditingTaskId(null);
       return;
     }
     setSavingTaskText(true);
     setError(null);
     try {
-      await updateTaskText(task.blockId, trimmed);
-      onTaskTextUpdated(task.blockId, trimmed);
+      await updateTaskText(task.id, trimmed);
+      onTaskTextUpdated(task.id, trimmed);
       setEditingTaskId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea');
@@ -267,8 +258,7 @@ export default function TaskList({
   }
 
   function startEditSession(s: Session) {
-    if (!s.blockId) return;
-    setEditingSessionId(s.blockId);
+    setEditingSessionId(s.id);
     setSessionDraft({ duration: formatDurationLabel(s.durationSeconds), start: s.start, end: s.end });
   }
 
@@ -287,12 +277,6 @@ export default function TaskList({
     return { duration, start, end };
   }
 
-  // Calcula la hora de fin a partir de inicio + duración; devuelve null si
-  // todavía no hay suficiente información válida para calcularla (para que
-  // el llamador deje el campo `end` tal cual estaba, sin pisarlo). El fin
-  // sigue siendo una etiqueta "HH:MM" (sin segundos), así que la duración
-  // se redondea al minuto más cercano solo para este cálculo — la
-  // duración que se guarda mantiene su precisión real de segundos.
   function deriveEnd(start: string, durationInput: string): string | null {
     const seconds = parseDurationToSeconds(durationInput);
     if (seconds === null || seconds <= 0) return null;
@@ -304,27 +288,24 @@ export default function TaskList({
   function handleSessionDurationChange(value: string) {
     setSessionDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
   }
-
   function handleSessionStartChange(value: string) {
     setSessionDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
   }
-
   function handleManualDurationChange(value: string) {
     setManualDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
   }
-
   function handleManualStartChange(value: string) {
     setManualDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
   }
 
-  async function submitSessionEdit(taskBlockId: string, sessionBlockId: string) {
+  async function submitSessionEdit(taskId: string, sessionId: string) {
     setError(null);
     const parsed = validateDraft(sessionDraft);
     if (!parsed) return;
     setSavingSession(true);
     try {
-      const res = await updateSession(sessionBlockId, parsed.duration, parsed.start, parsed.end);
-      onSessionUpdated(taskBlockId, { blockId: sessionBlockId, ...res.session });
+      const res = await updateSession(sessionId, parsed.duration, parsed.start, parsed.end);
+      onSessionUpdated(taskId, res.session);
       setEditingSessionId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo actualizar la sesión');
@@ -333,8 +314,8 @@ export default function TaskList({
     }
   }
 
-  // Encadena con la sesión más reciente de la tarea (la de mayor hora de
-  // fin) si existe alguna válida; si no hay ninguna, usa la hora actual.
+  // Encadena con la sesión más reciente de la tarea (mayor hora de fin) si
+  // hay alguna válida; si no, usa la hora actual.
   function defaultManualStart(task: Task): string {
     let latestEnd: string | null = null;
     for (const s of task.sessions) {
@@ -347,7 +328,7 @@ export default function TaskList({
   }
 
   function openManualEntry(task: Task) {
-    setManualEntryTaskId(task.blockId);
+    setManualEntryTaskId(task.id);
     setManualDraft({ duration: '', start: defaultManualStart(task), end: '' });
   }
 
@@ -357,8 +338,8 @@ export default function TaskList({
     if (!parsed) return;
     setAddingManualSession(true);
     try {
-      const res = await postManualSession(task.blockId, parsed.duration, parsed.start, parsed.end);
-      onManualSessionAdded(task.blockId, { blockId: res.session.blockId, ...res.session });
+      const res = await postManualSession(task.id, parsed.duration, parsed.start, parsed.end);
+      onManualSessionAdded(task.id, res.session);
       setManualEntryTaskId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo agregar la sesión');
@@ -376,40 +357,44 @@ export default function TaskList({
           {tasks.map((task, i) => {
             const total = sumSeconds(task);
             const manualOverlap =
-              manualEntryTaskId === task.blockId
+              manualEntryTaskId === task.id
                 ? findOverlap(tasks, null, manualDraft.start, manualDraft.end)
                 : null;
-            const isToggling = togglingIds.has(task.blockId);
-            const isLocked = lockedTaskBlockId === task.blockId;
-            const isBusy = busyTaskIds.has(task.blockId);
+            const isToggling = togglingIds.has(task.id);
+            const isLocked = lockedTaskId === task.id;
+            const isBusy = busyTaskIds.has(task.id);
             const disableEdit = isLocked || isBusy;
-            const isEditingText = editingTaskId === task.blockId;
+            const isEditingText = editingTaskId === task.id;
 
             return (
               <li
-                key={task.blockId}
+                key={task.id}
                 draggable={!disableEdit && !isEditingText}
-                onDragStart={(e) => handleDragStart(e, task.blockId)}
+                onDragStart={(e) => handleDragStart(e, task.id)}
                 onDragOver={(e) => handleDragOver(e, i)}
                 onDrop={(e) => handleDrop(e, i)}
                 onDragEnd={handleDragEnd}
-                className={dragOverIndex === i && dragBlockId && dragBlockId !== task.blockId ? 'drag-over' : ''}
+                className={dragOverIndex === i && dragId && dragId !== task.id ? 'drag-over' : ''}
               >
                 <div
                   className={
-                    task.blockId === selectedBlockId ? 'task-item active' : isLocked ? 'task-item locked' : 'task-item'
+                    task.id === selectedTaskId
+                      ? 'task-item active'
+                      : isLocked
+                        ? 'task-item locked'
+                        : 'task-item'
                   }
                   title={isLocked ? 'Detén el timer para mover o borrar esta tarea' : undefined}
                 >
                   <button
                     type="button"
-                    className={task.checked ? 'task-check checked' : 'task-check'}
-                    onClick={() => onToggleChecked(task)}
+                    className={task.done ? 'task-check checked' : 'task-check'}
+                    onClick={() => onToggleDone(task)}
                     disabled={isToggling}
-                    aria-label={task.checked ? 'Marcar como pendiente' : 'Marcar como hecha'}
-                    title={task.checked ? 'Marcar como pendiente' : 'Marcar como hecha'}
+                    aria-label={task.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
+                    title={task.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
                   >
-                    {!isToggling && task.checked ? '✓' : ''}
+                    {!isToggling && task.done ? '✓' : ''}
                   </button>
 
                   {isEditingText ? (
@@ -445,7 +430,7 @@ export default function TaskList({
                     </div>
                   ) : (
                     <button type="button" className="task-select" onClick={() => onSelect(task)}>
-                      <span className="task-text">{task.text || '(sin texto)'}</span>
+                      <span className="task-text">{task.name || '(sin texto)'}</span>
                     </button>
                   )}
 
@@ -484,7 +469,7 @@ export default function TaskList({
                       </button>
                       <MoveTaskMenu
                         currentDay={selectedDay}
-                        dayContainers={dayContainers}
+                        days={days}
                         previousWeekLabel={previousWeekLabel}
                         nextWeekLabel={nextWeekLabel}
                         fileId={fileId}
@@ -508,13 +493,13 @@ export default function TaskList({
                 <div className="session-area">
                   {task.sessions.length > 0 && (
                     <ul className="session-list">
-                      {task.sessions.map((s, si) => {
-                        const isEditingSession = s.blockId && editingSessionId === s.blockId;
+                      {task.sessions.map((s) => {
+                        const isEditingSession = editingSessionId === s.id;
                         const editOverlap = isEditingSession
-                          ? findOverlap(tasks, s.blockId ?? null, sessionDraft.start, sessionDraft.end)
+                          ? findOverlap(tasks, s.id, sessionDraft.start, sessionDraft.end)
                           : null;
                         return (
-                          <li key={s.blockId ?? si}>
+                          <li key={s.id}>
                             {isEditingSession ? (
                               <>
                                 <div className="session-edit-form">
@@ -550,7 +535,7 @@ export default function TaskList({
                                   <button
                                     type="button"
                                     className="session-delete"
-                                    onClick={() => s.blockId && void submitSessionEdit(task.blockId, s.blockId)}
+                                    onClick={() => void submitSessionEdit(task.id, s.id)}
                                     disabled={savingSession}
                                     aria-label="Guardar sesión"
                                     title="Guardar"
@@ -570,7 +555,7 @@ export default function TaskList({
                                 </div>
                                 {editOverlap && (
                                   <p className="warning">
-                                    ⚠ Se solapa con "{editOverlap.task.text || '(sin texto)'}" (
+                                    ⚠ Se solapa con "{editOverlap.task.name || '(sin texto)'}" (
                                     {editOverlap.session.start}–{editOverlap.session.end})
                                   </p>
                                 )}
@@ -580,30 +565,26 @@ export default function TaskList({
                                 <span>
                                   ⏱ {formatDurationLabel(s.durationSeconds)} ({s.start}–{s.end})
                                 </span>
-                                {s.blockId && (
-                                  <span className="session-row-actions">
-                                    <button
-                                      type="button"
-                                      className="session-delete"
-                                      aria-label="Editar sesión"
-                                      title="Editar sesión"
-                                      onClick={() => startEditSession(s)}
-                                    >
-                                      ✎
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="session-delete"
-                                      aria-label="Eliminar sesión"
-                                      title="Eliminar sesión"
-                                      onClick={() =>
-                                        setPendingDelete({ taskBlockId: task.blockId, sessionBlockId: s.blockId as string })
-                                      }
-                                    >
-                                      ×
-                                    </button>
-                                  </span>
-                                )}
+                                <span className="session-row-actions">
+                                  <button
+                                    type="button"
+                                    className="session-delete"
+                                    aria-label="Editar sesión"
+                                    title="Editar sesión"
+                                    onClick={() => startEditSession(s)}
+                                  >
+                                    ✎
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="session-delete"
+                                    aria-label="Eliminar sesión"
+                                    title="Eliminar sesión"
+                                    onClick={() => setPendingDelete({ taskId: task.id, sessionId: s.id })}
+                                  >
+                                    ×
+                                  </button>
+                                </span>
                               </>
                             )}
                           </li>
@@ -612,7 +593,7 @@ export default function TaskList({
                     </ul>
                   )}
 
-                  {manualEntryTaskId === task.blockId ? (
+                  {manualEntryTaskId === task.id ? (
                     <>
                       <div className="manual-session-form">
                         <input
@@ -661,13 +642,17 @@ export default function TaskList({
                       </div>
                       {manualOverlap && (
                         <p className="warning">
-                          ⚠ Se solapa con "{manualOverlap.task.text || '(sin texto)'}" (
+                          ⚠ Se solapa con "{manualOverlap.task.name || '(sin texto)'}" (
                           {manualOverlap.session.start}–{manualOverlap.session.end})
                         </p>
                       )}
                     </>
                   ) : (
-                    <button type="button" className="manual-session-trigger" onClick={() => openManualEntry(task)}>
+                    <button
+                      type="button"
+                      className="manual-session-trigger"
+                      onClick={() => openManualEntry(task)}
+                    >
                       + Agregar sesión manual
                     </button>
                   )}
@@ -685,9 +670,9 @@ export default function TaskList({
           onChange={(e) => setNewTaskText(e.target.value)}
           onKeyDown={handleAddKeyDown}
           placeholder="Agregar tarea…"
-          disabled={adding || !dayContainerId}
+          disabled={adding}
         />
-        <button type="submit" className="btn btn-tinted" disabled={adding || !newTaskText.trim() || !dayContainerId}>
+        <button type="submit" className="btn btn-tinted" disabled={adding || !newTaskText.trim()}>
           {adding ? 'Agregando…' : 'Agregar'}
         </button>
       </form>
@@ -698,7 +683,7 @@ export default function TaskList({
       {pendingDelete && (
         <ConfirmDialog
           title="Eliminar sesión"
-          message="Esto borra el registro de tiempo en Notion. No se puede deshacer."
+          message="Esto borra el registro de tiempo. No se puede deshacer."
           confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
           destructive
           onConfirm={confirmDelete}
@@ -714,7 +699,7 @@ export default function TaskList({
               ? `Esta tarea tiene ${pendingTaskDelete.sessions.length} sesión(es) registradas (${formatDurationLabel(
                   sumSeconds(pendingTaskDelete)
                 )}). Borrarla también borra ese historial. No se puede deshacer.`
-              : 'Esto borra la tarea en Notion. No se puede deshacer.'
+              : 'Esto borra la tarea. No se puede deshacer.'
           }
           confirmLabel={deletingTask ? 'Eliminando…' : 'Eliminar'}
           destructive

@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sendError } from './_lib/errors.js';
 import { withAuth } from './_lib/handler.js';
-import { notionStore } from './_lib/notionStore.js';
+import { sqliteStore } from './_lib/sqliteStore.js';
 import { formatDurationLabel } from '../shared/duration.js';
-import type { SessionRow } from './_lib/store.js';
+import type { SessionRow } from './_lib/taskStore.js';
 
 const CSV_COLUMNS: { header: string; value: (r: SessionRow) => string | number }[] = [
   { header: 'fecha', value: (r) => r.date },
@@ -40,7 +40,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     const from = typeof req.query.from === 'string' ? req.query.from : undefined;
     const to = typeof req.query.to === 'string' ? req.query.to : undefined;
     const fileId = typeof req.query.file === 'string' ? req.query.file : undefined;
-    const rows = await notionStore.getSessionsInRange({ from, to, fileId });
+    const rows = await sqliteStore.getSessionsInRange({ from, to, fileId });
 
     if (req.query.format === 'csv') {
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');

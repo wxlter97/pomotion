@@ -15,12 +15,12 @@ const KEY = 'pomotion:active-timer';
 const MAX_AGE_MS = 20 * 60 * 60 * 1000; // 20h: generoso para un día laboral, corta lo demás
 
 export type PersistedTimer = {
-  taskBlockId: string;
-  taskText: string;
+  taskId: string;
+  taskName: string;
   mode: TimerMode;
   phase: Exclude<TimerPhase, 'idle'>;
   startedAt: number; // epoch ms
-  day: string;
+  date: string;
 };
 
 function isSameCalendarDay(a: Date, b: Date): boolean {
@@ -56,7 +56,7 @@ export function loadActiveTimer(): PersistedTimer | null {
     const parsed = JSON.parse(raw) as Partial<PersistedTimer>;
     if (
       !parsed ||
-      typeof parsed.taskBlockId !== 'string' ||
+      typeof parsed.taskId !== 'string' ||
       typeof parsed.startedAt !== 'number' ||
       (parsed.phase !== 'work' && parsed.phase !== 'break') ||
       (parsed.mode !== 'pomodoro' && parsed.mode !== 'free')
