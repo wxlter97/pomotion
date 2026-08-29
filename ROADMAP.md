@@ -295,9 +295,10 @@ Implementa `Store` contra Turso, todo scopeado por `requestContext.userId`:
   de status pero devuelve **403 `pending_approval`** en todo lo de dominio. El front
   muestra "tu cuenta está pendiente de aprobación".
 - **Aprobar:** dos caminos, ambos triviales —
-  1. `scripts/approve-user.ts <email>` (un `UPDATE`).
-  2. Si sos admin, en **Settings** ves "usuarios pendientes" con un botón "Aprobar"
-     (`POST /api/admin/approve { userId }`, gated a `is_admin`).
+  1. `npm run approve -- <email>` (un `UPDATE`).
+  2. ✅ PR #34 — si sos admin, en el menú **⋮ → "Aprobar usuarios"** ves el diálogo
+     con pendientes / con acceso y botones Aprobar / Revocar
+     (`GET|POST /api/auth/status`, gated a `is_admin`; no revoca tu propia cuenta).
 - Invitar a alguien = decirle "entrá con Google" y aprobarlo. Sin claves compartidas.
 
 ---

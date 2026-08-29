@@ -57,6 +57,30 @@ export function getAuthStatus() {
 /** URL a la que navega el botón "Continuar con Google". */
 export const googleLoginUrl = '/api/auth/google/start';
 
+// --- Admin: aprobación de usuarios ---
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  pictureUrl: string | null;
+  approved: boolean;
+  isAdmin: boolean;
+  createdAt: string;
+  lastSeenAt: string | null;
+};
+
+export function getAdminUsers() {
+  return request<{ users: AdminUser[] }>('/api/auth/status?users=1');
+}
+
+export function setUserApproval(userId: string, approved: boolean) {
+  return request<{ ok: true }>('/api/auth/status', {
+    method: 'POST',
+    body: JSON.stringify({ action: approved ? 'approve' : 'revoke', userId }),
+  });
+}
+
 export function logout() {
   return request<{ ok: true }>('/api/auth/logout', { method: 'POST' });
 }

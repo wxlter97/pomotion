@@ -22,6 +22,7 @@ import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
+import AdminUsersDialog from './components/AdminUsersDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
@@ -85,6 +86,7 @@ function MoreIcon() {
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
   const [authEmail, setAuthEmail] = useState<string | null>(null);
+  const [authIsAdmin, setAuthIsAdmin] = useState(false);
   const [data, setData] = useState<TasksResponse | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,6 +103,7 @@ export default function App() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
@@ -203,6 +206,7 @@ export default function App() {
           return;
         }
         setAuthEmail(status.user.email);
+        setAuthIsAdmin(status.user.isAdmin);
         if (!status.approved) {
           setAuthState('pending');
           return;
@@ -571,6 +575,7 @@ export default function App() {
     }
     setAuthState('guest');
     setAuthEmail(null);
+    setAuthIsAdmin(false);
     setData(null);
     setSelectedTask(null);
     filesLoadedRef.current = false;
@@ -633,6 +638,9 @@ export default function App() {
             Traer pendientes al abrir
           </MenuItem>
           <div className="menu-sep" />
+          {authIsAdmin && (
+            <MenuItem onClick={() => { setShowAdmin(true); close(); }}>Aprobar usuarios</MenuItem>
+          )}
           <MenuItem
             onClick={() => { void refresh(data?.selectedDay, data?.week); close(); }}
             disabled={loading}
@@ -882,6 +890,8 @@ export default function App() {
           onClose={() => setShowGoals(false)}
         />
       )}
+
+      {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
 
       {showTags && data && (
         <TagsDialog
