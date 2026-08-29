@@ -13,6 +13,7 @@ import { formatDurationLabel } from './duration';
 import { computeAfterBlockId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
+import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
 
@@ -64,6 +65,24 @@ function ReportIcon() {
   );
 }
 
+function BellOnIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2.5 6 2.5 6h-17S6 14 6 9Z" />
+      <path d="M10 20a2.5 2.5 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+function BellOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9a6 6 0 0 1 9.5-4.9M18 12c0 3 1.5 4.2 2.2 4.8M17.7 17.7H3.5S6 14 6 9M10 20a2.5 2.5 0 0 0 4 0" />
+      <path d="M3 3l18 18" />
+    </svg>
+  );
+}
+
 function RefreshIcon({ spinning }: { spinning?: boolean }) {
   return (
     <svg
@@ -101,6 +120,7 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
+  const notifications = useNotificationSetting();
   const timerRef = useRef<TimerHandle>(null);
 
   // Selector de archivo (Trabajo/Casa/Hábitos, etc.). `files` queda vacío
@@ -454,6 +474,27 @@ export default function App() {
     </button>
   );
 
+  // El botón de notificaciones solo aparece si el navegador soporta la
+  // Notification API (en iOS/Safari fuera de una PWA no existe).
+  const notificationsTitle =
+    notifications.permission === 'denied'
+      ? 'Notificaciones bloqueadas en el navegador'
+      : notifications.enabled
+        ? 'Desactivar notificaciones'
+        : 'Avisar el cambio de fase con una notificación';
+  const notificationToggleButton = notifications.permission !== 'unsupported' && (
+    <button
+      type="button"
+      className="btn btn-icon"
+      onClick={() => void notifications.toggle()}
+      disabled={notifications.permission === 'denied'}
+      title={notificationsTitle}
+      aria-label={notificationsTitle}
+    >
+      {notifications.enabled ? <BellOnIcon /> : <BellOffIcon />}
+    </button>
+  );
+
   if (authState === 'checking') {
     return (
       <div className="center-screen">
@@ -505,6 +546,7 @@ export default function App() {
             <ReportIcon />
           </button>
           {soundToggleButton}
+          {notificationToggleButton}
           {themeToggleButton}
           <button
             type="button"
@@ -615,6 +657,7 @@ export default function App() {
                   onSessionLogged={handleSessionLogged}
                   onPhaseChange={setTimerPhase}
                   soundsEnabled={soundsEnabled}
+                  notificationsEnabled={notifications.enabled}
                 />
               </section>
             </div>
