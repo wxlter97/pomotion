@@ -1648,6 +1648,143 @@ h3 {
   background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
 }
 
+/* --- Metas del mes --- */
+.sheet--goals {
+  max-width: min(94vw, 480px);
+}
+
+.goal-new {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 1.1rem;
+}
+
+.goal-new-in {
+  font-size: 0.85rem;
+  color: var(--color-label-secondary);
+}
+
+.goal-hours-input {
+  width: 4rem;
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+  font-size: 0.85rem;
+}
+
+.goal-tag-select {
+  flex: 0 1 9rem;
+  min-width: 0;
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.goal-hours-input:focus,
+.goal-tag-select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.goal-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.goal-item {
+  /* color del progreso según el estado */
+  --goal-color: var(--color-accent);
+}
+.goal-item[data-state='behind'] {
+  --goal-color: var(--color-destructive);
+}
+.goal-item[data-state='ahead'],
+.goal-item[data-state='done'] {
+  --goal-color: var(--color-success);
+}
+
+.goal-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.goal-item-name {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-label);
+  overflow-wrap: anywhere;
+}
+
+.goal-item-delete {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.goal-item-delete:hover:not(:disabled) {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+}
+
+.goal-bar {
+  position: relative;
+  height: 0.7rem;
+  background: var(--color-fill);
+  border-radius: 980px;
+  overflow: hidden;
+}
+
+.goal-bar-fill {
+  height: 100%;
+  background: var(--goal-color);
+  border-radius: 980px;
+  transition: width 0.25s ease;
+}
+
+/* Marca del ritmo esperado a la fecha */
+.goal-bar-pace {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  background: var(--color-label);
+  opacity: 0.5;
+}
+
+.goal-item-meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.goal-item-pace {
+  color: var(--goal-color);
+  font-weight: 600;
+}
+
 .session-list {
   margin: 0;
   padding: 0;

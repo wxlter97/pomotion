@@ -35,6 +35,7 @@ import type {
   ApplyDayTemplateInput,
   ApplyRecurringInput,
   CreateDayTemplateInput,
+  CreateGoalInput,
   CreateRecurringRuleInput,
   CreateTagInput,
   CreateTaskInput,
@@ -46,6 +47,8 @@ import type {
   FocusHeatmapDay,
   GetAnalyticsInput,
   GetFocusHeatmapInput,
+  Goal,
+  GoalProgress,
   GetMonthSummaryInput,
   GetWeekViewInput,
   LogSessionInput,
@@ -60,6 +63,7 @@ import type {
   TaskPriority,
   TaskStore,
   UpdateDayTemplateInput,
+  UpdateGoalInput,
   UpdateRecurringRuleInput,
   UpdateSessionInput,
   UpdateTagInput,
@@ -1480,6 +1484,133 @@ async function applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: 
   return { added: inserts.length };
 }
 
+// --- Metas ---
+
+const GOAL_MAX_MINUTES = 60_000; // ~1000 h/mes: tope defensivo
+
+function toGoal(r: Row): Goal {
+  return {
+    id: String(r.id),
+    tagId: r.tag_id == null ? null : String(r.tag_id),
+    file: r.file == null ? null : String(r.file),
+    targetMinutes: Number(r.target_minutes),
+  };
+}
+
+function cleanTarget(minutes: number | undefined): number {
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes <= 0 || minutes > GOAL_MAX_MINUTES) {
+    throw new BadRequestError('invalid_target', `target_minutes debe ser entre 1 y ${GOAL_MAX_MINUTES}`);
+  }
+  return Math.round(minutes);
+}
+
+async function assertOwnsTag(userId: string, tagId: string): Promise<void> {
+  const row = (
+    await getDb().execute({ sql: 'SELECT 1 FROM tags WHERE id = ? AND user_id = ?', args: [tagId, userId] })
+  ).rows[0];
+  if (!row) throw new BadRequestError('unknown_tag', 'La etiqueta no existe');
+}
+
+async function listGoals(): Promise<GoalProgress[]> {
+  const userId = currentUserId();
+  const db = getDb();
+
+  const goals = (
+    await db.execute({
+      sql: 'SELECT * FROM goals WHERE user_id = ? ORDER BY created_at',
+      args: [userId],
+    })
+  ).rows.map(toGoal);
+  if (goals.length === 0) return [];
+
+  const today = todayDateStringInTz(TIMEZONE);
+  const month = today.slice(0, 7);
+  const { first, last } = monthRange(month);
+  const dayOfMonth = Number(today.slice(8, 10));
+  const daysInMonth = Number(last.slice(8, 10));
+
+  const tagName = new Map(
+    (
+      await db.execute({ sql: 'SELECT id, name FROM tags WHERE user_id = ?', args: [userId] })
+    ).rows.map((r) => [String(r.id), String(r.name)] as const)
+  );
+
+  const sessRows = (
+    await db.execute({
+      sql: `SELECT duration_sec, file, task_id FROM work_sessions
+            WHERE user_id = ? AND date >= ? AND date <= ?`,
+      args: [userId, first, last],
+    })
+  ).rows;
+  const tagsByTask = await tagIdsByTask([...new Set(sessRows.map((r) => String(r.task_id)))]);
+
+  return goals.map((goal) => {
+    let loggedSeconds = 0;
+    for (const s of sessRows) {
+      const sFile = s.file == null ? null : String(s.file);
+      if (goal.file != null && sFile !== goal.file) continue;
+      if (goal.tagId != null && !(tagsByTask.get(String(s.task_id)) ?? []).includes(goal.tagId)) continue;
+      loggedSeconds += Number(s.duration_sec);
+    }
+    return {
+      ...goal,
+      tagName: goal.tagId == null ? null : (tagName.get(goal.tagId) ?? '(borrada)'),
+      month,
+      loggedSeconds,
+      dayOfMonth,
+      daysInMonth,
+    };
+  });
+}
+
+async function createGoal(input: CreateGoalInput): Promise<Goal> {
+  const userId = currentUserId();
+  const targetMinutes = cleanTarget(input.targetMinutes);
+  const tagId = input.tagId ?? null;
+  if (tagId != null) await assertOwnsTag(userId, tagId);
+  const file = input.fileId ?? null;
+  const id = crypto.randomUUID();
+  await getDb().execute({
+    sql: `INSERT INTO goals (id, user_id, tag_id, file, target_minutes, created_at)
+          VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [id, userId, tagId, file, targetMinutes, new Date().toISOString()],
+  });
+  return { id, tagId, file, targetMinutes };
+}
+
+async function updateGoal(input: UpdateGoalInput): Promise<Goal> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_id', 'Falta id');
+
+  const sets: string[] = [];
+  const args: InValue[] = [];
+  if (input.targetMinutes !== undefined) {
+    sets.push('target_minutes = ?');
+    args.push(cleanTarget(input.targetMinutes));
+  }
+  if (input.tagId !== undefined) {
+    if (input.tagId != null) await assertOwnsTag(userId, input.tagId);
+    sets.push('tag_id = ?');
+    args.push(input.tagId);
+  }
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+
+  const res = await getDb().execute({
+    sql: `UPDATE goals SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`,
+    args: [...args, input.id, userId],
+  });
+  if (res.rowsAffected === 0) throw new NotFoundError('goal_not_found', 'Meta no encontrada');
+
+  const row = (await getDb().execute({ sql: 'SELECT * FROM goals WHERE id = ?', args: [input.id] })).rows[0];
+  return toGoal(row);
+}
+
+async function deleteGoal(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_id', 'Falta id');
+  await getDb().execute({ sql: 'DELETE FROM goals WHERE id = ? AND user_id = ?', args: [id, userId] });
+}
+
 export const sqliteStore: TaskStore = {
   getWeekView,
   getMonthSummary,
@@ -1508,4 +1639,8 @@ export const sqliteStore: TaskStore = {
   updateDayTemplate,
   deleteDayTemplate,
   applyDayTemplate,
+  listGoals,
+  createGoal,
+  updateGoal,
+  deleteGoal,
 };
