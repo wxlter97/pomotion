@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
-import { createTask, deleteTask, updateTask } from './_lib/notionStore.js';
+import { notionStore } from './_lib/notionStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
@@ -9,12 +9,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'PATCH') {
       const body = (req.body ?? {}) as { block_id?: string; checked?: boolean; text?: string };
-      const result = await updateTask({ blockId: body.block_id, checked: body.checked, text: body.text });
+      const result = await notionStore.updateTask({
+        blockId: body.block_id,
+        checked: body.checked,
+        text: body.text,
+      });
       return res.status(200).json({ ok: true, ...result });
     }
     if (req.method === 'POST') {
       const body = (req.body ?? {}) as { container_id?: string; after_block_id?: string; text?: string };
-      const task = await createTask({
+      const task = await notionStore.createTask({
         containerId: body.container_id,
         afterBlockId: body.after_block_id,
         text: body.text,
@@ -23,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (req.method === 'DELETE') {
       const body = (req.body ?? {}) as { block_id?: string };
-      await deleteTask(body.block_id);
+      await notionStore.deleteTask(body.block_id);
       return res.status(200).json({ ok: true });
     }
     res.setHeader('Allow', 'PATCH, POST, DELETE');

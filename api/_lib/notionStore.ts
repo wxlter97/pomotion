@@ -1,13 +1,13 @@
 /**
- * Capa de dominio: todo lo que la app necesita hacer con "las tareas del
- * día/semana y sus sesiones", expresado en términos del negocio y no de la
- * API de Notion. Hoy la única implementación habla con Notion (vía
- * notionClient.ts + notionPage.ts + sessionText.ts); el objetivo de tener
- * esta costura es que una futura migración a una base de datos real —o el
- * soporte multiusuario— cambie solo este archivo, sin tocar los endpoints.
+ * Implementación del `Store` (ver store.ts) contra Notion: arma la vista
+ * semanal a partir de una plantilla de Notion y escribe las sesiones/tareas
+ * de vuelta como bloques. Usa notionClient.ts (HTTP), notionPage.ts
+ * (resolución de páginas), sessionText.ts (formato de sesión) y weekModel.ts
+ * (heurísticas puras de qué semana/día mostrar).
  *
- * Los endpoints de `api/` se limitan a: extraer los campos de la request,
- * llamar acá, y traducir el resultado (o un ApiError) a HTTP.
+ * Los endpoints de `api/` solo hablan con el objeto `notionStore` de acá:
+ * extraen los campos de la request, llaman, y traducen el resultado (o un
+ * ApiError) a HTTP.
  */
 import {
   appendBlockChildren,
@@ -24,57 +24,39 @@ import { BadRequestError, ConflictError, NotFoundError, UpstreamError } from './
 import {
   computeNextWeekRange,
   formatWeekLabel,
-  isDateInRange,
-  normalize,
   parseWeekRange,
   plainText,
   todayDateStringInTz,
   todayWeekdayNameInTz,
 } from './parse.js';
 import { formatSessionText, parseSessionText } from './sessionText.js';
-import { resolveActivePageId, resolveFiles, richTextOf, type FileEntry } from './notionPage.js';
+import { resolveActivePageId, resolveFiles, richTextOf } from './notionPage.js';
+import { computeWeekNav, selectActiveWeek, selectDay, type WeekSummary } from './weekModel.js';
 import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
+import type {
+  CreateTaskInput,
+  CreateWeekInput,
+  FileEntry,
+  GetWeekViewInput,
+  LogSessionInput,
+  ReorderResult,
+  ReorderTaskInput,
+  Session,
+  Store,
+  Task,
+  TaskFieldsUpdate,
+  TaskRef,
+  UpdateSessionInput,
+  UpdateTaskInput,
+  WeekRef,
+  WeekSuggestion,
+  WeekView,
+} from './store.js';
 
 const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
 
 const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-// --- Tipos de dominio (sin nada de Notion en las firmas públicas) ---
-
-export type Session = {
-  blockId: string | undefined;
-  durationSeconds: number;
-  start: string;
-  end: string;
-};
-
-export type Task = {
-  blockId: string;
-  text: string;
-  checked: boolean;
-  day: string;
-  sessions: Session[];
-};
-
-export type WeekSource = 'auto-matched' | 'auto-fallback' | 'requested';
-
-export type WeekView = {
-  week: string | null;
-  weekSource: WeekSource;
-  isCurrentWeek: boolean;
-  previousWeekLabel: string | null;
-  nextWeekLabel: string | null;
-  availableDays: string[];
-  selectedDay: string | null;
-  dayMatched: boolean;
-  dayContainerId: string | null;
-  dayHeadingBlockId: string | null;
-  tasks: Task[];
-  weekTotalSeconds: number;
-};
-
-export type { FileEntry };
 
 // --- Lectura de la vista semanal ---
 
@@ -85,6 +67,29 @@ type WeekGroup = {
 };
 
 type PositionedBlock = { block: NotionBlock; parentId: string };
+
+type DayGrouping = {
+  dayOrder: string[];
+  dayBlocks: Map<string, NotionBlock[]>;
+  dayContainerId: Map<string, string>;
+  dayHeadingBlockId: Map<string, string>;
+};
+
+/** Agrupa los bloques de la página por heading_1 (cada uno = una semana). */
+function groupBlocksByWeek(blocks: NotionBlock[]): WeekGroup[] {
+  const weeks: WeekGroup[] = [];
+  let current: WeekGroup | null = null;
+  for (const block of blocks) {
+    if (block.type === 'heading_1') {
+      const label = plainText(richTextOf(block));
+      current = { label, range: parseWeekRange(label), blocks: [] };
+      weeks.push(current);
+    } else if (current) {
+      current.blocks.push(block);
+    }
+  }
+  return weeks;
+}
 
 /**
  * La plantilla real organiza cada semana en columnas de Notion (un
@@ -121,203 +126,125 @@ async function expandColumns(
   return expanded;
 }
 
-export async function getWeekView(opts: {
-  fileId?: string;
-  week?: string;
-  day?: string;
-}): Promise<WeekView> {
-  const activePageId = await resolveActivePageId(opts.fileId);
-  const blocks = await listBlockChildren(activePageId);
-
-  // 1. Agrupar por heading_1 (semana).
-  const weeks: WeekGroup[] = [];
-  let currentWeek: WeekGroup | null = null;
-  for (const block of blocks) {
-    if (block.type === 'heading_1') {
-      const label = plainText(richTextOf(block));
-      currentWeek = { label, range: parseWeekRange(label), blocks: [] };
-      weeks.push(currentWeek);
-    } else if (currentWeek) {
-      currentWeek.blocks.push(block);
-    }
-  }
-
-  if (weeks.length === 0) {
-    // Página activa válida pero sin ninguna semana todavía (ej. un archivo
-    // recién creado). No es un error — antes devolvía 404 y dejaba sin
-    // forma de llegar al botón "+ Agregar semana".
-    return {
-      week: null,
-      weekSource: 'auto-fallback',
-      isCurrentWeek: false,
-      previousWeekLabel: null,
-      nextWeekLabel: null,
-      availableDays: [],
-      selectedDay: null,
-      dayMatched: true,
-      dayContainerId: null,
-      dayHeadingBlockId: null,
-      tasks: [],
-      weekTotalSeconds: 0,
-    };
-  }
-
-  const today = todayDateStringInTz(TIMEZONE);
-  // Un rango solo es válido si start <= end (protege contra encabezados con
-  // typos, ej. "2026.08.03 - 2026.03.07").
-  const hasValidRange = (w: WeekGroup): w is WeekGroup & { range: { start: string; end: string } } =>
-    Boolean(w.range) && w.range!.start <= w.range!.end;
-
-  const todayWeek = weeks.find(
-    (w) => hasValidRange(w) && isDateInRange(today, w.range.start, w.range.end)
-  );
-  const requestedWeek = opts.week;
-
-  let activeWeek: WeekGroup;
-  // 'auto-matched': hoy cae exactamente dentro de un heading_1.
-  // 'auto-fallback': no hay match exacto (ej. fin de semana entre dos
-  //   semanas) y se usa una heurística — dispara el aviso en la UI.
-  // 'requested': el usuario navegó explícitamente a otra semana — no
-  //   dispara ningún aviso, fue intencional.
-  let weekSource: WeekSource;
-
-  if (requestedWeek) {
-    const found = weeks.find((w) => w.label === requestedWeek);
-    if (!found) {
-      throw new NotFoundError('week_not_found', `No se encontró la semana "${requestedWeek}"`);
-    }
-    activeWeek = found;
-    weekSource = 'requested';
-  } else if (todayWeek) {
-    activeWeek = todayWeek;
-    weekSource = 'auto-matched';
-  } else {
-    // Preferir la semana ya terminada más reciente; si todas las semanas
-    // con rango válido son futuras, la más próxima a empezar; si ninguna
-    // semana tiene rango parseable, la primera del documento (por posición,
-    // normalmente la más reciente en esta plantilla).
-    const validRanged = weeks.filter(hasValidRange);
-    const past = validRanged.filter((w) => w.range.end < today);
-    const future = validRanged.filter((w) => w.range.start > today);
-    if (past.length > 0) {
-      activeWeek = past.reduce((a, b) => (a.range.end > b.range.end ? a : b));
-    } else if (future.length > 0) {
-      activeWeek = future.reduce((a, b) => (a.range.start < b.range.start ? a : b));
-    } else {
-      activeWeek = weeks[0];
-    }
-    weekSource = 'auto-fallback';
-  }
-
-  // Navegación anterior/siguiente: en orden cronológico (por fecha de
-  // inicio), no por posición en el documento.
-  const navigableWeeks = weeks
-    .filter(hasValidRange)
-    .sort((a, b) => (a.range.start < b.range.start ? -1 : a.range.start > b.range.start ? 1 : 0));
-  const activeIndex = navigableWeeks.findIndex((w) => w === activeWeek);
-  const previousWeekLabel = activeIndex > 0 ? navigableWeeks[activeIndex - 1].label : null;
-  const nextWeekLabel =
-    activeIndex >= 0 && activeIndex < navigableWeeks.length - 1
-      ? navigableWeeks[activeIndex + 1].label
-      : null;
-  const isCurrentWeek = Boolean(todayWeek) && activeWeek === todayWeek;
-
-  // 2. Dentro de la semana activa, agrupar to_do por heading_3 (día),
-  //    aplanando columnas si la semana usa layout de columnas por día.
-  const activeWeekBlocks = await expandColumns(activeWeek.blocks, activePageId);
+/** Agrupa los to_do de la semana activa por heading_3 (día), guardando
+ *  dónde insertar tareas nuevas de cada día (contenedor + ancla). */
+function groupPositionedBlocksByDay(positioned: PositionedBlock[]): DayGrouping {
   const dayOrder: string[] = [];
   const dayBlocks = new Map<string, NotionBlock[]>();
   const dayContainerId = new Map<string, string>();
   const dayHeadingBlockId = new Map<string, string>();
-  let currentDayLabel: string | null = null;
-  for (const { block, parentId } of activeWeekBlocks) {
+  let currentDay: string | null = null;
+  for (const { block, parentId } of positioned) {
     if (block.type === 'heading_3') {
-      currentDayLabel = plainText(richTextOf(block));
-      if (currentDayLabel && !dayOrder.includes(currentDayLabel)) {
-        dayOrder.push(currentDayLabel);
-        dayBlocks.set(currentDayLabel, []);
-        dayContainerId.set(currentDayLabel, parentId);
-        dayHeadingBlockId.set(currentDayLabel, block.id);
+      currentDay = plainText(richTextOf(block));
+      if (currentDay && !dayOrder.includes(currentDay)) {
+        dayOrder.push(currentDay);
+        dayBlocks.set(currentDay, []);
+        dayContainerId.set(currentDay, parentId);
+        dayHeadingBlockId.set(currentDay, block.id);
       }
-    } else if (block.type === 'to_do' && currentDayLabel) {
-      dayBlocks.get(currentDayLabel)?.push(block);
+    } else if (block.type === 'to_do' && currentDay) {
+      dayBlocks.get(currentDay)?.push(block);
     }
   }
+  return { dayOrder, dayBlocks, dayContainerId, dayHeadingBlockId };
+}
+
+/** Lee las sesiones (bloques hijos) de un to_do y las parsea. */
+async function readSessions(block: NotionBlock): Promise<Session[]> {
+  if (!block.has_children) return [];
+  const children = await listBlockChildren(block.id);
+  return children
+    .map((child): Session | null => {
+      const parsed = parseSessionText(plainText(richTextOf(child)));
+      return parsed ? { ...parsed, blockId: child.id } : null;
+    })
+    .filter((s): s is Session => s !== null);
+}
+
+/** Forma de la vista cuando la página no tiene semanas todavía, o la semana
+ *  activa no tiene desglose por día. */
+function weekViewShell(overrides: Partial<WeekView> & Pick<WeekView, 'week' | 'weekSource'>): WeekView {
+  return {
+    isCurrentWeek: false,
+    previousWeekLabel: null,
+    nextWeekLabel: null,
+    availableDays: [],
+    selectedDay: null,
+    dayMatched: true,
+    dayContainerId: null,
+    dayHeadingBlockId: null,
+    tasks: [],
+    weekTotalSeconds: 0,
+    ...overrides,
+  };
+}
+
+async function getWeekView(opts: GetWeekViewInput): Promise<WeekView> {
+  const activePageId = await resolveActivePageId(opts.fileId);
+  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId));
+
+  if (weekGroups.length === 0) {
+    // Página activa válida pero sin ninguna semana todavía (ej. un archivo
+    // recién creado). No es un error — antes devolvía 404 y dejaba sin
+    // forma de llegar al botón "+ Agregar semana".
+    return weekViewShell({ week: null, weekSource: 'auto-fallback' });
+  }
+
+  const today = todayDateStringInTz(TIMEZONE);
+  const summaries: WeekSummary[] = weekGroups.map((w) => ({ label: w.label, range: w.range }));
+  const { activeIndex, weekSource, todayWeekIndex } = selectActiveWeek(summaries, today, opts.week);
+  if (activeIndex === -1) {
+    throw new NotFoundError('week_not_found', `No se encontró la semana "${opts.week}"`);
+  }
+  const activeWeek = weekGroups[activeIndex];
+  const isCurrentWeek = todayWeekIndex !== -1 && todayWeekIndex === activeIndex;
+  const { previousWeekLabel, nextWeekLabel } = computeWeekNav(summaries, activeIndex);
+
+  const positioned = await expandColumns(activeWeek.blocks, activePageId);
+  const { dayOrder, dayBlocks, dayContainerId, dayHeadingBlockId } =
+    groupPositionedBlocksByDay(positioned);
 
   if (dayOrder.length === 0) {
     // Semana válida pero sin desglose por día (ej. una semana de vacaciones
     // anotada solo con una nota). No es un error.
-    return {
+    return weekViewShell({
       week: activeWeek.label,
       weekSource,
       isCurrentWeek,
       previousWeekLabel,
       nextWeekLabel,
-      availableDays: [],
-      selectedDay: null,
-      dayMatched: true,
-      dayContainerId: null,
-      dayHeadingBlockId: null,
-      tasks: [],
-      weekTotalSeconds: 0,
-    };
+    });
   }
 
-  const requestedDay = opts.day;
-  const todayWeekday = todayWeekdayNameInTz(TIMEZONE);
+  const { selectedDay, dayMatched } = selectDay(dayOrder, {
+    requestedDay: opts.day,
+    weekSource,
+    todayWeekday: todayWeekdayNameInTz(TIMEZONE),
+  });
 
-  let selectedDay: string | undefined;
-  let dayMatched: boolean;
-  if (requestedDay) {
-    selectedDay = dayOrder.find((d) => normalize(d) === normalize(requestedDay));
-    dayMatched = Boolean(selectedDay);
-  } else if (weekSource === 'requested') {
-    // Se navegó explícitamente a otra semana: no tiene sentido buscar "el
-    // día de hoy" ahí — se cae al primer día sin marcar "no encontrado".
-    dayMatched = true;
-  } else {
-    selectedDay = dayOrder.find((d) => normalize(d) === todayWeekday);
-    dayMatched = Boolean(selectedDay);
-  }
-  if (!selectedDay) selectedDay = dayOrder[0];
-
-  // 3. Para cada to_do de la semana (todos los días, no solo el
-  //    seleccionado), traer sus hijos (sesiones registradas). Se hace para
-  //    toda la semana de una — no solo el día elegido — para calcular el
-  //    total semanal sin pedirle a Notion los mismos bloques otra vez.
-  const allTodoEntries = dayOrder.flatMap((day) =>
+  // Se traen las sesiones de TODOS los días de la semana (no solo el
+  // seleccionado) para calcular el total semanal sin pedirle a Notion los
+  // mismos bloques otra vez día por día.
+  const allEntries = dayOrder.flatMap((day) =>
     (dayBlocks.get(day) ?? []).map((block) => ({ day, block }))
   );
   const allResults = await Promise.all(
-    allTodoEntries.map(async ({ day, block }) => {
+    allEntries.map(async ({ day, block }) => {
       const content = block.to_do as { rich_text?: { plain_text?: string }[]; checked?: boolean };
-      const text = plainText(content?.rich_text);
-      const checked = Boolean(content?.checked);
-
-      let sessions: Session[] = [];
-      if (block.has_children) {
-        const children = await listBlockChildren(block.id);
-        sessions = children
-          .map((child) => {
-            const parsed = parseSessionText(plainText(richTextOf(child)));
-            return parsed ? { ...parsed, blockId: child.id } : null;
-          })
-          .filter((s): s is NonNullable<typeof s> => s !== null);
-      }
-
-      return { day, blockId: block.id, text, checked, sessions };
+      return {
+        day,
+        blockId: block.id,
+        text: plainText(content?.rich_text),
+        checked: Boolean(content?.checked),
+        sessions: await readSessions(block),
+      };
     })
   );
 
   const tasks: Task[] = allResults
     .filter((r) => r.day === selectedDay)
-    .map(({ blockId, text, checked, sessions }) => ({
-      blockId,
-      text,
-      checked,
-      day: selectedDay as string,
-      sessions,
-    }));
+    .map(({ blockId, text, checked, sessions }) => ({ blockId, text, checked, day: selectedDay, sessions }));
 
   const weekTotalSeconds = allResults.reduce(
     (sum, r) => sum + r.sessions.reduce((s, ses) => s + ses.durationSeconds, 0),
@@ -375,9 +302,7 @@ async function loadExistingWeeks(activePageId: string): Promise<ExistingWeeks> {
   return { labels, endDates, topAnchorBlockId };
 }
 
-export async function suggestNextWeek(
-  fileId?: string
-): Promise<{ start: string; end: string; label: string }> {
+async function suggestNextWeek(fileId?: string): Promise<WeekSuggestion> {
   const activePageId = await resolveActivePageId(fileId);
   const { endDates } = await loadExistingWeeks(activePageId);
   const today = todayDateStringInTz(TIMEZONE);
@@ -385,11 +310,7 @@ export async function suggestNextWeek(
   return { start, end, label: formatWeekLabel(start, end) };
 }
 
-export async function createWeek(input: {
-  start?: string;
-  end?: string;
-  fileId?: string;
-}): Promise<{ label: string; start: string; end: string }> {
+async function createWeek(input: CreateWeekInput): Promise<WeekRef> {
   const { start, end, fileId } = input;
 
   if (!start || !DATE_RE.test(start)) {
@@ -431,17 +352,13 @@ export async function createWeek(input: {
 
 // --- Archivos ---
 
-export async function listFiles(): Promise<FileEntry[]> {
+function listFiles(): Promise<FileEntry[]> {
   return resolveFiles();
 }
 
 // --- Tareas ---
 
-export async function updateTask(input: {
-  blockId?: string;
-  checked?: boolean;
-  text?: string;
-}): Promise<{ checked: boolean | undefined; text: string | undefined }> {
+async function updateTask(input: UpdateTaskInput): Promise<TaskFieldsUpdate> {
   const { blockId, checked, text } = input;
 
   if (!blockId || typeof blockId !== 'string') {
@@ -466,11 +383,7 @@ export async function updateTask(input: {
   return { checked, text: trimmedText };
 }
 
-export async function createTask(input: {
-  containerId?: string;
-  afterBlockId?: string;
-  text?: string;
-}): Promise<{ blockId: string; text: string; checked: false }> {
+async function createTask(input: CreateTaskInput): Promise<TaskRef> {
   const { containerId, afterBlockId, text } = input;
 
   if (!containerId || typeof containerId !== 'string') {
@@ -497,7 +410,7 @@ export async function createTask(input: {
   return { blockId, text: trimmed, checked: false };
 }
 
-export async function deleteTask(blockId?: string): Promise<void> {
+async function deleteTask(blockId?: string): Promise<void> {
   if (!blockId || typeof blockId !== 'string') {
     throw new BadRequestError('invalid_block_id', 'Falta block_id');
   }
@@ -520,11 +433,7 @@ export async function deleteTask(blockId?: string): Promise<void> {
  *      duplicado viejo, no un error.
  * Un fallo en los pasos 1-2 deja el original intacto (no-op seguro).
  */
-export async function reorderTask(input: {
-  blockId?: string;
-  containerId?: string;
-  afterBlockId?: string;
-}): Promise<{ newBlockId: string; warning?: 'stale_original_not_deleted' }> {
+async function reorderTask(input: ReorderTaskInput): Promise<ReorderResult> {
   const { blockId, containerId, afterBlockId } = input;
 
   if (!blockId || typeof blockId !== 'string') {
@@ -626,16 +535,7 @@ function formatTimeFromIso(iso: string): string {
   }).format(date);
 }
 
-export async function logSession(input: {
-  blockId?: string;
-  durationSeconds?: number;
-  // Timer en vivo: horas ISO completas, se formatean con la zona horaria configurada.
-  startTime?: string;
-  endTime?: string;
-  // Registro manual: el usuario ya escribió la hora tal cual la quiere ver ("HH:MM").
-  start?: string;
-  end?: string;
-}): Promise<Session> {
+async function logSession(input: LogSessionInput): Promise<Session> {
   const { blockId, durationSeconds, startTime, endTime, start, end } = input;
 
   if (!blockId || typeof blockId !== 'string') {
@@ -675,12 +575,7 @@ export async function logSession(input: {
   return { blockId: sessionBlockId, durationSeconds: roundedSeconds, start: startLabel, end: endLabel };
 }
 
-export async function updateSession(input: {
-  blockId?: string;
-  durationSeconds?: number;
-  start?: string;
-  end?: string;
-}): Promise<Session> {
+async function updateSession(input: UpdateSessionInput): Promise<Session> {
   const { blockId, durationSeconds, start, end } = input;
 
   if (!blockId || typeof blockId !== 'string') {
@@ -704,9 +599,23 @@ export async function updateSession(input: {
   return { blockId, durationSeconds: roundedSeconds, start, end };
 }
 
-export async function deleteSession(blockId?: string): Promise<void> {
+async function deleteSession(blockId?: string): Promise<void> {
   if (!blockId || typeof blockId !== 'string') {
     throw new BadRequestError('invalid_block_id', 'Falta block_id');
   }
   await deleteBlock(blockId);
 }
+
+export const notionStore: Store = {
+  getWeekView,
+  suggestNextWeek,
+  createWeek,
+  listFiles,
+  updateTask,
+  createTask,
+  deleteTask,
+  reorderTask,
+  logSession,
+  updateSession,
+  deleteSession,
+};
