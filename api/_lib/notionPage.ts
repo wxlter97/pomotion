@@ -1,4 +1,4 @@
-import { listBlockChildren, type NotionBlock } from './notion.js';
+import { listBlockChildren, type NotionBlock } from './notionClient.js';
 import { extractNotionPageId, plainText, stripNotionReference } from './parse.js';
 
 /**

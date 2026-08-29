@@ -1,5 +1,4 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { formatDurationLabel } from '../../shared/duration';
 import {
   addDaysToDate,
   computeNextWeekRange,
@@ -8,7 +7,6 @@ import {
   isDateInRange,
   nextMondayAfter,
   normalize,
-  parseSessionText,
   parseWeekRange,
   plainText,
   stripNotionReference,
@@ -68,54 +66,6 @@ describe('isDateInRange', () => {
   it('deja afuera lo que cae fuera del rango', () => {
     expect(isDateInRange('2026-08-16', '2026-08-17', '2026-08-21')).toBe(false);
     expect(isDateInRange('2026-08-22', '2026-08-17', '2026-08-21')).toBe(false);
-  });
-});
-
-describe('parseSessionText', () => {
-  it('lee el formato legado en minutos "⏱ 25m (10:15–10:40)"', () => {
-    expect(parseSessionText('⏱ 25m (10:15–10:40)')).toEqual({
-      durationSeconds: 1500,
-      start: '10:15',
-      end: '10:40',
-    });
-  });
-
-  it('lee el formato con precisión de segundos', () => {
-    expect(parseSessionText('⏱ 1h 30m 45s (09:00–10:30)')).toEqual({
-      durationSeconds: 5445,
-      start: '09:00',
-      end: '10:30',
-    });
-  });
-
-  it('acepta guión normal además de guión largo como separador de horas', () => {
-    expect(parseSessionText('⏱ 25m (10:15-10:40)')).toEqual({
-      durationSeconds: 1500,
-      start: '10:15',
-      end: '10:40',
-    });
-  });
-
-  it('encuentra la sesión aunque haya texto delante', () => {
-    expect(parseSessionText('trabajo ⏱ 25m (10:15–10:40)')?.durationSeconds).toBe(1500);
-  });
-
-  it('redondea a segundos enteros (mínimo 1)', () => {
-    expect(parseSessionText('⏱ 1h 30m 45.5s (09:00–10:30)')?.durationSeconds).toBe(5446);
-    expect(parseSessionText('⏱ 0m (10:00–10:00)')?.durationSeconds).toBe(1);
-  });
-
-  it('devuelve null si no hay bloque de sesión o la duración no parsea', () => {
-    expect(parseSessionText('nada que ver acá')).toBeNull();
-    expect(parseSessionText('⏱ basura (10:00–10:30)')).toBeNull();
-  });
-
-  it('round-trip con formatDurationLabel: lo que se escribe se relee igual', () => {
-    // Espeja formatSessionText de api/session.ts: "⏱ {label} ({start}–{end})".
-    for (const seconds of [1, 45, 1500, 5400, 5445, 7245]) {
-      const text = `⏱ ${formatDurationLabel(seconds)} (10:00–11:00)`;
-      expect(parseSessionText(text)?.durationSeconds).toBe(seconds);
-    }
   });
 });
 

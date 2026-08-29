@@ -51,7 +51,7 @@ export function roundDurationSeconds(seconds: number): number {
  * las partes en cero (ej. 5400 → "1h 30m", 45 → "45s", 0 → "0m").
  *
  * Es la MISMA función que arma el texto guardado en Notion (ver
- * formatSessionText en api/session.ts) y la que se usa para mostrar la
+ * formatSessionText en api/_lib/sessionText.ts) y la que se usa para mostrar la
  * duración en la UI — así los dos lugares quedan siempre consistentes: una
  * duración de minutos exactos se ve idéntica al formato legado ("25m"), y
  * solo aparecen "h"/"s" cuando efectivamente hacen falta.
