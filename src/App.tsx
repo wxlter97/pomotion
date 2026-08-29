@@ -111,6 +111,11 @@ export default function App() {
   // tarea" comparando el id, y moverla se lo cambiaría.
   const lockedTaskId = timerPhase !== 'idle' ? (selectedTask?.id ?? null) : null;
 
+  // Suma de las estimaciones de las tareas del día visible (para el pill
+  // "plan vs. real"). En segundos, para reusar formatDurationLabel.
+  const dayEstimateSeconds =
+    (data?.tasks ?? []).reduce((sum, t) => sum + (t.estimateMinutes ?? 0), 0) * 60;
+
   const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
     setLoading(true);
     setError(null);
@@ -643,13 +648,23 @@ export default function App() {
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
               loading={loading}
             />
-            {(data.dayTotalSeconds > 0 || data.weekTotalSeconds > 0) && (
-              <div className="total-pill" title="Tiempo registrado">
+            {(data.dayTotalSeconds > 0 ||
+              data.weekTotalSeconds > 0 ||
+              dayEstimateSeconds > 0) && (
+              <div className="total-pill" title="Tiempo registrado y estimado">
                 {data.dayTotalSeconds > 0 && (
                   <span className="total-seg">
                     <span className="total-pill-label">Día</span>
                     <span className="total-pill-value">
                       {formatDurationLabel(data.dayTotalSeconds)}
+                    </span>
+                  </span>
+                )}
+                {dayEstimateSeconds > 0 && (
+                  <span className="total-seg">
+                    <span className="total-pill-label">Est</span>
+                    <span className="total-pill-value total-pill-est">
+                      {formatDurationLabel(dayEstimateSeconds)}
                     </span>
                   </span>
                 )}

@@ -2,6 +2,7 @@
  * Helpers puros para los metadatos de una tarea: prioridad, vencimiento.
  * Sin dependencias de React ni del almacén.
  */
+import { formatDurationLabel, parseDurationToSeconds } from './duration';
 import type { TaskPriority } from './types';
 
 const MONTH_ABBR = [
@@ -67,4 +68,45 @@ export function dueChipLabel(due: string, today: string): string {
   if (diff === 1) return 'mañana';
   if (diff === -1) return 'ayer';
   return shortDate(due);
+}
+
+// --- Estimación vs. real ---
+
+/**
+ * Interpreta lo que el usuario escribe en el campo de estimación ("90",
+ * "1h 30m") y lo devuelve en minutos enteros, o null si está vacío / no
+ * matchea ningún formato. Comparte el parser con la duración de sesiones.
+ */
+export function parseEstimateMinutes(input: string): number | null {
+  const seconds = parseDurationToSeconds(input);
+  if (seconds == null || seconds <= 0) return null;
+  return Math.max(1, Math.round(seconds / 60));
+}
+
+/** "1h 30m" a partir de minutos; '' si es null. */
+export function estimateLabel(minutes: number | null): string {
+  return minutes == null ? '' : formatDurationLabel(minutes * 60);
+}
+
+/**
+ * Texto que va en la fila combinando lo registrado con la estimación:
+ * - sin estimación: sólo lo registrado ("1h 20m"), o null si no hay nada.
+ * - con estimación y algo registrado: "1h 20m / 2h".
+ * - con estimación y nada registrado: "est. 2h".
+ * `over` = se pasó de la estimación (para pintarlo en rojo).
+ */
+export function taskTimeSummary(
+  totalSeconds: number,
+  estimateMinutes: number | null
+): { text: string; over: boolean } | null {
+  if (estimateMinutes == null) {
+    return totalSeconds > 0 ? { text: formatDurationLabel(totalSeconds), over: false } : null;
+  }
+  const estSeconds = estimateMinutes * 60;
+  const over = totalSeconds > estSeconds;
+  const text =
+    totalSeconds > 0
+      ? `${formatDurationLabel(totalSeconds)} / ${formatDurationLabel(estSeconds)}`
+      : `est. ${formatDurationLabel(estSeconds)}`;
+  return { text, over };
 }

@@ -363,7 +363,10 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
 
 ### Tier 2 — requiere UI nueva, schema ya listo
 - **Tags/proyectos**: alta de tags, asignar a tareas, filtrar la vista, reporte por tag.
-- **Estimación vs real**: campo `estimate_min` en la UI + comparativa en el reporte.
+- ~~**Estimación vs real**~~ ✅ PR #28 — campo "Estimado" en el panel de detalle
+  (acepta "90" o "1h 30m"). En la fila: `registrado / estimado` (o `est. 2h` sin
+  registro), rojo si se pasó. Pill del día gana segmento "Est". Reporte: total
+  "Estimado" + columna `estimado_min` en el CSV. `Task.estimateMinutes` nuevo.
 - **Backlog/inbox**: sección para tareas con `date` NULL; arrastrar al día.
 - ~~**Prioridad / notas / due date**~~ ✅ PR #26 — panel de detalle al editar la tarea
   (pills de prioridad, fecha de vencimiento, notas). Franja de color por prioridad y chip

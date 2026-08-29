@@ -138,6 +138,31 @@ describe('updateTask / deleteTask', () => {
     ).rejects.toThrow();
   });
 
+  it('setea la estimación en minutos y la limpia con null', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: t.id, estimateMinutes: 90 });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0].estimateMinutes).toBe(90);
+
+    const cleared = await as(USER, async () => {
+      await sqliteStore.updateTask({ taskId: view.tasks[0].id, estimateMinutes: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0].estimateMinutes).toBeNull();
+  });
+
+  it('rechaza estimaciones no positivas o absurdas', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, estimateMinutes: 0 }))
+    ).rejects.toThrow();
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, estimateMinutes: 999_999 }))
+    ).rejects.toThrow();
+  });
+
   it('updateTask sin campos falla', async () => {
     const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
     await expect(as(USER, () => sqliteStore.updateTask({ taskId: t.id }))).rejects.toThrow();
@@ -332,6 +357,19 @@ describe('getSessionsInRange (reporte)', () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ task: 'Tarea A', date: '2026-08-24', day: 'Lunes', durationSeconds: 1500 });
+  });
+
+  it('trae taskId y la estimación de la tarea en cada fila', async () => {
+    await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Estimada' });
+      await sqliteStore.updateTask({ taskId: a.id, estimateMinutes: 120 });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 1500, start: '09:00', end: '09:25' });
+    });
+    const rows = await as(USER, () =>
+      sqliteStore.getSessionsInRange({ from: '2026-08-01', to: '2026-08-31' })
+    );
+    expect(rows[0]).toMatchObject({ estimateMinutes: 120 });
+    expect(rows[0].taskId).toEqual(expect.any(String));
   });
 
   it('valida el rango', async () => {

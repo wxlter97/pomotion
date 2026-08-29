@@ -119,15 +119,21 @@ export function updateTaskText(id: string, text: string) {
   });
 }
 
-/** Prioridad / notas / vencimiento. `null` en un campo lo limpia; omitirlo lo deja igual. */
+/** Prioridad / notas / vencimiento / estimación. `null` en un campo lo limpia;
+ *  omitirlo lo deja igual. */
 export function updateTaskFields(
   id: string,
-  fields: { priority?: TaskPriority | null; notes?: string | null; due?: string | null }
+  fields: {
+    priority?: TaskPriority | null;
+    notes?: string | null;
+    due?: string | null;
+    estimateMinutes?: number | null;
+  }
 ) {
-  return request<{ ok: true; priority?: TaskPriority | null; notes?: string | null; due?: string | null }>(
-    '/api/task',
-    { method: 'PATCH', body: JSON.stringify({ id, ...fields }) }
-  );
+  const { estimateMinutes, ...rest } = fields;
+  const body: Record<string, unknown> = { id, ...rest };
+  if (estimateMinutes !== undefined) body.estimate_min = estimateMinutes;
+  return request<{ ok: true }>('/api/task', { method: 'PATCH', body: JSON.stringify(body) });
 }
 
 export function deleteTask(id: string) {
@@ -218,7 +224,9 @@ export type ReportRow = {
   date: string;
   day: string;
   week: string;
+  taskId: string;
   task: string;
+  estimateMinutes: number | null;
   durationSeconds: number;
   start: string;
   end: string;
@@ -231,7 +239,7 @@ function reportParams(from: string, to: string, fileId?: string, extra?: Record<
 }
 
 export function getReport(from: string, to: string, fileId?: string) {
-  return request<{ rows: ReportRow[]; totalSeconds: number }>(
+  return request<{ rows: ReportRow[]; totalSeconds: number; estimatedMinutes: number }>(
     `/api/report?${reportParams(from, to, fileId)}`
   );
 }

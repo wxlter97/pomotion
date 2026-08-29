@@ -1,11 +1,16 @@
 import { useState } from 'react';
 import { updateTaskFields, UnauthorizedError } from '../api';
-import { PRIORITY_OPTIONS } from '../taskMeta';
+import { estimateLabel, parseEstimateMinutes, PRIORITY_OPTIONS } from '../taskMeta';
 import type { Task, TaskPriority } from '../types';
 
-type Fields = { priority?: TaskPriority | null; notes?: string | null; due?: string | null };
+type Fields = {
+  priority?: TaskPriority | null;
+  notes?: string | null;
+  due?: string | null;
+  estimateMinutes?: number | null;
+};
 
-/** Panel expandible bajo una tarea: prioridad, vencimiento y notas. */
+/** Panel expandible bajo una tarea: prioridad, estimación, vencimiento y notas. */
 export default function TaskDetails({
   task,
   onChange,
@@ -16,6 +21,7 @@ export default function TaskDetails({
   disabled?: boolean;
 }) {
   const [notes, setNotes] = useState(task.notes ?? '');
+  const [estimate, setEstimate] = useState(estimateLabel(task.estimateMinutes));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +50,22 @@ export default function TaskDetails({
     void save({ notes: trimmed || null });
   }
 
+  function commitEstimate() {
+    const raw = estimate.trim();
+    if (!raw) {
+      if (task.estimateMinutes != null) void save({ estimateMinutes: null });
+      return;
+    }
+    const minutes = parseEstimateMinutes(raw);
+    if (minutes == null) {
+      setError('No entendí esa duración. Probá con "90" o "1h 30m".');
+      return;
+    }
+    setEstimate(estimateLabel(minutes)); // normaliza "90" → "1h 30m"
+    if (minutes !== task.estimateMinutes) void save({ estimateMinutes: minutes });
+    else setError(null);
+  }
+
   const busy = disabled || saving;
 
   return (
@@ -63,6 +85,38 @@ export default function TaskDetails({
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="task-details-row">
+        <span className="task-details-label">Estimado</span>
+        <input
+          type="text"
+          className="task-estimate-input"
+          placeholder="90 o 1h 30m"
+          value={estimate}
+          onChange={(e) => setEstimate(e.target.value)}
+          onBlur={commitEstimate}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commitEstimate();
+            }
+          }}
+          disabled={busy}
+        />
+        {task.estimateMinutes != null && (
+          <button
+            type="button"
+            className="btn btn-plain btn-small"
+            onClick={() => {
+              setEstimate('');
+              void save({ estimateMinutes: null });
+            }}
+            disabled={busy}
+          >
+            Quitar
+          </button>
+        )}
       </div>
 
       <div className="task-details-row">
