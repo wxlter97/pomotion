@@ -51,9 +51,15 @@ describe('parseWeekRange', () => {
     });
   });
 
+  it('tolera `-` o `/` como separador interno (encabezados viejos con typos)', () => {
+    expect(parseWeekRange('2025.10.06 - 2025-10.10')).toEqual({ start: '2025-10-06', end: '2025-10-10' });
+    expect(parseWeekRange('2025-10-06 – 2025-10-10')).toEqual({ start: '2025-10-06', end: '2025-10-10' });
+  });
+
   it('devuelve null si no hay un rango con el formato esperado', () => {
     expect(parseWeekRange('sin fechas')).toBeNull();
     expect(parseWeekRange('2026.8.17 - 2026.8.21')).toBeNull();
+    expect(parseWeekRange('9 al 13 de diciembre')).toBeNull();
   });
 });
 

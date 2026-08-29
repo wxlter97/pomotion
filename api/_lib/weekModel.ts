@@ -27,11 +27,14 @@ const WEEKDAY_LABELS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes'];
 /**
  * Offset en días desde el inicio de la semana (lunes) para una etiqueta de
  * día, o null si no es un día laboral reconocible. Insensible a acentos y
- * mayúsculas. Se usa para fechar las sesiones de un día dentro de su semana
- * (las sesiones solo guardan "HH:MM", la fecha sale de semana + día).
+ * mayúsculas. Tolera anotaciones después del nombre del día ("Lunes
+ * (Asueto)", "Martes 17 (Puente)", "Miércoles Santo") — se queda con la
+ * primera palabra. Se usa para fechar las sesiones de un día dentro de su
+ * semana (las sesiones solo guardan "HH:MM", la fecha sale de semana + día).
  */
 export function weekdayOffset(dayLabel: string): number | null {
-  const idx = WEEKDAY_LABELS.indexOf(normalize(dayLabel));
+  const head = normalize(dayLabel).replace(/[\s(].*$/, '');
+  const idx = WEEKDAY_LABELS.indexOf(head);
   return idx === -1 ? null : idx;
 }
 

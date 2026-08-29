@@ -13,8 +13,11 @@ export function normalize(text: string): string {
     .toLowerCase();
 }
 
-// Ej: "2026.08.17 - 2026.08.21"
-const WEEK_RANGE_RE = /(\d{4})\.(\d{2})\.(\d{2})\s*-\s*(\d{4})\.(\d{2})\.(\d{2})/;
+// Ej: "2026.08.17 - 2026.08.21". Tolera `-` o `/` como separador interno
+// (encabezados viejos con typos como "2025.10.06 - 2025-10.10") y guion
+// largo entre las dos fechas.
+const WEEK_RANGE_RE =
+  /(\d{4})[.\-/](\d{2})[.\-/](\d{2})\s*[-–—]\s*(\d{4})[.\-/](\d{2})[.\-/](\d{2})/;
 
 export function parseWeekRange(headingText: string): { start: string; end: string } | null {
   const match = headingText.match(WEEK_RANGE_RE);
