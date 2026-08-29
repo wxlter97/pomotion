@@ -886,6 +886,24 @@ h3 {
   justify-content: center;
 }
 
+.timer-overrun {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  width: 100%;
+  max-width: 320px;
+}
+
+.timer-overrun-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
 /* --- Confirm dialog / sheet --- */
 .sheet-backdrop {
   position: fixed;
