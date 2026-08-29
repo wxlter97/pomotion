@@ -133,6 +133,10 @@ export default function App() {
   const selectedFileIdRef = useRef<string | null>(null);
   const filesRef = useRef<FileEntry[]>([]);
   const filesLoadedRef = useRef(false);
+  // El server cachea la vista semanal ~30s. Tras cualquier mutación
+  // optimista (que no re-fetchea), el próximo refresh debe pedir datos
+  // frescos para que el cambio no "desaparezca" al navegar entre días.
+  const pendingFreshRef = useRef(false);
 
   // Mientras haya un timer corriendo, la tarea activa queda con sus
   // controles de mover/arrastrar/borrar bloqueados — reordenarla o
@@ -142,9 +146,11 @@ export default function App() {
   // día siguen totalmente editables.
   const lockedTaskBlockId = timerPhase !== 'idle' ? (selectedTask?.blockId ?? null) : null;
 
-  const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
+  const refresh = useCallback(
+    async (day?: string, week?: string, fileIdParam?: string, opts?: { fresh?: boolean }) => {
     setLoading(true);
     setError(null);
+    const fresh = opts?.fresh === true || pendingFreshRef.current;
     try {
       let fileId = fileIdParam ?? selectedFileIdRef.current ?? undefined;
       // Solo la primera vez: resuelve la lista de archivos y, si hay más
@@ -165,7 +171,8 @@ export default function App() {
           selectedFileIdRef.current = fileId;
         }
       }
-      const res = await getTasks(day, week, fileId);
+      const res = await getTasks(day, week, fileId, fresh);
+      pendingFreshRef.current = false; // consumido con éxito
       setData(res);
       setAuthState('authed');
       setSelectedTask((prev) => {
@@ -209,7 +216,9 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  },
+    []
+  );
 
   useEffect(() => {
     void refresh();
@@ -290,6 +299,7 @@ export default function App() {
     try {
       const res = await createWeek(pendingNewWeek.start, pendingNewWeek.end, selectedFileId ?? undefined);
       setPendingNewWeek(null);
+      pendingFreshRef.current = true;
       const newLabel = res.week.label;
       guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () => void refresh(undefined, newLabel));
     } catch (err) {
@@ -328,6 +338,7 @@ export default function App() {
   }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(blockId: string, session: Session) {
+    pendingFreshRef.current = true;
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -340,6 +351,7 @@ export default function App() {
   }
 
   function handleSessionDeleted(taskBlockId: string, sessionBlockId: string) {
+    pendingFreshRef.current = true;
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -362,6 +374,7 @@ export default function App() {
 
   async function handleToggleChecked(task: Task) {
     const nextChecked = !task.checked;
+    pendingFreshRef.current = true;
     setTogglingIds((prev) => new Set(prev).add(task.blockId));
     setTaskChecked(task.blockId, nextChecked); // optimista
     try {
@@ -379,6 +392,7 @@ export default function App() {
   }
 
   function handleTaskCreated(task: { blockId: string; text: string; checked: boolean }) {
+    pendingFreshRef.current = true;
     setData((prev) => {
       if (!prev) return prev;
       return { ...prev, tasks: [...prev.tasks, { ...task, day: prev.selectedDay ?? '', sessions: [] }] };
@@ -386,11 +400,13 @@ export default function App() {
   }
 
   function handleTaskDeleted(blockId: string) {
+    pendingFreshRef.current = true;
     setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.blockId !== blockId) } : prev));
     setSelectedTask((prev) => (prev?.blockId === blockId ? null : prev));
   }
 
   function handleTaskTextUpdated(blockId: string, text: string) {
+    pendingFreshRef.current = true;
     setData((prev) => {
       if (!prev) return prev;
       return { ...prev, tasks: prev.tasks.map((t) => (t.blockId === blockId ? { ...t, text } : t)) };
@@ -399,6 +415,7 @@ export default function App() {
   }
 
   function handleSessionUpdated(taskBlockId: string, session: Session) {
+    pendingFreshRef.current = true;
     setData((prev) => {
       if (!prev) return prev;
       return {
@@ -414,6 +431,7 @@ export default function App() {
 
   async function handleReorderTask(task: Task, targetIndex: number) {
     if (!data?.dayContainerId || !data.dayHeadingBlockId) return;
+    pendingFreshRef.current = true;
     const afterBlockId = computeAfterBlockId(data.tasks, task.blockId, targetIndex, data.dayHeadingBlockId);
     const originalTasks = data.tasks;
     const originalIndex = originalTasks.findIndex((t) => t.blockId === task.blockId);
@@ -517,7 +535,12 @@ export default function App() {
           <div className="login-card">
             <h1>pomotion</h1>
             <p className="error">{error ?? 'No se pudo conectar con el servidor'}</p>
-            <button type="button" className="btn btn-filled" onClick={() => void refresh()} disabled={loading}>
+            <button
+              type="button"
+              className="btn btn-filled"
+              onClick={() => void refresh(undefined, undefined, undefined, { fresh: true })}
+              disabled={loading}
+            >
               {loading ? 'Reintentando…' : 'Reintentar'}
             </button>
           </div>
@@ -551,7 +574,9 @@ export default function App() {
           <button
             type="button"
             className="btn btn-icon"
-            onClick={() => void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined)}
+            onClick={() =>
+              void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined, undefined, { fresh: true })
+            }
             disabled={loading}
             title="Actualizar"
             aria-label="Actualizar"
