@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # --if-present: hasta que se mergee el ítem 1 (tests con Vitest) el
+      # script `test` no existe todavía; en cuanto exista, este paso empieza
+      # a correrlo solo.
+      - run: npm run test --if-present
+      - run: npm run build
