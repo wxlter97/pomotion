@@ -70,6 +70,15 @@ export type TaskRef = { blockId: string; text: string; checked: false };
 export type TaskFieldsUpdate = { checked: boolean | undefined; text: string | undefined };
 export type ReorderResult = { newBlockId: string; warning?: 'stale_original_not_deleted' };
 
+/** Lista de definiciones recurrentes leídas de la sección "Recurrentes" de
+ *  la página. `headingBlockId` es null si esa sección todavía no existe
+ *  (la UI ofrece crearla). `containerId` es dónde se crean/reordenan las
+ *  definiciones (la página, con `headingBlockId` como ancla). */
+export type RecurringList = { tasks: TaskRef[]; containerId: string; headingBlockId: string | null };
+export type EnsureRecurringResult = { containerId: string; headingBlockId: string };
+export type ApplyRecurringInput = { fileId?: string; week?: string };
+export type ApplyRecurringResult = { added: number };
+
 export type GetWeekViewInput = { fileId?: string; week?: string; day?: string };
 export type CreateWeekInput = { start?: string; end?: string; fileId?: string };
 export type UpdateTaskInput = { blockId?: string; checked?: boolean; text?: string };
@@ -104,6 +113,13 @@ export interface Store {
   createTask(input: CreateTaskInput): Promise<TaskRef>;
   deleteTask(blockId?: string): Promise<void>;
   reorderTask(input: ReorderTaskInput): Promise<ReorderResult>;
+  /** Definiciones de la sección "Recurrentes" de la página. */
+  listRecurringTasks(fileId?: string): Promise<RecurringList>;
+  /** Crea la sección "Recurrentes" si no existe; idempotente. */
+  ensureRecurringSection(fileId?: string): Promise<EnsureRecurringResult>;
+  /** Agrega a cada día de la semana las tareas recurrentes que le falten
+   *  (dedup por texto normalizado). Devuelve cuántas se crearon en total. */
+  applyRecurringToWeek(input: ApplyRecurringInput): Promise<ApplyRecurringResult>;
   logSession(input: LogSessionInput): Promise<Session>;
   updateSession(input: UpdateSessionInput): Promise<Session>;
   deleteSession(blockId?: string): Promise<void>;

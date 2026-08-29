@@ -122,6 +122,29 @@ export function reorderTask(blockId: string, containerId: string, afterBlockId: 
   });
 }
 
+export type RecurringTask = { blockId: string; text: string; checked: boolean };
+
+export function getRecurringTasks(fileId?: string) {
+  const query = fileId ? `?file=${encodeURIComponent(fileId)}` : '';
+  return request<{ tasks: RecurringTask[]; containerId: string; headingBlockId: string | null }>(
+    `/api/recurring${query}`
+  );
+}
+
+export function ensureRecurringSection(fileId?: string) {
+  return request<{ ok: true; containerId: string; headingBlockId: string }>('/api/recurring', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'ensure', file: fileId }),
+  });
+}
+
+export function applyRecurring(week: string, fileId?: string) {
+  return request<{ ok: true; added: number }>('/api/recurring', {
+    method: 'POST',
+    body: JSON.stringify({ week, file: fileId }),
+  });
+}
+
 export function getNextWeekSuggestion(fileId?: string) {
   const query = fileId ? `?file=${encodeURIComponent(fileId)}` : '';
   return request<{ start: string; end: string; label: string }>(`/api/week${query}`);
