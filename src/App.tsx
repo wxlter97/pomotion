@@ -7,6 +7,7 @@ import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import Report from './components/Report';
+import type { MoveTarget } from './components/MoveTaskMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
@@ -460,6 +461,35 @@ export default function App() {
     }
   }
 
+  async function handleMoveTask(task: Task, target: MoveTarget) {
+    if (!data) return;
+    pendingFreshRef.current = true;
+    const originalTasks = data.tasks;
+    const originalDay = data.selectedDay ?? undefined;
+    const originalWeek = data.week ?? undefined;
+
+    // Optimista: la tarea desaparece del día actual; se confirma con refresh.
+    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.blockId !== task.blockId) } : prev));
+    setSelectedTask((prev) => (prev?.blockId === task.blockId ? null : prev));
+    setBusyTaskIds((prev) => new Set(prev).add(task.blockId));
+
+    try {
+      // Misma mecánica que reordenar (crear en destino + copiar sesiones +
+      // borrar original); solo cambia el contenedor destino.
+      await reorderTask(task.blockId, target.containerId, target.afterBlockId);
+      void refresh(originalDay, originalWeek);
+    } catch (err) {
+      setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev)); // revertir
+      setError(err instanceof Error ? err.message : `No se pudo mover la tarea a ${target.destLabel}`);
+    } finally {
+      setBusyTaskIds((prev) => {
+        const next = new Set(prev);
+        next.delete(task.blockId);
+        return next;
+      });
+    }
+  }
+
   async function handleLogout() {
     await logout();
     setAuthState('guest');
@@ -664,12 +694,18 @@ export default function App() {
                   onSessionDeleted={handleSessionDeleted}
                   dayContainerId={data.dayContainerId}
                   dayHeadingBlockId={data.dayHeadingBlockId}
+                  dayContainers={data.dayContainers}
+                  selectedDay={data.selectedDay}
+                  previousWeekLabel={data.previousWeekLabel}
+                  nextWeekLabel={data.nextWeekLabel}
+                  fileId={selectedFileId}
                   lockedTaskBlockId={lockedTaskBlockId}
                   busyTaskIds={busyTaskIds}
                   onTaskCreated={handleTaskCreated}
                   onTaskDeleted={handleTaskDeleted}
                   onTaskTextUpdated={handleTaskTextUpdated}
                   onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
+                  onMoveTask={(task, target) => void handleMoveTask(task, target)}
                   onSessionUpdated={handleSessionUpdated}
                   onManualSessionAdded={handleSessionLogged}
                 />
