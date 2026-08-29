@@ -7,7 +7,7 @@ import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import Report from './components/Report';
-import TaskList from './components/TaskList';
+import TaskList, { type TaskListHandle } from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
 import { computeAfterBlockId } from './taskReorder';
@@ -122,6 +122,7 @@ export default function App() {
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const notifications = useNotificationSetting();
   const timerRef = useRef<TimerHandle>(null);
+  const taskListRef = useRef<TaskListHandle>(null);
 
   // Selector de archivo (Trabajo/Casa/Hábitos, etc.). `files` queda vacío
   // si no hay NOTION_FILES_INDEX_PAGE_ID configurada — modo de un solo
@@ -310,7 +311,8 @@ export default function App() {
   }
 
   // Atajos de teclado: espacio inicia/detiene, 1–5 cambia de día,
-  // [ / ] cambia de semana, T cambia el tema.
+  // [ / ] cambia de semana, T cambia el tema, M abre "+ Agregar sesión
+  // manual" de la tarea seleccionada.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -324,6 +326,11 @@ export default function App() {
         else timerRef.current?.stop();
       } else if (e.key === 't' || e.key === 'T') {
         toggleTheme();
+      } else if (e.key === 'm' || e.key === 'M') {
+        // preventDefault: si no, la misma tecla se escribe en el input de
+        // duración que acaba de recibir el foco (autoFocus).
+        e.preventDefault();
+        if (selectedTask) taskListRef.current?.openManualEntry(selectedTask.blockId);
       } else if (/^[1-5]$/.test(e.key) && data) {
         const day = data.availableDays[Number(e.key) - 1];
         if (day) guardedSelectDay(day);
@@ -335,7 +342,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay, guardedGoToWeek]);
+  }, [timerPhase, data, pendingSwitch, authState, selectedTask, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(blockId: string, session: Session) {
     pendingFreshRef.current = true;
@@ -656,6 +663,7 @@ export default function App() {
             <div className="main-grid">
               <section className="tasks-panel card">
                 <TaskList
+                  ref={taskListRef}
                   tasks={data.tasks}
                   selectedBlockId={selectedTask?.blockId ?? null}
                   onSelect={guardedSelectTask}
@@ -690,7 +698,8 @@ export default function App() {
 
           <footer className="shortcuts-hint">
             <kbd>espacio</kbd> inicia/detiene · <kbd>1</kbd>–<kbd>5</kbd> cambia de día ·{' '}
-            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>T</kbd> cambia el tema
+            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>M</kbd> sesión manual ·{' '}
+            <kbd>T</kbd> cambia el tema
           </footer>
         </>
       )}
