@@ -1,8 +1,8 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth.js';
 import { getCached, setCached } from './_lib/apiCache.js';
 import { sendError } from './_lib/errors.js';
+import { withAuth } from './_lib/handler.js';
 import { notionStore } from './_lib/notionStore.js';
+import { currentUserId } from './_lib/requestContext.js';
 import type { WeekView } from './_lib/store.js';
 
 // Armar la vista semanal cuesta decenas de llamadas a Notion. Una caché
@@ -12,19 +12,18 @@ import type { WeekView } from './_lib/store.js';
 // App.tsx) y en el botón de "Actualizar".
 const WEEK_VIEW_TTL_MS = 30_000;
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default withAuth(async (req, res) => {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'method_not_allowed' });
   }
-  if (!requireAuth(req, res)) return;
 
   const opts = {
     fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
     week: typeof req.query.week === 'string' ? req.query.week : undefined,
     day: typeof req.query.day === 'string' ? req.query.day : undefined,
   };
-  const cacheKey = `weekview:${opts.fileId ?? ''}|${opts.week ?? ''}|${opts.day ?? ''}`;
+  const cacheKey = `weekview:${currentUserId()}|${opts.fileId ?? ''}|${opts.week ?? ''}|${opts.day ?? ''}`;
   const fresh = req.query.fresh === '1';
 
   try {
@@ -38,4 +37,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (err) {
     return sendError(res, err);
   }
-}
+});

@@ -1,14 +1,13 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { requireAuth } from './_lib/auth.js';
 import { sendError } from './_lib/errors.js';
+import { withAuth } from './_lib/handler.js';
 import { notionStore } from './_lib/notionStore.js';
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'method_not_allowed' });
   }
-  if (!requireAuth(req, res)) return;
 
   try {
     const files = await notionStore.listFiles();
@@ -17,3 +16,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return sendError(res, err);
   }
 }
+
+export default withAuth(handler);

@@ -1,61 +1,55 @@
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
-import { login } from '../api';
+import { googleLoginUrl } from '../api';
 import Footer from './Footer';
 
-export default function Login({ onLoggedIn }: { onLoggedIn: () => void }) {
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  google_denied: 'Cancelaste el acceso con Google.',
+  email_unverified: 'Tu email de Google no está verificado.',
+  state: 'El intento de login expiró. Probá de nuevo.',
+  token_exchange: 'No se pudo completar el login con Google. Probá de nuevo.',
+  server_misconfigured: 'El servidor no tiene configurado el login con Google.',
+};
 
-  async function performLogin() {
-    if (loading || password.length === 0) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await login(password);
-      onLoggedIn();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
-    } finally {
-      setLoading(false);
-    }
-  }
+function GoogleGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
+      />
+      <path
+        fill="#34A853"
+        d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.02-3.7H.96v2.33A9 9 0 0 0 9 18Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M3.98 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.02-2.33Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.02 2.33C4.68 5.16 6.66 3.58 9 3.58Z"
+      />
+    </svg>
+  );
+}
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    void performLogin();
-  }
-
-  // No depender solo del submit implícito del navegador al presionar Enter
-  // (poco fiable entre navegadores/teclados/autocompletado) — se maneja
-  // explícito acá, y se cancela el default para no disparar el submit del
-  // form dos veces.
-  function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      void performLogin();
-    }
-  }
+export default function Login() {
+  const authError = new URLSearchParams(window.location.search).get('auth_error');
+  const errorMessage = authError
+    ? AUTH_ERROR_MESSAGES[authError] ?? 'No se pudo iniciar sesión. Probá de nuevo.'
+    : null;
 
   return (
     <div className="login-screen">
       <div className="screen-content">
-        <form className="login-card" onSubmit={handleSubmit}>
+        <div className="login-card">
           <h1>pomotion</h1>
-          <p className="muted">Ingresa la contraseña para continuar</p>
-          <input
-            type="password"
-            autoFocus
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Contraseña"
-          />
-          {error && <p className="error">{error}</p>}
-          <button type="submit" className="btn btn-filled btn-large" disabled={loading || password.length === 0}>
-            {loading ? 'Entrando…' : 'Entrar'}
-          </button>
-        </form>
+          <p className="muted">Iniciá sesión para continuar</p>
+          {errorMessage && <p className="error">{errorMessage}</p>}
+          <a className="btn btn-filled btn-large google-btn" href={googleLoginUrl}>
+            <GoogleGlyph />
+            Continuar con Google
+          </a>
+        </div>
       </div>
       <Footer />
     </div>
