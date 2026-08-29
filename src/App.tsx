@@ -21,6 +21,7 @@ import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
+import FocusHeatmap from './components/FocusHeatmap';
 import type { MoveTarget } from './components/MoveTaskMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
@@ -78,6 +79,17 @@ function CalendarIcon() {
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <rect x="3" y="4.5" width="18" height="16" rx="2" />
       <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
+    </svg>
+  );
+}
+
+function HeatmapIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+      <rect x="3" y="3" width="7" height="7" rx="1.6" />
+      <rect x="14" y="3" width="7" height="7" rx="1.6" opacity="0.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.6" opacity="0.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.6" />
     </svg>
   );
 }
@@ -151,6 +163,7 @@ export default function App() {
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
   const [showReport, setShowReport] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
+  const [showHeatmap, setShowHeatmap] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
@@ -645,6 +658,15 @@ export default function App() {
           <button
             type="button"
             className="btn btn-icon"
+            onClick={() => setShowHeatmap(true)}
+            title="Heatmap de foco"
+            aria-label="Heatmap de foco"
+          >
+            <HeatmapIcon />
+          </button>
+          <button
+            type="button"
+            className="btn btn-icon"
             onClick={() => setShowReport(true)}
             title="Reporte de tiempo"
             aria-label="Reporte de tiempo"
@@ -785,6 +807,10 @@ export default function App() {
           onPick={guardedGoToDate}
           onClose={() => setShowMonth(false)}
         />
+      )}
+
+      {showHeatmap && (
+        <FocusHeatmap fileId={selectedFileId} onClose={() => setShowHeatmap(false)} />
       )}
 
       {showRecurring && data && (

@@ -70,6 +70,29 @@ export type MonthSummary = {
   days: MonthDaySummary[];
 };
 
+/** Un día del heatmap de foco (solo días con horas registradas). */
+export type FocusHeatmapDay = {
+  date: string; // 'YYYY-MM-DD'
+  totalSeconds: number;
+};
+
+export type FocusHeatmap = {
+  /** Lunes de la primera columna, 'YYYY-MM-DD'. */
+  startDate: string;
+  /** Último día con celda (hoy), 'YYYY-MM-DD'. */
+  endDate: string;
+  today: string;
+  /** Cantidad de columnas (semanas) de la grilla. */
+  weeks: number;
+  totalSeconds: number;
+  /** Días con al menos una sesión en el rango. */
+  activeDays: number;
+  /** Máximo de segundos registrados en un día del rango (0 si no hay). */
+  maxSeconds: number;
+  /** Días con horas registradas, ordenados por fecha. */
+  days: FocusHeatmapDay[];
+};
+
 /** Fila del reporte de tiempo. */
 export type SessionRow = {
   date: string;
@@ -96,6 +119,7 @@ export type RecurringRule = {
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
 export type GetMonthSummaryInput = { month?: string; fileId?: string };
+export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 
 export type CreateTaskInput = {
@@ -144,6 +168,8 @@ export interface TaskStore {
   getWeekView(input: GetWeekViewInput): Promise<WeekView>;
   /** Resumen por día de un mes: conteo de tareas y horas registradas. */
   getMonthSummary(input: GetMonthSummaryInput): Promise<MonthSummary>;
+  /** Horas registradas por día en las últimas N semanas, para el heatmap. */
+  getFocusHeatmap(input: GetFocusHeatmapInput): Promise<FocusHeatmap>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   listFiles(): Promise<FileEntry[]>;
 

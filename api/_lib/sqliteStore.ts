@@ -34,6 +34,9 @@ import type {
   CreateRecurringRuleInput,
   CreateTaskInput,
   FileEntry,
+  FocusHeatmap,
+  FocusHeatmapDay,
+  GetFocusHeatmapInput,
   GetMonthSummaryInput,
   GetWeekViewInput,
   LogSessionInput,
@@ -352,6 +355,55 @@ async function getMonthSummary(input: GetMonthSummaryInput): Promise<MonthSummar
     isCurrentMonth: month === today.slice(0, 7),
     today: today.slice(0, 7) === month ? today : null,
     days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+  };
+}
+
+// --- Heatmap de foco ---
+
+const HEATMAP_DEFAULT_WEEKS = 26;
+const HEATMAP_MIN_WEEKS = 4;
+const HEATMAP_MAX_WEEKS = 53;
+
+function clampWeeks(weeks: number | undefined): number {
+  if (typeof weeks !== 'number' || !Number.isFinite(weeks)) return HEATMAP_DEFAULT_WEEKS;
+  return Math.min(HEATMAP_MAX_WEEKS, Math.max(HEATMAP_MIN_WEEKS, Math.round(weeks)));
+}
+
+/** Segundos registrados por día en las últimas N semanas (columnas del
+ *  heatmap estilo GitHub). 1 query agregada; solo devuelve los días con
+ *  actividad — el cliente arma la grilla. */
+async function getFocusHeatmap(input: GetFocusHeatmapInput): Promise<FocusHeatmap> {
+  const userId = currentUserId();
+  const today = todayDateStringInTz(TIMEZONE);
+  const weeks = clampWeeks(input.weeks);
+  // La última columna es la semana (Lun–Dom) que contiene hoy; la primera
+  // empieza (weeks - 1) semanas antes, siempre un lunes.
+  const startDate = addDaysToDate(mondayOf(today), -(weeks - 1) * 7);
+  const f = fileFilter(input.fileId);
+
+  const rows = (
+    await getDb().execute({
+      sql: `SELECT date, sum(duration_sec) AS secs FROM work_sessions
+            WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
+            GROUP BY date
+            ORDER BY date`,
+      args: [userId, ...f.args, startDate, today],
+    })
+  ).rows;
+
+  const days: FocusHeatmapDay[] = rows
+    .map((r) => ({ date: String(r.date), totalSeconds: Number(r.secs ?? 0) }))
+    .filter((d) => d.totalSeconds > 0);
+
+  return {
+    startDate,
+    endDate: today,
+    today,
+    weeks,
+    totalSeconds: days.reduce((sum, d) => sum + d.totalSeconds, 0),
+    activeDays: days.length,
+    maxSeconds: days.reduce((max, d) => Math.max(max, d.totalSeconds), 0),
+    days,
   };
 }
 
@@ -743,6 +795,7 @@ async function applyRecurringToWeek(input: ApplyRecurringInput): Promise<{ added
 export const sqliteStore: TaskStore = {
   getWeekView,
   getMonthSummary,
+  getFocusHeatmap,
   getSessionsInRange,
   listFiles,
   createTask,

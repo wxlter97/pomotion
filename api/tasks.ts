@@ -14,6 +14,15 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return res.status(200).json(summary);
       }
+      // ?heatmap=1 → horas por día de las últimas N semanas (heatmap de foco).
+      if (typeof req.query.heatmap === 'string') {
+        const weeks = Number(req.query.weeks);
+        const heatmap = await sqliteStore.getFocusHeatmap({
+          fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
+          weeks: Number.isFinite(weeks) ? weeks : undefined,
+        });
+        return res.status(200).json(heatmap);
+      }
       const view = await sqliteStore.getWeekView({
         fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
         week: typeof req.query.week === 'string' ? req.query.week : undefined,

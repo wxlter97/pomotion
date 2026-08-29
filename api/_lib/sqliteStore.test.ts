@@ -191,6 +191,65 @@ describe('getMonthSummary (vista mensual)', () => {
   });
 });
 
+describe('getFocusHeatmap (heatmap de foco)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('suma segundos por día dentro de la ventana, solo días con foco', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z')); // hoy = miércoles 26
+
+    const heatmap = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-10', text: 'A' });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 1200, start: '09:00', end: '09:20' });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 600, start: '10:00', end: '10:10' });
+      // día con tarea pero sin sesión: no aparece
+      await sqliteStore.createTask({ date: '2026-08-11', text: 'B' });
+      return sqliteStore.getFocusHeatmap({ weeks: 4 });
+    });
+
+    expect(heatmap.endDate).toBe('2026-08-26');
+    // 4 semanas: lunes de esta semana (2026-08-24) menos 3 semanas.
+    expect(heatmap.startDate).toBe('2026-08-03');
+    expect(heatmap.weeks).toBe(4);
+    expect(heatmap.days).toEqual([{ date: '2026-08-10', totalSeconds: 1800 }]);
+    expect(heatmap.totalSeconds).toBe(1800);
+    expect(heatmap.activeDays).toBe(1);
+    expect(heatmap.maxSeconds).toBe(1800);
+  });
+
+  it('excluye sesiones anteriores a la ventana', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    const heatmap = await as(USER, async () => {
+      const old = await sqliteStore.createTask({ date: '2026-06-01', text: 'vieja' });
+      await sqliteStore.logSession({ taskId: old.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+      return sqliteStore.getFocusHeatmap({ weeks: 4 });
+    });
+
+    expect(heatmap.days).toEqual([]);
+    expect(heatmap.totalSeconds).toBe(0);
+  });
+
+  it('clampa weeks fuera de rango y scopea por usuario', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-25', text: 'mía' });
+      await sqliteStore.logSession({ taskId: t.id, durationSeconds: 600, start: '09:00', end: '09:10' });
+    });
+
+    const huge = await as(USER, () => sqliteStore.getFocusHeatmap({ weeks: 999 }));
+    expect(huge.weeks).toBe(53);
+    const tiny = await as(USER, () => sqliteStore.getFocusHeatmap({ weeks: 1 }));
+    expect(tiny.weeks).toBe(4);
+
+    const other = await as(OTHER, () => sqliteStore.getFocusHeatmap({ weeks: 8 }));
+    expect(other.days).toEqual([]);
+  });
+});
+
 describe('sesiones + totales', () => {
   it('logSession suma al total del día y de la semana', async () => {
     const view = await as(USER, async () => {
