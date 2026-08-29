@@ -171,6 +171,24 @@ export async function listPendingUsers(): Promise<UserRow[]> {
   return res.rows.map(rowToUser);
 }
 
+/** Todos los usuarios para el panel de admin: los pendientes primero, luego
+ *  por creación descendente. */
+export async function listUsersForAdmin(): Promise<UserRow[]> {
+  const res = await getDb().execute(
+    'SELECT * FROM users ORDER BY approved_login ASC, created_at DESC'
+  );
+  return res.rows.map(rowToUser);
+}
+
+/** Aprueba (1) o revoca (0) el login de un usuario por id. */
+export async function setUserApproval(userId: string, approved: boolean): Promise<boolean> {
+  const res = await getDb().execute({
+    sql: 'UPDATE users SET approved_login = ? WHERE id = ?',
+    args: [approved ? 1 : 0, userId],
+  });
+  return res.rowsAffected > 0;
+}
+
 export async function approveUserByEmail(email: string): Promise<boolean> {
   const res = await getDb().execute({
     sql: 'UPDATE users SET approved_login = 1 WHERE lower(email) = lower(?)',

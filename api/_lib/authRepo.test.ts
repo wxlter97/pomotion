@@ -8,7 +8,9 @@ import {
   deleteAuthSession,
   getUserBySessionToken,
   listPendingUsers,
+  listUsersForAdmin,
   putOAuthState,
+  setUserApproval,
   takeOAuthState,
   upsertUserFromGoogle,
 } from './authRepo.js';
@@ -115,5 +117,26 @@ describe('aprobación', () => {
     expect(await approveUserByEmail('ANA@GMAIL.COM')).toBe(true);
     expect((await listPendingUsers()).map((u) => u.email)).toEqual(['beto@gmail.com']);
     expect(await approveUserByEmail('nadie@gmail.com')).toBe(false);
+  });
+
+  it('listUsersForAdmin trae a todos, pendientes primero', async () => {
+    const ana = await upsertUserFromGoogle(GOOGLE);
+    await upsertUserFromGoogle({ ...GOOGLE, googleSub: 'sub-2', email: 'beto@gmail.com', name: 'Beto' });
+    await setUserApproval(ana.id, true);
+
+    const all = await listUsersForAdmin();
+    expect(all).toHaveLength(2);
+    expect(all[0].email).toBe('beto@gmail.com'); // pendiente primero
+    expect(all[0].approvedLogin).toBe(false);
+    expect(all[1].approvedLogin).toBe(true);
+  });
+
+  it('setUserApproval aprueba y revoca por id', async () => {
+    const ana = await upsertUserFromGoogle(GOOGLE);
+    expect(await setUserApproval(ana.id, true)).toBe(true);
+    expect((await listPendingUsers())).toHaveLength(0);
+    expect(await setUserApproval(ana.id, false)).toBe(true);
+    expect((await listPendingUsers()).map((u) => u.email)).toEqual(['ana@gmail.com']);
+    expect(await setUserApproval('no-existe', true)).toBe(false);
   });
 });
