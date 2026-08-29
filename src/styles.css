@@ -410,11 +410,13 @@ h3 {
   line-height: 1;
 }
 
+/* Navegación de semana como un clúster compacto (‹ etiqueta › Hoy +), como
+   el selector de mes de cualquier calendario — antes la etiqueta tenía
+   margin-right:auto y mandaba el ‹›+ al borde derecho del contenedor. */
 .week-label {
   color: var(--color-label-secondary);
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
-  margin-right: auto;
 }
 
 .week-today-btn {
