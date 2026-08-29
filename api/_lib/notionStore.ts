@@ -27,12 +27,14 @@ import {
   dateRangesOverlap,
   formatWeekLabel,
   isDateInRange,
+  normalize,
   parseWeekRange,
   plainText,
   todayDateStringInTz,
   todayWeekdayNameInTz,
 } from './parse.js';
 import { formatSessionText, parseSessionText } from './sessionText.js';
+import { missingRecurringTasks } from './recurring.js';
 import { resolveActivePageId, resolveFiles, richTextOf } from './notionPage.js';
 import {
   computeWeekNav,
@@ -44,12 +46,16 @@ import {
 } from './weekModel.js';
 import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
 import type {
+  ApplyRecurringInput,
+  ApplyRecurringResult,
   CreateTaskInput,
   CreateWeekInput,
   DayContainer,
+  EnsureRecurringResult,
   FileEntry,
   GetWeekViewInput,
   LogSessionInput,
+  RecurringList,
   ReorderResult,
   ReorderTaskInput,
   ReportInput,
@@ -70,6 +76,16 @@ const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
 
 const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Encabezado heading_1 reservado para la lista de tareas recurrentes. No es
+// una semana: se filtra de la navegación de semanas y del reporte, y sus
+// to_do (hermanos directos de la página, hasta el siguiente heading) son
+// las definiciones recurrentes.
+const RECURRING_HEADING = 'Recurrentes';
+
+function isRecurringHeadingLabel(label: string): boolean {
+  return normalize(label) === normalize(RECURRING_HEADING);
+}
 
 // --- Lectura de la vista semanal ---
 
@@ -196,7 +212,9 @@ function weekViewShell(overrides: Partial<WeekView> & Pick<WeekView, 'week' | 'w
 
 async function getWeekView(opts: GetWeekViewInput): Promise<WeekView> {
   const activePageId = await resolveActivePageId(opts.fileId);
-  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId));
+  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId)).filter(
+    (g) => !isRecurringHeadingLabel(g.label)
+  );
 
   if (weekGroups.length === 0) {
     // Página activa válida pero sin ninguna semana todavía (ej. un archivo
@@ -305,7 +323,9 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
   }
 
   const activePageId = await resolveActivePageId(fileId);
-  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId));
+  const weekGroups = groupBlocksByWeek(await listBlockChildren(activePageId)).filter(
+    (g) => !isRecurringHeadingLabel(g.label)
+  );
 
   const rows: SessionRow[] = [];
   for (const week of weekGroups) {
@@ -364,11 +384,18 @@ async function loadExistingWeeks(activePageId: string): Promise<ExistingWeeks> {
 
   for (const block of blocks) {
     if (block.type === 'heading_1') {
+      const label = plainText(richTextOf(block));
+      // La sección "Recurrentes" no es una semana: se la salta (no entra en
+      // `labels` ni fija el ancla), así las semanas nuevas quedan debajo de
+      // ella y no se la confunde con una semana existente.
+      if (isRecurringHeadingLabel(label)) {
+        previousBlock = block;
+        continue;
+      }
       if (!firstHeadingFound) {
         firstHeadingFound = true;
         topAnchorBlockId = previousBlock?.id;
       }
-      const label = plainText(richTextOf(block));
       labels.push(label);
       const range = parseWeekRange(label);
       if (range) endDates.push(range.end);
@@ -597,6 +624,109 @@ async function reorderTask(input: ReorderTaskInput): Promise<ReorderResult> {
   return { newBlockId };
 }
 
+// --- Tareas recurrentes ---
+
+type RecurringScan = {
+  headingBlock: NotionBlock | null;
+  /** to_do que siguen al heading "Recurrentes" hasta el próximo heading. */
+  todos: NotionBlock[];
+};
+
+/** Localiza la sección "Recurrentes" en los hijos directos de la página y
+ *  sus to_do (hermanos que la siguen, hasta el siguiente encabezado). */
+function scanRecurring(pageBlocks: NotionBlock[]): RecurringScan {
+  const headingIndex = pageBlocks.findIndex(
+    (b) => b.type === 'heading_1' && isRecurringHeadingLabel(plainText(richTextOf(b)))
+  );
+  if (headingIndex === -1) return { headingBlock: null, todos: [] };
+  const todos: NotionBlock[] = [];
+  for (let i = headingIndex + 1; i < pageBlocks.length; i++) {
+    const block = pageBlocks[i];
+    if (block.type.startsWith('heading_')) break;
+    if (block.type === 'to_do') todos.push(block);
+  }
+  return { headingBlock: pageBlocks[headingIndex], todos };
+}
+
+async function listRecurringTasks(fileId?: string): Promise<RecurringList> {
+  const activePageId = await resolveActivePageId(fileId);
+  const { headingBlock, todos } = scanRecurring(await listBlockChildren(activePageId));
+  const tasks: TaskRef[] = todos
+    .map((b) => ({ blockId: b.id, text: plainText(richTextOf(b)), checked: false as const }))
+    .filter((t) => t.text.length > 0);
+  return { tasks, containerId: activePageId, headingBlockId: headingBlock?.id ?? null };
+}
+
+async function ensureRecurringSection(fileId?: string): Promise<EnsureRecurringResult> {
+  const activePageId = await resolveActivePageId(fileId);
+  const blocks = await listBlockChildren(activePageId);
+  const existing = scanRecurring(blocks).headingBlock;
+  if (existing) return { containerId: activePageId, headingBlockId: existing.id };
+
+  // Insertar justo antes de la primera semana (o al final si la página
+  // arranca con un heading_1 y no hay dónde anclar "antes").
+  const firstHeadingIndex = blocks.findIndex((b) => b.type === 'heading_1');
+  const after = firstHeadingIndex > 0 ? blocks[firstHeadingIndex - 1].id : undefined;
+  const result = (await appendBlockChildren(
+    activePageId,
+    [{ heading_1: { rich_text: [{ type: 'text', text: { content: RECURRING_HEADING } }] } }],
+    after
+  )) as { results?: { id?: string }[] };
+  const headingBlockId = result?.results?.[0]?.id;
+  if (!headingBlockId) {
+    throw new UpstreamError('notion_no_id', 'Notion no devolvió el id de la sección creada');
+  }
+  return { containerId: activePageId, headingBlockId };
+}
+
+async function applyRecurringToWeek(input: ApplyRecurringInput): Promise<ApplyRecurringResult> {
+  const { fileId, week } = input;
+  if (!week || typeof week !== 'string') {
+    throw new BadRequestError('invalid_week', 'Falta la semana destino');
+  }
+
+  const activePageId = await resolveActivePageId(fileId);
+  const pageBlocks = await listBlockChildren(activePageId);
+
+  const recurringTexts = scanRecurring(pageBlocks)
+    .todos.map((b) => plainText(richTextOf(b)))
+    .filter((t) => t.length > 0);
+  if (recurringTexts.length === 0) return { added: 0 };
+
+  const weekGroups = groupBlocksByWeek(pageBlocks).filter((g) => !isRecurringHeadingLabel(g.label));
+  const target = weekGroups.find((g) => g.label === week);
+  if (!target) {
+    throw new NotFoundError('week_not_found', `No se encontró la semana "${week}"`);
+  }
+
+  const positioned = await expandColumns(target.blocks, activePageId);
+  const { dayOrder, dayBlocks, dayContainerId, dayHeadingBlockId } =
+    groupPositionedBlocksByDay(positioned);
+
+  let added = 0;
+  for (const day of dayOrder) {
+    const dayTodos = dayBlocks.get(day) ?? [];
+    const existing = dayTodos.map((b) => plainText(richTextOf(b)));
+    const missing = missingRecurringTasks(existing, recurringTexts);
+    if (missing.length === 0) continue;
+
+    const containerId = dayContainerId.get(day);
+    const anchor = dayTodos.length > 0 ? dayTodos[dayTodos.length - 1].id : dayHeadingBlockId.get(day);
+    if (!containerId || !anchor) continue;
+
+    await appendBlockChildren(
+      containerId,
+      missing.map((text) => ({
+        to_do: { rich_text: [{ type: 'text', text: { content: text } }], checked: false },
+      })),
+      anchor
+    );
+    added += missing.length;
+  }
+
+  return { added };
+}
+
 // --- Sesiones ---
 
 function formatTimeFromIso(iso: string): string {
@@ -693,6 +823,9 @@ export const notionStore: Store = {
   createTask,
   deleteTask,
   reorderTask,
+  listRecurringTasks,
+  ensureRecurringSection,
+  applyRecurringToWeek,
   logSession,
   updateSession,
   deleteSession,
