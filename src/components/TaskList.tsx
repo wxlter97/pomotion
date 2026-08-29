@@ -22,7 +22,7 @@ import { daysBetween, dueChipLabel, dueLabel, isOverdue } from '../taskMeta';
  *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
 const DUE_CHIP_WINDOW_DAYS = 3;
 import ConfirmDialog from './ConfirmDialog';
-import MoveTaskMenu, { type MoveTarget } from './MoveTaskMenu';
+import TaskRowMenu, { type MoveTarget } from './TaskRowMenu';
 import TaskDetails from './TaskDetails';
 
 function sumSeconds(task: Task): number {
@@ -445,76 +445,40 @@ export default function TaskList({
                     </button>
                   )}
 
-                  {task.due &&
-                    !isEditingText &&
-                    daysBetween(today, task.due) <= DUE_CHIP_WINDOW_DAYS && (
-                      <span
-                        className={
-                          isOverdue(task.due, task.done, today)
-                            ? 'task-due-chip overdue'
-                            : 'task-due-chip'
-                        }
-                        title={dueLabel(task.due, today)}
-                      >
-                        {dueChipLabel(task.due, today)}
-                      </span>
-                    )}
-                  {total > 0 && <span className="task-total">{formatDurationLabel(total)}</span>}
                   {!isEditingText && (
-                    <div className="task-actions">
-                      <button
-                        type="button"
-                        className={
-                          task.priority || task.notes || task.due
-                            ? 'task-move task-detail-toggle is-set'
-                            : 'task-move task-detail-toggle'
-                        }
-                        onClick={() => startEditTask(task)}
-                        disabled={isBusy}
-                        aria-label="Editar tarea"
-                        title="Editar tarea, prioridad, vencimiento y notas"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        className="task-move"
-                        onClick={() => onReorderTask(task, i - 1)}
-                        disabled={i === 0 || disableEdit}
-                        aria-label="Mover arriba"
-                        title="Mover arriba"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="task-move"
-                        onClick={() => onReorderTask(task, i + 1)}
-                        disabled={i === tasks.length - 1 || disableEdit}
-                        aria-label="Mover abajo"
-                        title="Mover abajo"
-                      >
-                        ↓
-                      </button>
-                      <MoveTaskMenu
+                    <div className="task-item-trailing">
+                      {task.due && daysBetween(today, task.due) <= DUE_CHIP_WINDOW_DAYS && (
+                        <span
+                          className={
+                            isOverdue(task.due, task.done, today)
+                              ? 'task-due-chip overdue'
+                              : 'task-due-chip'
+                          }
+                          title={dueLabel(task.due, today)}
+                        >
+                          {dueChipLabel(task.due, today)}
+                        </span>
+                      )}
+                      {total > 0 && (
+                        <span className="task-total">{formatDurationLabel(total)}</span>
+                      )}
+                      <TaskRowMenu
+                        onEdit={() => startEditTask(task)}
+                        onMoveUp={() => onReorderTask(task, i - 1)}
+                        onMoveDown={() => onReorderTask(task, i + 1)}
+                        canMoveUp={i > 0}
+                        canMoveDown={i < tasks.length - 1}
+                        onDelete={() => setPendingTaskDelete(task)}
+                        disabled={disableEdit}
+                        editDisabled={isBusy}
+                        isSet={Boolean(task.priority || task.notes || task.due)}
                         currentDay={selectedDay}
                         days={days}
                         previousWeekLabel={previousWeekLabel}
                         nextWeekLabel={nextWeekLabel}
                         fileId={fileId}
-                        disabled={disableEdit}
                         onMove={(target) => onMoveTask(task, target)}
                       />
-                      <button
-                        type="button"
-                        className="task-delete"
-                        onClick={() => setPendingTaskDelete(task)}
-                        disabled={disableEdit}
-                        aria-label="Eliminar tarea"
-                        title="Eliminar tarea"
-                      >
-                        ×
-                      </button>
                     </div>
                   )}
                 </div>

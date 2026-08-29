@@ -22,7 +22,8 @@ import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
-import type { MoveTarget } from './components/MoveTaskMenu';
+import Menu, { MenuItem } from './components/Menu';
+import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
@@ -56,96 +57,20 @@ function MoonIcon() {
   );
 }
 
-function SoundOnIcon() {
+function ChevronDownIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
-      <path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
 
-function SoundOffIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 9v6h4l5 4V5L8 9H4Z" />
-      <path d="M16 9l5 6M21 9l-5 6" />
-    </svg>
-  );
-}
-
-function CalendarIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="4.5" width="18" height="16" rx="2" />
-      <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
-    </svg>
-  );
-}
-
-function HeatmapIcon() {
+function MoreIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-      <rect x="3" y="3" width="7" height="7" rx="1.6" />
-      <rect x="14" y="3" width="7" height="7" rx="1.6" opacity="0.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.6" opacity="0.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.6" />
-    </svg>
-  );
-}
-
-function ReportIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-    </svg>
-  );
-}
-
-function BellOnIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9a6 6 0 0 1 12 0c0 5 2.5 6 2.5 6h-17S6 14 6 9Z" />
-      <path d="M10 20a2.5 2.5 0 0 0 4 0" />
-    </svg>
-  );
-}
-
-function BellOffIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9a6 6 0 0 1 9.5-4.9M18 12c0 3 1.5 4.2 2.2 4.8M17.7 17.7H3.5S6 14 6 9M10 20a2.5 2.5 0 0 0 4 0" />
-      <path d="M3 3l18 18" />
-    </svg>
-  );
-}
-
-function RepeatIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 2l4 4-4 4" />
-      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-      <path d="M7 22l-4-4 4-4" />
-      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-    </svg>
-  );
-}
-
-function RefreshIcon({ spinning }: { spinning?: boolean }) {
-  return (
-    <svg
-      className={spinning ? 'icon-spin' : undefined}
-      viewBox="0 0 24 24"
-      width="18"
-      height="18"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3.5 12a8.5 8.5 0 0 1 14.5-6M20.5 12a8.5 8.5 0 0 1-14.5 6" />
-      <path d="M18 3v4h-4M6 21v-4h4" />
+      <circle cx="12" cy="5" r="1.85" />
+      <circle cx="12" cy="12" r="1.85" />
+      <circle cx="12" cy="19" r="1.85" />
     </svg>
   );
 }
@@ -576,35 +501,59 @@ export default function App() {
     </button>
   );
 
-  const soundToggleButton = (
-    <button
-      type="button"
-      className="btn btn-icon"
-      onClick={toggleSounds}
-      title={soundsEnabled ? 'Desactivar sonidos' : 'Activar sonidos'}
-      aria-label={soundsEnabled ? 'Desactivar sonidos' : 'Activar sonidos'}
-    >
-      {soundsEnabled ? <SoundOnIcon /> : <SoundOffIcon />}
-    </button>
+  const notificationsState =
+    notifications.permission === 'denied'
+      ? 'Bloqueadas'
+      : notifications.enabled
+        ? 'Sí'
+        : 'No';
+
+  const viewMenu = (
+    <Menu ariaLabel="Ver" trigger={<>Ver<ChevronDownIcon /></>}>
+      {(close) => (
+        <>
+          <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
+          <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
+          <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
+          <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
+        </>
+      )}
+    </Menu>
   );
 
-  const notificationsTitle =
-    notifications.permission === 'denied'
-      ? 'Notificaciones bloqueadas en el navegador'
-      : notifications.enabled
-        ? 'Desactivar notificaciones'
-        : 'Avisar el cambio de fase con una notificación';
-  const notificationToggleButton = notifications.permission !== 'unsupported' && (
-    <button
-      type="button"
-      className="btn btn-icon"
-      onClick={() => void notifications.toggle()}
-      disabled={notifications.permission === 'denied'}
-      title={notificationsTitle}
-      aria-label={notificationsTitle}
-    >
-      {notifications.enabled ? <BellOnIcon /> : <BellOffIcon />}
-    </button>
+  const moreMenu = (
+    <Menu ariaLabel="Más opciones" triggerClassName="btn btn-icon" trigger={<MoreIcon />}>
+      {(close) => (
+        <>
+          <div className="menu-heading">Ajustes</div>
+          <MenuItem onClick={toggleSounds} state={soundsEnabled ? 'Sí' : 'No'}>
+            Sonidos
+          </MenuItem>
+          {notifications.permission !== 'unsupported' && (
+            <MenuItem
+              onClick={() => void notifications.toggle()}
+              disabled={notifications.permission === 'denied'}
+              state={notificationsState}
+            >
+              Notificaciones
+            </MenuItem>
+          )}
+          <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? 'Sí' : 'No'}>
+            Traer pendientes al abrir
+          </MenuItem>
+          <div className="menu-sep" />
+          <MenuItem
+            onClick={() => { void refresh(data?.selectedDay, data?.week); close(); }}
+            disabled={loading}
+          >
+            Actualizar
+          </MenuItem>
+          <MenuItem danger onClick={() => { close(); void handleLogout(); }}>
+            Salir
+          </MenuItem>
+        </>
+      )}
+    </Menu>
   );
 
   if (authState === 'checking') {
@@ -653,58 +602,9 @@ export default function App() {
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => setShowMonth(true)}
-            title="Vista mensual"
-            aria-label="Vista mensual"
-          >
-            <CalendarIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => setShowHeatmap(true)}
-            title="Heatmap de foco"
-            aria-label="Heatmap de foco"
-          >
-            <HeatmapIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => setShowReport(true)}
-            title="Reporte de tiempo"
-            aria-label="Reporte de tiempo"
-          >
-            <ReportIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => setShowRecurring(true)}
-            title="Tareas recurrentes"
-            aria-label="Tareas recurrentes"
-          >
-            <RepeatIcon />
-          </button>
-          {soundToggleButton}
-          {notificationToggleButton}
           {themeToggleButton}
-          <button
-            type="button"
-            className="btn btn-icon"
-            onClick={() => void refresh(data?.selectedDay, data?.week)}
-            disabled={loading}
-            title="Actualizar"
-            aria-label="Actualizar"
-          >
-            <RefreshIcon spinning={loading} />
-          </button>
-          <button type="button" className="btn btn-plain" onClick={() => void handleLogout()}>
-            Salir
-          </button>
+          {viewMenu}
+          {moreMenu}
         </div>
       </header>
 
@@ -743,16 +643,24 @@ export default function App() {
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
               loading={loading}
             />
-            {data.dayTotalSeconds > 0 && (
-              <div className="total-pill" title="Total registrado este día">
-                <span className="total-pill-label">Día</span>
-                <span className="total-pill-value">{formatDurationLabel(data.dayTotalSeconds)}</span>
-              </div>
-            )}
-            {data.weekTotalSeconds > 0 && (
-              <div className="total-pill" title="Total registrado esta semana">
-                <span className="total-pill-label">Semana</span>
-                <span className="total-pill-value">{formatDurationLabel(data.weekTotalSeconds)}</span>
+            {(data.dayTotalSeconds > 0 || data.weekTotalSeconds > 0) && (
+              <div className="total-pill" title="Tiempo registrado">
+                {data.dayTotalSeconds > 0 && (
+                  <span className="total-seg">
+                    <span className="total-pill-label">Día</span>
+                    <span className="total-pill-value">
+                      {formatDurationLabel(data.dayTotalSeconds)}
+                    </span>
+                  </span>
+                )}
+                {data.weekTotalSeconds > 0 && (
+                  <span className="total-seg">
+                    <span className="total-pill-label">Sem</span>
+                    <span className="total-pill-value">
+                      {formatDurationLabel(data.weekTotalSeconds)}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
           </div>
