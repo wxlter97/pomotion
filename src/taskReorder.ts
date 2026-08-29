@@ -1,5 +1,3 @@
-import type { Task } from './types';
-
 /**
  * Calcula el `after_block_id` (ancla de Notion) para insertar `movingBlockId`
  * en `targetIndex` dentro de `tasks`. Una sola implementación, reusada por
@@ -12,7 +10,7 @@ import type { Task } from './types';
  * inicio del día).
  */
 export function computeAfterBlockId(
-  tasks: Task[],
+  tasks: { blockId: string }[],
   movingBlockId: string,
   targetIndex: number,
   dayHeadingBlockId: string

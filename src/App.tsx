@@ -6,6 +6,7 @@ import DismissibleBanner from './components/DismissibleBanner';
 import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
+import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import type { MoveTarget } from './components/MoveTaskMenu';
 import TaskList from './components/TaskList';
@@ -84,6 +85,17 @@ function BellOffIcon() {
   );
 }
 
+function RepeatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 2l4 4-4 4" />
+      <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+      <path d="M7 22l-4-4 4-4" />
+      <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </svg>
+  );
+}
+
 function RefreshIcon({ spinning }: { spinning?: boolean }) {
   return (
     <svg
@@ -119,6 +131,8 @@ export default function App() {
   const [addingWeek, setAddingWeek] = useState(false);
   const [addWeekError, setAddWeekError] = useState<string | null>(null);
   const [showReport, setShowReport] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(false);
+  const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [theme, toggleTheme] = useTheme();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const notifications = useNotificationSetting();
@@ -598,6 +612,15 @@ export default function App() {
           >
             <ReportIcon />
           </button>
+          <button
+            type="button"
+            className="btn btn-icon"
+            onClick={() => setShowRecurring(true)}
+            title="Tareas recurrentes"
+            aria-label="Tareas recurrentes"
+          >
+            <RepeatIcon />
+          </button>
           {soundToggleButton}
           {notificationToggleButton}
           {themeToggleButton}
@@ -628,6 +651,13 @@ export default function App() {
 
       {error && <p className="error banner">{error}</p>}
       {addWeekError && <p className="error banner">{addWeekError}</p>}
+      {recurringNotice && (
+        <DismissibleBanner
+          key={recurringNotice.n}
+          tone="success"
+          message={recurringNotice.text}
+        />
+      )}
       {data && data.week && data.weekSource === 'auto-fallback' && (
         <DismissibleBanner
           key={`week-fallback-${data.week}`}
@@ -734,6 +764,25 @@ export default function App() {
       <Footer />
 
       {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
+
+      {showRecurring && (
+        <RecurringTasksDialog
+          fileId={selectedFileId}
+          currentWeek={data?.week ?? null}
+          onClose={() => setShowRecurring(false)}
+          onApplied={(added) => {
+            setRecurringNotice((prev) => ({
+              n: (prev?.n ?? 0) + 1,
+              text:
+                added === 0
+                  ? 'Las tareas recurrentes ya estaban en todos los días de esta semana.'
+                  : `${added} ${added === 1 ? 'tarea recurrente agregada' : 'tareas recurrentes agregadas'} a la semana.`,
+            }));
+            pendingFreshRef.current = true;
+            void refresh(data?.selectedDay ?? undefined, data?.week ?? undefined);
+          }}
+        />
+      )}
 
       {pendingSwitch && (
         <ConfirmDialog

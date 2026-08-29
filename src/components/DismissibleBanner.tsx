@@ -16,7 +16,7 @@ export default function DismissibleBanner({
   durationMs = DEFAULT_DURATION_MS,
 }: {
   message: string;
-  tone?: 'warning' | 'error';
+  tone?: 'warning' | 'error' | 'success';
   durationMs?: number;
 }) {
   const [state, setState] = useState<'visible' | 'fading' | 'hidden'>('visible');

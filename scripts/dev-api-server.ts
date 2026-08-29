@@ -15,6 +15,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import filesHandler from '../api/files';
 import loginHandler from '../api/login';
 import logoutHandler from '../api/logout';
+import recurringHandler from '../api/recurring';
 import reportHandler from '../api/report';
 import sessionHandler from '../api/session';
 import taskHandler from '../api/task';
@@ -34,6 +35,7 @@ const routes: Record<string, Handler> = {
   '/api/week': weekHandler as Handler,
   '/api/files': filesHandler as Handler,
   '/api/report': reportHandler as Handler,
+  '/api/recurring': recurringHandler as Handler,
 };
 
 const PORT = Number(process.env.API_PORT) || 3000;
