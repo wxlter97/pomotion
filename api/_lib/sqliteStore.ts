@@ -16,6 +16,7 @@ import {
   normalize,
   todayDateStringInTz,
 } from './parse.js';
+import { computeAnalytics } from './analytics.js';
 import { currentUserId } from './requestContext.js';
 import {
   WEEKDAY_NAMES,
@@ -30,6 +31,7 @@ import {
 } from './weekDates.js';
 import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
 import type {
+  Analytics,
   ApplyRecurringInput,
   CreateRecurringRuleInput,
   CreateTagInput,
@@ -37,6 +39,7 @@ import type {
   FileEntry,
   FocusHeatmap,
   FocusHeatmapDay,
+  GetAnalyticsInput,
   GetFocusHeatmapInput,
   GetMonthSummaryInput,
   GetWeekViewInput,
@@ -506,6 +509,52 @@ async function getFocusHeatmap(input: GetFocusHeatmapInput): Promise<FocusHeatma
     maxSeconds: days.reduce((max, d) => Math.max(max, d.totalSeconds), 0),
     days,
   };
+}
+
+// --- Analítica ---
+
+const ANALYTICS_DEFAULT_WEEKS = 12;
+
+function clampAnalyticsWeeks(weeks: number | undefined): number {
+  if (typeof weeks !== 'number' || !Number.isFinite(weeks)) return ANALYTICS_DEFAULT_WEEKS;
+  return Math.min(52, Math.max(4, Math.round(weeks)));
+}
+
+/** Agregados del panel de analítica. 2 queries (sesiones + tareas de la
+ *  ventana); el cálculo lo hace `computeAnalytics` (puro). */
+async function getAnalytics(input: GetAnalyticsInput): Promise<Analytics> {
+  const userId = currentUserId();
+  const today = todayDateStringInTz(TIMEZONE);
+  const weeks = clampAnalyticsWeeks(input.weeks);
+  const startMonday = addDaysToDate(mondayOf(today), -(weeks - 1) * 7);
+  const f = fileFilter(input.fileId);
+  const db = getDb();
+
+  const sessRows = (
+    await db.execute({
+      sql: `SELECT date, start_hhmm, duration_sec FROM work_sessions
+            WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?`,
+      args: [userId, ...f.args, startMonday, today],
+    })
+  ).rows;
+
+  const taskRows = (
+    await db.execute({
+      sql: `SELECT date, done FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND date IS NOT NULL AND date >= ? AND date <= ?`,
+      args: [userId, ...f.args, startMonday, today],
+    })
+  ).rows;
+
+  return computeAnalytics(
+    sessRows.map((r) => ({
+      date: String(r.date),
+      start: String(r.start_hhmm),
+      durationSec: Number(r.duration_sec),
+    })),
+    taskRows.map((r) => ({ date: String(r.date), done: Number(r.done) === 1 })),
+    { weeks, startMonday, endDate: today }
+  );
 }
 
 // --- Reporte ---
@@ -1175,6 +1224,7 @@ export const sqliteStore: TaskStore = {
   getWeekView,
   getMonthSummary,
   getFocusHeatmap,
+  getAnalytics,
   getSessionsInRange,
   listFiles,
   listTags,

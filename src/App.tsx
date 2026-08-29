@@ -23,6 +23,7 @@ import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
+import Analytics from './components/Analytics';
 import Inbox from './components/Inbox';
 import Menu, { MenuItem } from './components/Menu';
 import TagsDialog from './components/TagsDialog';
@@ -93,6 +94,7 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
@@ -595,6 +597,7 @@ export default function App() {
         <>
           <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
+          <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
           <MenuItem onClick={() => { setShowTags(true); close(); }}>Etiquetas</MenuItem>
@@ -860,6 +863,10 @@ export default function App() {
 
       {showHeatmap && (
         <FocusHeatmap fileId={selectedFileId} onClose={() => setShowHeatmap(false)} />
+      )}
+
+      {showAnalytics && (
+        <Analytics fileId={selectedFileId} onClose={() => setShowAnalytics(false)} />
       )}
 
       {showTags && data && (

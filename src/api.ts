@@ -1,4 +1,5 @@
 import type {
+  Analytics,
   FileEntry,
   FocusHeatmap,
   MonthSummary,
@@ -87,6 +88,15 @@ export function getFocusHeatmap(weeks?: number, fileId?: string) {
   if (weeks) params.set('weeks', String(weeks));
   if (fileId) params.set('file', fileId);
   return request<FocusHeatmap>(`/api/tasks?${params.toString()}`);
+}
+
+/** Agregados del panel de analítica de las últimas `weeks` semanas. */
+export function getAnalytics(weeks?: number, fileId?: string) {
+  const params = new URLSearchParams();
+  params.set('analytics', '1');
+  if (weeks) params.set('weeks', String(weeks));
+  if (fileId) params.set('file', fileId);
+  return request<Analytics>(`/api/tasks?${params.toString()}`);
 }
 
 // --- Tareas ---

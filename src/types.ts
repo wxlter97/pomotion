@@ -101,6 +101,19 @@ export type FocusHeatmap = {
   days: FocusHeatmapDay[];
 };
 
+export type Analytics = {
+  weeks: number;
+  startDate: string;
+  endDate: string;
+  totalSeconds: number;
+  activeDays: number;
+  byWeekday: { label: string; totalSeconds: number }[];
+  byHour: { hour: number; totalSeconds: number }[];
+  byWeek: { weekStart: string; label: string; totalSeconds: number }[];
+  completion: { total: number; done: number };
+  streak: { current: number; longest: number };
+};
+
 export type RecurringRule = {
   id: string;
   name: string;

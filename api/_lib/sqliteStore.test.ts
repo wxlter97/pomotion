@@ -479,6 +479,41 @@ describe('sesiones + totales', () => {
   });
 });
 
+describe('getAnalytics', () => {
+  it('agrega las sesiones de la ventana y la tasa de completado', async () => {
+    vi.setSystemTime(new Date('2026-08-27T12:00:00Z')); // jueves
+    const a = await as(USER, async () => {
+      const t1 = await sqliteStore.createTask({ date: '2026-08-24', text: 'a' }); // lunes
+      const t2 = await sqliteStore.createTask({ date: '2026-08-26', text: 'b' }); // miércoles
+      await sqliteStore.updateTask({ taskId: t1.id, done: true });
+      await sqliteStore.logSession({ taskId: t1.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+      await sqliteStore.logSession({ taskId: t2.id, durationSeconds: 1800, start: '15:30', end: '16:00' });
+      return sqliteStore.getAnalytics({ weeks: 4 });
+    });
+    vi.useRealTimers();
+
+    expect(a.weeks).toBe(4);
+    expect(a.totalSeconds).toBe(5400);
+    expect(a.activeDays).toBe(2);
+    expect(a.byWeekday[0].totalSeconds).toBe(3600); // lunes
+    expect(a.byHour[9].totalSeconds).toBe(3600);
+    expect(a.byHour[15].totalSeconds).toBe(1800);
+    expect(a.completion).toEqual({ total: 2, done: 1 });
+    expect(a.byWeek).toHaveLength(4);
+  });
+
+  it('scopea por usuario', async () => {
+    vi.setSystemTime(new Date('2026-08-27T12:00:00Z'));
+    await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.logSession({ taskId: t.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+    });
+    const other = await as(OTHER, () => sqliteStore.getAnalytics({ weeks: 4 }));
+    vi.useRealTimers();
+    expect(other.totalSeconds).toBe(0);
+  });
+});
+
 describe('getSessionsInRange (reporte)', () => {
   it('devuelve las sesiones del rango con el nombre de la tarea', async () => {
     await as(USER, async () => {
