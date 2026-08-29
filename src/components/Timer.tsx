@@ -1,7 +1,9 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { postSession } from '../api';
+import { formatDurationLabel } from '../duration';
 import { playChime, unlockAudio } from '../sound';
 import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
+import { overrunElapsedHours, shouldWarnOverrun } from '../timerOverrun';
 import type { Session, Task, TimerMode, TimerPhase } from '../types';
 import ProgressRing from './ProgressRing';
 
@@ -37,6 +39,9 @@ const Timer = forwardRef<
   const [now, setNow] = useState<number>(Date.now());
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Última marca horaria del aviso de "timer olvidado" que el usuario ya
+  // ignoró — se resetea al detener o cambiar de tarea.
+  const [overrunAckHours, setOverrunAckHours] = useState(0);
 
   const taskRef = useRef(task);
   const restoredRef = useRef(false);
@@ -99,6 +104,10 @@ const Timer = forwardRef<
   useEffect(() => {
     onPhaseChange?.(phase);
   }, [phase, onPhaseChange]);
+
+  useEffect(() => {
+    if (phase === 'idle') setOverrunAckHours(0);
+  }, [phase]);
 
   async function finishWork(natural: boolean) {
     const currentTask = taskRef.current;
@@ -166,6 +175,7 @@ const Timer = forwardRef<
     if (!task || phase !== 'idle') return;
     unlockAudio(); // gesto real del usuario: deja el audio listo para el chime automático de más tarde
     setError(null);
+    setOverrunAckHours(0);
     setPhase('work');
     setStartedAt(Date.now());
     setNow(Date.now());
@@ -187,6 +197,14 @@ const Timer = forwardRef<
   const remainingMs = totalMs - elapsed;
   const displayMs = mode === 'pomodoro' ? (phase === 'idle' ? WORK_MS : remainingMs) : elapsed;
   const ringProgress = mode === 'pomodoro' ? (phase === 'idle' ? 1 : Math.max(0, remainingMs / totalMs)) : 1;
+
+  const elapsedHours = overrunElapsedHours(elapsed);
+  const showOverrunWarning = shouldWarnOverrun({
+    running: phase !== 'idle',
+    posting,
+    elapsedMs: elapsed,
+    ackHours: overrunAckHours,
+  });
 
   return (
     <div className="timer">
@@ -223,6 +241,29 @@ const Timer = forwardRef<
         {phase === 'work' && (task ? task.text : 'Trabajando')}
         {phase === 'break' && 'Descanso'}
       </p>
+
+      {showOverrunWarning && (
+        <div className="warning banner timer-overrun" role="alert">
+          <span>
+            Este timer lleva <strong>{formatDurationLabel(Math.floor(elapsed / 1000))}</strong>{' '}
+            corriendo. ¿Seguís?
+          </span>
+          <span className="timer-overrun-actions">
+            <button type="button" className="btn btn-destructive btn-small" onClick={stop}>
+              Detener
+            </button>
+            <button
+              type="button"
+              className="banner-dismiss"
+              onClick={() => setOverrunAckHours(elapsedHours)}
+              aria-label="Ignorar aviso"
+              title="Ignorar"
+            >
+              ×
+            </button>
+          </span>
+        </div>
+      )}
 
       <div className="timer-actions">
         {phase === 'idle' && (
