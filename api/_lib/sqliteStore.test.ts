@@ -350,6 +350,86 @@ describe('recurrentes', () => {
   });
 });
 
+describe('recurrentes automáticas (al abrir la semana)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('getWeekView materializa las reglas activas de la semana actual, una sola vez', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z')); // miércoles 26; lunes = 24
+
+    const view1 = await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' }); // Lun–Vie
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' });
+    });
+    expect(view1.tasks.map((t) => t.name)).toEqual(['Standup']);
+
+    const view2 = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(view2.tasks.map((t) => t.name)).toEqual(['Standup']);
+  });
+
+  it('no repone una tarea recurrente que el usuario borró', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    const reloaded = await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' });
+      const v = await sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' });
+      await sqliteStore.deleteTask(v.tasks[0].id);
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' });
+    });
+    expect(reloaded.tasks).toEqual([]);
+  });
+
+  it('no toca semanas pasadas', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    const past = await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' });
+      return sqliteStore.getWeekView({ week: '2026.08.17 - 2026.08.21', day: 'Lunes' });
+    });
+    expect(past.tasks).toEqual([]);
+  });
+
+  it('aplica a una semana futura al abrirla', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    const future = await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' });
+      return sqliteStore.getWeekView({ week: '2026.08.31 - 2026.09.04', day: 'Lunes' });
+    });
+    expect(future.tasks.map((t) => t.name)).toEqual(['Standup']);
+  });
+
+  it('el "Aplicar" manual marca la semana y getWeekView no vuelve a correr', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    const reloaded = await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' });
+      await sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' });
+      const v = await sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' });
+      await sqliteStore.deleteTask(v.tasks[0].id);
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' });
+    });
+    expect(reloaded.tasks).toEqual([]);
+  });
+
+  it('scopea por usuario', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+
+    await as(USER, () => sqliteStore.createRecurringRule({ name: 'Standup' }));
+    const other = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(other.tasks).toEqual([]);
+  });
+});
+
 afterEach(() => {
   resetDb();
 });

@@ -180,12 +180,25 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
   const userId = currentUserId();
   const weekStart = resolveWeekStart(input.week, TIMEZONE);
   const dates = weekDates(weekStart);
-  const isCurrentWeek = weekStart === mondayOf(todayDateStringInTz(TIMEZONE));
+  const thisMonday = mondayOf(todayDateStringInTz(TIMEZONE));
+  const isCurrentWeek = weekStart === thisMonday;
   const selectedDay = selectDay({ requestedDay: input.day, isCurrentWeek, timeZone: TIMEZONE });
   const selectedDate = dates[weekdayIndex(selectedDay) ?? 0];
 
   const f = fileFilter(input.fileId);
   const db = getDb();
+
+  // Materializar las reglas recurrentes al abrir la semana (actual o futura),
+  // una sola vez por semana y contexto. Best-effort: si algo falla (p. ej. la
+  // migración de `recurring_runs` todavía no corrió en prod), la vista igual
+  // se sirve.
+  if (weekStart >= thisMonday) {
+    try {
+      await autoApplyRecurring(userId, weekStart, input.fileId ?? null);
+    } catch (err) {
+      console.error('autoApplyRecurring falló:', err);
+    }
+  }
 
   const taskRows = (
     await db.execute({
@@ -727,11 +740,56 @@ async function deleteRecurringRule(id?: string): Promise<void> {
   });
 }
 
+/** Semana + contexto donde ya se materializaron las recurrentes. */
+const runKey = (file: string | null): string => file ?? '';
+
+/** Registra (o refresca) que las recurrentes ya corrieron para esta
+ *  semana/contexto — el "Aplicar" manual también cuenta. */
+async function markRecurringRun(userId: string, weekStart: string, file: string | null): Promise<void> {
+  await getDb().execute({
+    sql: `INSERT INTO recurring_runs (user_id, week_start, file_key, applied_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT (user_id, week_start, file_key)
+            DO UPDATE SET applied_at = excluded.applied_at`,
+    args: [userId, weekStart, runKey(file), new Date().toISOString()],
+  });
+}
+
+/** Materializa las recurrentes en `weekStart` una única vez: reclama la
+ *  semana con un INSERT best-effort y solo aplica si nadie la reclamó antes
+ *  (otra request concurrente, o el "Aplicar" manual). */
+async function autoApplyRecurring(
+  userId: string,
+  weekStart: string,
+  file: string | null
+): Promise<void> {
+  const claim = await getDb().execute({
+    sql: `INSERT OR IGNORE INTO recurring_runs (user_id, week_start, file_key, applied_at)
+          VALUES (?, ?, ?, ?)`,
+    args: [userId, weekStart, runKey(file), new Date().toISOString()],
+  });
+  if (claim.rowsAffected === 0) return; // ya se aplicó esta semana/contexto
+  await applyRulesToWeek(userId, weekStart, file);
+}
+
 async function applyRecurringToWeek(input: ApplyRecurringInput): Promise<{ added: number }> {
   const userId = currentUserId();
   const weekStart = resolveWeekStart(input.week, TIMEZONE);
-  const dates = weekDates(weekStart);
   const file = input.fileId ?? null;
+  const result = await applyRulesToWeek(userId, weekStart, file);
+  await markRecurringRun(userId, weekStart, file);
+  return result;
+}
+
+/** Agrega a la semana las tareas de las reglas activas que apliquen a cada
+ *  día, saltando las que ya existan (dedup por nombre normalizado).
+ *  Idempotente. */
+async function applyRulesToWeek(
+  userId: string,
+  weekStart: string,
+  file: string | null
+): Promise<{ added: number }> {
+  const dates = weekDates(weekStart);
   const f = fileFilter(file ?? undefined);
   const db = getDb();
 

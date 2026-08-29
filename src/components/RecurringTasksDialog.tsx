@@ -186,8 +186,8 @@ export default function RecurringTasksDialog({
       >
         <h2 id="recurring-title">Tareas recurrentes</h2>
         <p className="muted">
-          Reglas que se repiten en los días marcados. «Aplicar» las agrega a la semana visible,
-          saltando las que ya estén.
+          Se agregan solas a cada semana nueva, en los días marcados. Si creás una regla a mitad de
+          semana, usá «Aplicar» para traerla a la semana visible.
         </p>
 
         {loading ? (
