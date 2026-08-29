@@ -1,5 +1,6 @@
 import type {
   FileEntry,
+  FocusHeatmap,
   MonthSummary,
   RecurringRule,
   Session,
@@ -75,6 +76,15 @@ export function getMonthSummary(month?: string, fileId?: string) {
   params.set('month', month ?? '');
   if (fileId) params.set('file', fileId);
   return request<MonthSummary>(`/api/tasks?${params.toString()}`);
+}
+
+/** Horas registradas por día en las últimas `weeks` semanas (heatmap de foco). */
+export function getFocusHeatmap(weeks?: number, fileId?: string) {
+  const params = new URLSearchParams();
+  params.set('heatmap', '1');
+  if (weeks) params.set('weeks', String(weeks));
+  if (fileId) params.set('file', fileId);
+  return request<FocusHeatmap>(`/api/tasks?${params.toString()}`);
 }
 
 // --- Tareas ---

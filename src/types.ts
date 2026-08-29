@@ -61,6 +61,24 @@ export type MonthSummary = {
   days: MonthDaySummary[];
 };
 
+export type FocusHeatmapDay = {
+  date: string; // 'YYYY-MM-DD'
+  totalSeconds: number;
+};
+
+export type FocusHeatmap = {
+  /** Lunes de la primera columna, 'YYYY-MM-DD'. */
+  startDate: string;
+  /** Último día con celda (hoy), 'YYYY-MM-DD'. */
+  endDate: string;
+  today: string;
+  weeks: number;
+  totalSeconds: number;
+  activeDays: number;
+  maxSeconds: number;
+  days: FocusHeatmapDay[];
+};
+
 export type RecurringRule = {
   id: string;
   name: string;
