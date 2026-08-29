@@ -162,6 +162,28 @@ export type DayTemplate = {
   items: DayTemplateItem[];
 };
 
+/** Meta mensual: X minutos en una etiqueta (o en todo el contexto). */
+export type Goal = {
+  id: string;
+  /** Etiqueta objetivo; null = todo el contexto. */
+  tagId: string | null;
+  file: string | null;
+  targetMinutes: number;
+};
+
+/** Una meta + su progreso en el mes en curso. */
+export type GoalProgress = Goal & {
+  /** Nombre de la etiqueta (para mostrar), o null. */
+  tagName: string | null;
+  /** 'YYYY-MM' evaluado. */
+  month: string;
+  /** Segundos registrados que cuentan para la meta este mes. */
+  loggedSeconds: number;
+  /** Día del mes de hoy (1..31) y días totales del mes — para el burn-down. */
+  dayOfMonth: number;
+  daysInMonth: number;
+};
+
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
@@ -217,6 +239,9 @@ export type UpdateDayTemplateInput = {
   items?: DayTemplateItemInput[];
 };
 export type ApplyDayTemplateInput = { id?: string; date?: string; fileId?: string };
+
+export type CreateGoalInput = { tagId?: string | null; targetMinutes?: number; fileId?: string };
+export type UpdateGoalInput = { id?: string; targetMinutes?: number; tagId?: string | null };
 
 export type UpdateTaskPositionInput = {
   taskId?: string;
@@ -304,4 +329,10 @@ export interface TaskStore {
   deleteDayTemplate(id?: string): Promise<void>;
   /** "Estampa" la plantilla en un día: crea sus tareas (dedup por nombre). */
   applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: number }>;
+
+  /** Metas del usuario con su progreso en el mes en curso. */
+  listGoals(): Promise<GoalProgress[]>;
+  createGoal(input: CreateGoalInput): Promise<Goal>;
+  updateGoal(input: UpdateGoalInput): Promise<Goal>;
+  deleteGoal(id?: string): Promise<void>;
 }

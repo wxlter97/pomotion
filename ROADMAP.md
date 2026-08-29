@@ -395,7 +395,10 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   un set de tareas (a mano, o copiando el día visible con su prioridad/estimación) y
   "Aplicar" al día visible (dedup por nombre). Migración `003_day_templates.sql`
   (`day_templates` + `day_template_items`). CRUD plegado en `POST /api/tasks`.
-- **Metas**: "X horas en Proyecto Y este mes" con burn-down.
+- ~~**Metas**~~ ✅ PR #33 — diálogo "Metas del mes" (menú "Ver"): "X horas en [etiqueta]
+  al mes", barra de progreso con marca del ritmo esperado a la fecha, estado
+  atrás/en ritmo/adelantada/cumplida. Migración `004_goals.sql`. `GET /api/tasks?goals=1`
+  + CRUD en `POST /api/tasks`. `src/goals.ts` puro para el burn-down.
 
 ### Fuera de alcance por ahora
 - Signup 100% abierto, billing, límites de abuso.

@@ -241,6 +241,67 @@ describe('etiquetas / proyectos', () => {
   });
 });
 
+describe('metas del mes', () => {
+  it('crea una meta por etiqueta y calcula el progreso del mes', async () => {
+    vi.setSystemTime(new Date('2026-08-15T12:00:00Z'));
+    const goals = await as(USER, async () => {
+      const tag = await sqliteStore.createTag({ name: 'Cliente', color: 'green' });
+      const other = await sqliteStore.createTag({ name: 'Interno' });
+      const g = await sqliteStore.createGoal({ tagId: tag.id, targetMinutes: 1200 }); // 20h
+      void g;
+
+      const a = await sqliteStore.createTask({ date: '2026-08-10', text: 'con cliente' });
+      const b = await sqliteStore.createTask({ date: '2026-08-12', text: 'interno' });
+      const c = await sqliteStore.createTask({ date: '2026-07-30', text: 'mes pasado' });
+      await sqliteStore.updateTask({ taskId: a.id, tagIds: [tag.id] });
+      await sqliteStore.updateTask({ taskId: b.id, tagIds: [other.id] });
+      await sqliteStore.updateTask({ taskId: c.id, tagIds: [tag.id] });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+      await sqliteStore.logSession({ taskId: b.id, durationSeconds: 7200, start: '11:00', end: '13:00' });
+      await sqliteStore.logSession({ taskId: c.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+
+      return sqliteStore.listGoals();
+    });
+    vi.useRealTimers();
+
+    expect(goals).toHaveLength(1);
+    expect(goals[0]).toMatchObject({
+      tagName: 'Cliente',
+      targetMinutes: 1200,
+      loggedSeconds: 3600, // solo la sesión de agosto con la etiqueta correcta
+      month: '2026-08',
+      dayOfMonth: 15,
+      daysInMonth: 31,
+    });
+  });
+
+  it('meta sin etiqueta suma todas las sesiones del mes', async () => {
+    vi.setSystemTime(new Date('2026-08-15T12:00:00Z'));
+    const goals = await as(USER, async () => {
+      await sqliteStore.createGoal({ targetMinutes: 600 });
+      const t = await sqliteStore.createTask({ date: '2026-08-05', text: 'x' });
+      await sqliteStore.logSession({ taskId: t.id, durationSeconds: 1800, start: '09:00', end: '09:30' });
+      return sqliteStore.listGoals();
+    });
+    vi.useRealTimers();
+    expect(goals[0].loggedSeconds).toBe(1800);
+    expect(goals[0].tagName).toBeNull();
+  });
+
+  it('valida el objetivo y la etiqueta; scope por usuario', async () => {
+    await expect(as(USER, () => sqliteStore.createGoal({ targetMinutes: 0 }))).rejects.toThrow();
+    const foreign = await as(OTHER, () => sqliteStore.createTag({ name: 'ajena' }));
+    await expect(
+      as(USER, () => sqliteStore.createGoal({ tagId: foreign.id, targetMinutes: 60 }))
+    ).rejects.toThrow();
+
+    const g = await as(USER, () => sqliteStore.createGoal({ targetMinutes: 60 }));
+    await expect(as(OTHER, () => sqliteStore.updateGoal({ id: g.id, targetMinutes: 999 }))).rejects.toThrow();
+    await as(USER, () => sqliteStore.deleteGoal(g.id));
+    expect(await as(USER, () => sqliteStore.listGoals())).toHaveLength(0);
+  });
+});
+
 describe('plantillas de día', () => {
   it('crea con ítems explícitos y aparece en getWeekView', async () => {
     const view = await as(USER, async () => {

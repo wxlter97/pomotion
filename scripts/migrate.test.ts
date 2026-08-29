@@ -14,6 +14,7 @@ const SCHEMA_TABLES = [
   'task_tags',
   'day_templates',
   'day_template_items',
+  'goals',
   'schema_migrations',
 ];
 
@@ -30,6 +31,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('001_init.sql');
     expect(applied).toContain('002_recurring_runs.sql');
     expect(applied).toContain('003_day_templates.sql');
+    expect(applied).toContain('004_goals.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });

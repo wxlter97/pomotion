@@ -4,6 +4,7 @@ import type {
   DayTemplateItem,
   FileEntry,
   FocusHeatmap,
+  GoalProgress,
   MonthSummary,
   RecurringRule,
   Session,
@@ -222,6 +223,36 @@ export function applyDayTemplate(id: string, date: string, fileId?: string) {
   return request<{ ok: true; added: number }>('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({ action: 'apply_template', id, date, file: fileId }),
+  });
+}
+
+// --- Metas ---
+
+export function getGoals() {
+  return request<{ goals: GoalProgress[] }>('/api/tasks?goals=1');
+}
+
+export function createGoal(targetMinutes: number, tagId: string | null, fileId?: string) {
+  return request<{ ok: true; goal: GoalProgress }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_goal', target_minutes: targetMinutes, tag_id: tagId, file: fileId }),
+  });
+}
+
+export function updateGoal(id: string, fields: { targetMinutes?: number; tagId?: string | null }) {
+  const body: Record<string, unknown> = { action: 'update_goal', id };
+  if (fields.targetMinutes !== undefined) body.target_minutes = fields.targetMinutes;
+  if ('tagId' in fields) body.tag_id = fields.tagId;
+  return request<{ ok: true; goal: GoalProgress }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteGoal(id: string) {
+  return request<{ ok: true }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_goal', id }),
   });
 }
 

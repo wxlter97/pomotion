@@ -21,6 +21,7 @@ import Login from './components/Login';
 import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
+import GoalsDialog from './components/GoalsDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
@@ -98,6 +99,7 @@ export default function App() {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showGoals, setShowGoals] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
@@ -600,6 +602,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
           <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
+          <MenuItem onClick={() => { setShowGoals(true); close(); }}>Metas del mes</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
           <MenuItem onClick={() => { setShowTemplates(true); close(); }}>Plantillas de día</MenuItem>
@@ -870,6 +873,14 @@ export default function App() {
 
       {showAnalytics && (
         <Analytics fileId={selectedFileId} onClose={() => setShowAnalytics(false)} />
+      )}
+
+      {showGoals && data && (
+        <GoalsDialog
+          tags={data.tags}
+          fileId={selectedFileId}
+          onClose={() => setShowGoals(false)}
+        />
       )}
 
       {showTags && data && (

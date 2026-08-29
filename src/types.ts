@@ -138,6 +138,21 @@ export type DayTemplate = {
   items: DayTemplateItem[];
 };
 
+export type Goal = {
+  id: string;
+  tagId: string | null;
+  file: string | null;
+  targetMinutes: number;
+};
+
+export type GoalProgress = Goal & {
+  tagName: string | null;
+  month: string;
+  loggedSeconds: number;
+  dayOfMonth: number;
+  daysInMonth: number;
+};
+
 export type TimerMode = 'pomodoro' | 'free';
 export type TimerPhase = 'idle' | 'work' | 'break';
 

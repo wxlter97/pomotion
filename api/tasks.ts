@@ -24,6 +24,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return res.status(200).json(heatmap);
       }
+      // ?goals=1 → metas del usuario con su progreso del mes.
+      if (typeof req.query.goals === 'string') {
+        return res.status(200).json({ goals: await sqliteStore.listGoals() });
+      }
       // ?analytics=1 → agregados del panel de analítica.
       if (typeof req.query.analytics === 'string') {
         const weeks = Number(req.query.weeks);
@@ -52,6 +56,8 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         date?: string;
         from_date?: string;
         items?: DayTemplateItemInput[];
+        tag_id?: string | null;
+        target_minutes?: number;
       };
       if (body.action === 'carry_over') {
         const result = await sqliteStore.carryOverToToday({ fileId: body.file });
@@ -97,6 +103,26 @@ async function handler(req: VercelRequest, res: VercelResponse) {
           fileId: body.file,
         });
         return res.status(200).json({ ok: true, ...result });
+      }
+      if (body.action === 'create_goal') {
+        const goal = await sqliteStore.createGoal({
+          tagId: body.tag_id,
+          targetMinutes: body.target_minutes,
+          fileId: body.file,
+        });
+        return res.status(200).json({ ok: true, goal });
+      }
+      if (body.action === 'update_goal') {
+        const goal = await sqliteStore.updateGoal({
+          id: body.id,
+          tagId: 'tag_id' in body ? body.tag_id : undefined,
+          targetMinutes: body.target_minutes,
+        });
+        return res.status(200).json({ ok: true, goal });
+      }
+      if (body.action === 'delete_goal') {
+        await sqliteStore.deleteGoal(body.id);
+        return res.status(200).json({ ok: true });
       }
       return res.status(400).json({ error: 'invalid_action' });
     }
