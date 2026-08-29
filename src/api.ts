@@ -62,6 +62,14 @@ export function getTasks(day?: string, week?: string, fileId?: string) {
 
 // --- Tareas ---
 
+/** Mueve a hoy las tareas pendientes (sin sesiones) de días pasados. */
+export function carryOverToToday(fileId?: string) {
+  return request<{ ok: true; moved: number }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'carry_over', file: fileId }),
+  });
+}
+
 export function createTask(date: string, text: string, fileId?: string, afterId?: string | null) {
   return request<{ ok: true; task: Task }>('/api/task', {
     method: 'POST',

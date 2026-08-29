@@ -4,6 +4,7 @@ import {
   mondayOf,
   resolveWeekStart,
   selectDay,
+  toWeekday,
   weekDates,
   weekLabelOf,
   weekdayIndex,
@@ -68,6 +69,14 @@ describe('weekdayIndex / weekdayNameOf', () => {
     expect(weekdayNameOf('2026-08-24')).toBe('Lunes');
     expect(weekdayNameOf('2026-08-28')).toBe('Viernes');
     expect(weekdayNameOf('2026-08-29')).toBeNull(); // sábado
+  });
+});
+
+describe('toWeekday', () => {
+  it('deja un día laboral igual, corre el fin de semana al lunes', () => {
+    expect(toWeekday('2026-08-26')).toBe('2026-08-26'); // miércoles
+    expect(toWeekday('2026-08-29')).toBe('2026-08-31'); // sábado → lunes
+    expect(toWeekday('2026-08-30')).toBe('2026-08-31'); // domingo → lunes
   });
 });
 

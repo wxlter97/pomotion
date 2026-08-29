@@ -39,6 +39,8 @@ export type TasksResponse = {
   tasks: Task[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
+  /** Tareas pendientes de días pasados que se pueden "traer a hoy". */
+  carryOverCount: number;
 };
 
 export type RecurringRule = {

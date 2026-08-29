@@ -56,6 +56,13 @@ export function weekdayNameOf(dateStr: string): string | null {
   return dow >= 1 && dow <= 5 ? WEEKDAY_NAMES[dow - 1] : null;
 }
 
+/** `dateStr` si es día laboral; si cae en fin de semana, el lunes siguiente. */
+export function toWeekday(dateStr: string): string {
+  let d = dateStr;
+  while (weekdayNameOf(d) === null) d = addDaysToDate(d, 1);
+  return d;
+}
+
 /**
  * Día seleccionado dentro de la semana visible: el pedido (si es un día
  * laboral válido), o "hoy" si es la semana actual y hoy es día laboral, o

@@ -108,6 +108,35 @@ h3 {
   color: color-mix(in srgb, var(--color-success) 72%, var(--color-label));
 }
 
+.info.banner {
+  background: var(--color-fill);
+  color: var(--color-label);
+}
+
+.carry-over-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.carry-over-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.carry-over-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--color-label-secondary);
+  cursor: pointer;
+}
+
 .dismissible-banner {
   display: flex;
   align-items: flex-start;

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  carryOverToToday,
   getAuthStatus,
   getFiles,
   getTasks,
@@ -9,6 +10,7 @@ import {
   UnauthorizedError,
   updateTaskDone,
 } from './api';
+import CarryOverBanner from './components/CarryOverBanner';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
 import DismissibleBanner from './components/DismissibleBanner';
@@ -25,6 +27,7 @@ import { formatDurationLabel } from './duration';
 import { computeAfterId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
+import { useCarryOverSetting } from './useCarryOverSetting';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
@@ -139,10 +142,13 @@ export default function App() {
   const [showReport, setShowReport] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
+  const [carryingOver, setCarryingOver] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
+  const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const notifications = useNotificationSetting();
   const timerRef = useRef<TimerHandle>(null);
+  const carryOverDoneRef = useRef(false);
 
   // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
   // tareas con `file` → modo de un solo contexto, el selector no aparece.
@@ -473,6 +479,36 @@ export default function App() {
     }
   }
 
+  async function handleCarryOver() {
+    if (!data) return;
+    setCarryingOver(true);
+    setError(null);
+    try {
+      const res = await carryOverToToday(selectedFileId ?? undefined);
+      if (res.moved > 0) void refresh(data.selectedDay, data.week);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudieron traer las tareas');
+    } finally {
+      setCarryingOver(false);
+    }
+  }
+
+  // Carry-over automático: una vez por sesión, si está activado y hay
+  // pendientes, apenas cargan los datos.
+  useEffect(() => {
+    if (!carryOverAuto || carryOverDoneRef.current) return;
+    if (!data || data.carryOverCount === 0) return;
+    carryOverDoneRef.current = true;
+    void (async () => {
+      try {
+        const res = await carryOverToToday(selectedFileIdRef.current ?? undefined);
+        if (res.moved > 0) void refresh(data.selectedDay, data.week);
+      } catch {
+        // silencioso — el usuario igual ve el banner y puede hacerlo a mano
+      }
+    })();
+  }, [carryOverAuto, data, refresh]);
+
   async function handleLogout() {
     try {
       await logout();
@@ -622,6 +658,15 @@ export default function App() {
       {error && <p className="error banner">{error}</p>}
       {recurringNotice && (
         <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
+      )}
+      {data && data.carryOverCount > 0 && (
+        <CarryOverBanner
+          count={data.carryOverCount}
+          auto={carryOverAuto}
+          onToggleAuto={toggleCarryOverAuto}
+          onCarryOver={() => void handleCarryOver()}
+          busy={carryingOver}
+        />
       )}
 
       {data && (
