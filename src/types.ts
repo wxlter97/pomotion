@@ -21,6 +21,8 @@ export type Task = {
   notes: string | null;
   /** Fecha de vencimiento 'YYYY-MM-DD', distinta de la agenda (`date`). */
   due: string | null;
+  /** Estimación de esfuerzo en minutos; null = sin estimar. */
+  estimateMinutes: number | null;
   sessions: Session[];
 };
 

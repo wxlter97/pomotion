@@ -12,9 +12,20 @@ const CSV_COLUMNS: { header: string; value: (r: SessionRow) => string | number }
   { header: 'tarea', value: (r) => r.task },
   { header: 'duracion', value: (r) => formatDurationLabel(r.durationSeconds) },
   { header: 'segundos', value: (r) => r.durationSeconds },
+  { header: 'estimado_min', value: (r) => r.estimateMinutes ?? '' },
   { header: 'inicio', value: (r) => r.start },
   { header: 'fin', value: (r) => r.end },
 ];
+
+/** Suma de la estimación de cada tarea distinta con sesiones en el rango
+ *  (cada tarea se cuenta una vez). En minutos; 0 si nadie estimó. */
+function estimatedMinutes(rows: SessionRow[]): number {
+  const seen = new Map<string, number>();
+  for (const r of rows) {
+    if (r.estimateMinutes != null) seen.set(r.taskId, r.estimateMinutes);
+  }
+  return [...seen.values()].reduce((sum, m) => sum + m, 0);
+}
 
 function csvCell(value: string | number): string {
   const s = String(value);
@@ -49,7 +60,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const totalSeconds = rows.reduce((sum, r) => sum + r.durationSeconds, 0);
-    return res.status(200).json({ rows, totalSeconds });
+    return res.status(200).json({ rows, totalSeconds, estimatedMinutes: estimatedMinutes(rows) });
   } catch (err) {
     return sendError(res, err);
   }

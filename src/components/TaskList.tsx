@@ -16,7 +16,7 @@ import {
   parseDurationToSeconds,
 } from '../duration';
 import type { DayColumn, Session, Task } from '../types';
-import { daysBetween, dueChipLabel, dueLabel, isOverdue } from '../taskMeta';
+import { daysBetween, dueChipLabel, dueLabel, isOverdue, taskTimeSummary } from '../taskMeta';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
  *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
@@ -366,6 +366,7 @@ export default function TaskList({
         <ul className="task-list">
           {tasks.map((task, i) => {
             const total = sumSeconds(task);
+            const timeSummary = taskTimeSummary(total, task.estimateMinutes);
             const manualOverlap =
               manualEntryTaskId === task.id
                 ? findOverlap(tasks, null, manualDraft.start, manualDraft.end)
@@ -459,8 +460,17 @@ export default function TaskList({
                           {dueChipLabel(task.due, today)}
                         </span>
                       )}
-                      {total > 0 && (
-                        <span className="task-total">{formatDurationLabel(total)}</span>
+                      {timeSummary && (
+                        <span
+                          className={timeSummary.over ? 'task-total over' : 'task-total'}
+                          title={
+                            task.estimateMinutes != null
+                              ? `Registrado vs. estimado${timeSummary.over ? ' — te pasaste' : ''}`
+                              : undefined
+                          }
+                        >
+                          {timeSummary.text}
+                        </span>
                       )}
                       <TaskRowMenu
                         onEdit={() => startEditTask(task)}

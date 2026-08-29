@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { daysBetween, dueChipLabel, dueLabel, isOverdue, priorityLabel, shortDate } from './taskMeta';
+import {
+  daysBetween,
+  dueChipLabel,
+  dueLabel,
+  estimateLabel,
+  isOverdue,
+  parseEstimateMinutes,
+  priorityLabel,
+  shortDate,
+  taskTimeSummary,
+} from './taskMeta';
 
 describe('priorityLabel', () => {
   it('traduce los niveles y el null', () => {
@@ -52,5 +62,48 @@ describe('dueChipLabel', () => {
     expect(dueChipLabel('2026-08-30', '2026-08-29')).toBe('mañana');
     expect(dueChipLabel('2026-08-28', '2026-08-29')).toBe('ayer');
     expect(dueChipLabel('2026-09-05', '2026-08-29')).toBe('5 sep');
+  });
+});
+
+describe('parseEstimateMinutes', () => {
+  it('interpreta número plano como minutos y formato Jira', () => {
+    expect(parseEstimateMinutes('90')).toBe(90);
+    expect(parseEstimateMinutes('1h 30m')).toBe(90);
+    expect(parseEstimateMinutes('2h')).toBe(120);
+    expect(parseEstimateMinutes('  45 ')).toBe(45);
+  });
+
+  it('devuelve null para vacío / basura / cero', () => {
+    expect(parseEstimateMinutes('')).toBeNull();
+    expect(parseEstimateMinutes('   ')).toBeNull();
+    expect(parseEstimateMinutes('luego')).toBeNull();
+    expect(parseEstimateMinutes('0')).toBeNull();
+  });
+});
+
+describe('estimateLabel', () => {
+  it('formatea minutos y trata null como vacío', () => {
+    expect(estimateLabel(90)).toBe('1h 30m');
+    expect(estimateLabel(30)).toBe('30m');
+    expect(estimateLabel(null)).toBe('');
+  });
+});
+
+describe('taskTimeSummary', () => {
+  it('sin estimación: solo lo registrado, o null si no hay nada', () => {
+    expect(taskTimeSummary(0, null)).toBeNull();
+    expect(taskTimeSummary(1500, null)).toEqual({ text: '25m', over: false });
+  });
+
+  it('con estimación y algo registrado: "registrado / estimado"', () => {
+    expect(taskTimeSummary(3600, 120)).toEqual({ text: '1h / 2h', over: false });
+  });
+
+  it('con estimación y nada registrado: "est. X"', () => {
+    expect(taskTimeSummary(0, 120)).toEqual({ text: 'est. 2h', over: false });
+  });
+
+  it('marca over cuando lo registrado pasa la estimación', () => {
+    expect(taskTimeSummary(9000, 120)).toEqual({ text: '2h 30m / 2h', over: true });
   });
 });

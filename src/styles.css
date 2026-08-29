@@ -794,6 +794,19 @@ h3 {
   color: var(--color-label-secondary);
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Se pasó de la estimación: registrado > estimado. */
+.task-total.over,
+.report-over {
+  color: var(--color-destructive);
+}
+
+/* La estimación del día es un plan, no tiempo registrado → tono neutro,
+ * para no competir con los totales reales (Día / Sem) en acento. */
+.total-pill-est {
+  color: var(--color-label-secondary);
 }
 
 .task-item-trailing {
@@ -959,6 +972,7 @@ h3 {
 }
 
 .task-due-input,
+.task-estimate-input,
 .task-notes-input {
   font-family: inherit;
   background: var(--color-bg-elevated);
@@ -970,12 +984,17 @@ h3 {
 .task-due-input {
   padding: 0.25rem 0.5rem;
 }
+.task-estimate-input {
+  padding: 0.25rem 0.5rem;
+  width: 7rem;
+}
 .task-notes-input {
   padding: 0.4rem 0.55rem;
   resize: vertical;
   width: 100%;
 }
 .task-due-input:focus,
+.task-estimate-input:focus,
 .task-notes-input:focus {
   outline: none;
   border-color: var(--color-accent);

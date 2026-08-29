@@ -88,6 +88,7 @@ function toTask(r: Row, sessions: Session[]): Task {
     priority: priority && PRIORITIES.has(priority) ? (priority as TaskPriority) : null,
     notes: notes && notes.length > 0 ? notes : null,
     due: r.due == null ? null : String(r.due),
+    estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
     sessions,
   };
 }
@@ -443,7 +444,8 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
   const f = fileFilter(fileId, 'ws.file');
   const rows = (
     await getDb().execute({
-      sql: `SELECT ws.date, ws.duration_sec, ws.start_hhmm, ws.end_hhmm, t.name AS task_name
+      sql: `SELECT ws.date, ws.duration_sec, ws.start_hhmm, ws.end_hhmm,
+                   t.id AS task_id, t.name AS task_name, t.estimate_min
             FROM work_sessions ws JOIN tasks t ON t.id = ws.task_id
             WHERE ws.user_id = ? AND ${f.clause} AND ws.date >= ? AND ws.date <= ?
             ORDER BY ws.date, ws.start_hhmm`,
@@ -457,7 +459,9 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
       date,
       day: weekdayNameOf(date) ?? '',
       week: weekLabelOf(mondayOf(date)),
+      taskId: String(r.task_id),
       task: String(r.task_name),
+      estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
       durationSeconds: Number(r.duration_sec),
       start: String(r.start_hhmm),
       end: String(r.end_hhmm),
@@ -506,11 +510,14 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     priority: null,
     notes: null,
     due: null,
+    estimateMinutes: null,
     sessions: [],
   };
 }
 
 const NOTES_MAX = 4000;
+// Tope defensivo para la estimación: 100 horas. Más que eso es un error de tipeo.
+const ESTIMATE_MAX_MIN = 6000;
 
 async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
   const userId = currentUserId();
@@ -560,6 +567,22 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     sets.push('due = ?');
     args.push(d);
     result.due = d;
+  }
+  if (input.estimateMinutes !== undefined) {
+    const e = input.estimateMinutes;
+    let value: number | null = null;
+    if (e !== null) {
+      if (typeof e !== 'number' || !Number.isFinite(e) || e <= 0 || e > ESTIMATE_MAX_MIN) {
+        throw new BadRequestError(
+          'invalid_estimate',
+          `estimate_min debe ser un número entre 1 y ${ESTIMATE_MAX_MIN} o null`
+        );
+      }
+      value = Math.round(e);
+    }
+    sets.push('estimate_min = ?');
+    args.push(value);
+    result.estimateMinutes = value;
   }
 
   if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');

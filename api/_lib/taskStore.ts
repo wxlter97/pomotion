@@ -32,6 +32,8 @@ export type Task = {
   notes: string | null;
   /** Vencimiento 'YYYY-MM-DD', distinto de la agenda (`date`). */
   due: string | null;
+  /** Estimación de esfuerzo en minutos; null = sin estimar. */
+  estimateMinutes: number | null;
   sessions: Session[];
 };
 
@@ -108,7 +110,10 @@ export type SessionRow = {
   date: string;
   day: string;
   week: string;
+  taskId: string;
   task: string;
+  /** Estimación de la tarea en minutos; null = sin estimar. */
+  estimateMinutes: number | null;
   durationSeconds: number;
   start: string;
   end: string;
@@ -149,6 +154,8 @@ export type UpdateTaskInput = {
   notes?: string | null;
   /** 'YYYY-MM-DD' para setear, null para quitar. */
   due?: string | null;
+  /** Minutos estimados (entero > 0) para setear, null para quitar. */
+  estimateMinutes?: number | null;
 };
 export type UpdateTaskPositionInput = {
   taskId?: string;
@@ -191,6 +198,7 @@ export type UpdateTaskResult = {
   priority?: TaskPriority | null;
   notes?: string | null;
   due?: string | null;
+  estimateMinutes?: number | null;
 };
 
 export interface TaskStore {

@@ -24,7 +24,11 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
   const [to, setTo] = useState(todayLocal);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ rows: ReportRow[]; totalSeconds: number } | null>(null);
+  const [result, setResult] = useState<{
+    rows: ReportRow[];
+    totalSeconds: number;
+    estimatedMinutes: number;
+  } | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -109,6 +113,18 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
             <p className="report-total">
               Total <strong>{formatDurationLabel(result.totalSeconds)}</strong> · {result.rows.length}{' '}
               {result.rows.length === 1 ? 'sesión' : 'sesiones'}
+              {result.estimatedMinutes > 0 && (
+                <>
+                  {' · '}Estimado{' '}
+                  <strong
+                    className={
+                      result.totalSeconds > result.estimatedMinutes * 60 ? 'report-over' : undefined
+                    }
+                  >
+                    {formatDurationLabel(result.estimatedMinutes * 60)}
+                  </strong>
+                </>
+              )}
             </p>
 
             {result.rows.length === 0 ? (
