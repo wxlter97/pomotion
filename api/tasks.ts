@@ -6,6 +6,14 @@ import { sqliteStore } from './_lib/sqliteStore.js';
 async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'GET') {
+      // ?month=YYYY-MM → resumen del mes para la vista de calendario.
+      if (typeof req.query.month === 'string') {
+        const summary = await sqliteStore.getMonthSummary({
+          month: req.query.month,
+          fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
+        });
+        return res.status(200).json(summary);
+      }
       const view = await sqliteStore.getWeekView({
         fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
         week: typeof req.query.week === 'string' ? req.query.week : undefined,

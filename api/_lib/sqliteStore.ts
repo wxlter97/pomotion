@@ -8,7 +8,14 @@ import crypto from 'node:crypto';
 import type { InValue, Row } from '@libsql/client';
 import { BadRequestError, NotFoundError } from './errors.js';
 import { getDb } from './db.js';
-import { addDaysToDate, normalize, todayDateStringInTz } from './parse.js';
+import {
+  addDaysToDate,
+  addMonths,
+  isValidMonth,
+  monthRange,
+  normalize,
+  todayDateStringInTz,
+} from './parse.js';
 import { currentUserId } from './requestContext.js';
 import {
   WEEKDAY_NAMES,
@@ -27,8 +34,11 @@ import type {
   CreateRecurringRuleInput,
   CreateTaskInput,
   FileEntry,
+  GetMonthSummaryInput,
   GetWeekViewInput,
   LogSessionInput,
+  MonthDaySummary,
+  MonthSummary,
   RecurringRule,
   ReportInput,
   Session,
@@ -285,6 +295,64 @@ async function carryOverToToday(input: { fileId?: string }): Promise<{ moved: nu
     'write'
   );
   return { moved: rows.length };
+}
+
+// --- Vista mensual ---
+
+/** Resumen por día del mes: cuántas tareas (y cuántas hechas) y cuántos
+ *  segundos registrados. Solo devuelve los días con actividad — el cliente
+ *  arma la grilla del calendario. 2 queries agregadas. */
+async function getMonthSummary(input: GetMonthSummaryInput): Promise<MonthSummary> {
+  const userId = currentUserId();
+  const today = todayDateStringInTz(TIMEZONE);
+  const month = input.month && isValidMonth(input.month) ? input.month : today.slice(0, 7);
+  const { first, last } = monthRange(month);
+  const f = fileFilter(input.fileId);
+  const db = getDb();
+
+  const taskRows = (
+    await db.execute({
+      sql: `SELECT date, count(*) AS tasks, sum(done) AS done FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
+            GROUP BY date`,
+      args: [userId, ...f.args, first, last],
+    })
+  ).rows;
+
+  const sessRows = (
+    await db.execute({
+      sql: `SELECT date, sum(duration_sec) AS secs FROM work_sessions
+            WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
+            GROUP BY date`,
+      args: [userId, ...f.args, first, last],
+    })
+  ).rows;
+
+  const byDate = new Map<string, MonthDaySummary>();
+  for (const r of taskRows) {
+    const date = String(r.date);
+    byDate.set(date, {
+      date,
+      taskCount: Number(r.tasks),
+      doneCount: Number(r.done ?? 0),
+      totalSeconds: 0,
+    });
+  }
+  for (const r of sessRows) {
+    const date = String(r.date);
+    const entry = byDate.get(date) ?? { date, taskCount: 0, doneCount: 0, totalSeconds: 0 };
+    entry.totalSeconds = Number(r.secs ?? 0);
+    byDate.set(date, entry);
+  }
+
+  return {
+    month,
+    previousMonth: addMonths(month, -1),
+    nextMonth: addMonths(month, 1),
+    isCurrentMonth: month === today.slice(0, 7),
+    today: today.slice(0, 7) === month ? today : null,
+    days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)),
+  };
 }
 
 // --- Reporte ---
@@ -674,6 +742,7 @@ async function applyRecurringToWeek(input: ApplyRecurringInput): Promise<{ added
 
 export const sqliteStore: TaskStore = {
   getWeekView,
+  getMonthSummary,
   getSessionsInRange,
   listFiles,
   createTask,

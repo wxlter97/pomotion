@@ -1,4 +1,11 @@
-import type { FileEntry, RecurringRule, Session, Task, TasksResponse } from './types';
+import type {
+  FileEntry,
+  MonthSummary,
+  RecurringRule,
+  Session,
+  Task,
+  TasksResponse,
+} from './types';
 
 export class UnauthorizedError extends Error {}
 /** La sesión existe pero la cuenta todavía no está aprobada (403). */
@@ -58,6 +65,16 @@ export function getTasks(day?: string, week?: string, fileId?: string) {
   if (fileId) params.set('file', fileId);
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
+}
+
+/** Resumen del mes "YYYY-MM" (tareas + horas por día) para el calendario. */
+export function getMonthSummary(month?: string, fileId?: string) {
+  const params = new URLSearchParams();
+  // Siempre presente (aunque vacío) para que el endpoint sirva el resumen
+  // del mes y no la vista semanal; vacío = mes en curso del server.
+  params.set('month', month ?? '');
+  if (fileId) params.set('file', fileId);
+  return request<MonthSummary>(`/api/tasks?${params.toString()}`);
 }
 
 // --- Tareas ---

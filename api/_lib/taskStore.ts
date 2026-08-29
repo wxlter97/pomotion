@@ -50,6 +50,26 @@ export type WeekView = {
   carryOverCount: number;
 };
 
+/** Resumen de un día en la vista mensual (solo días con actividad). */
+export type MonthDaySummary = {
+  date: string; // 'YYYY-MM-DD'
+  taskCount: number;
+  doneCount: number;
+  totalSeconds: number;
+};
+
+export type MonthSummary = {
+  /** 'YYYY-MM'. */
+  month: string;
+  previousMonth: string;
+  nextMonth: string;
+  isCurrentMonth: boolean;
+  /** 'YYYY-MM-DD' si hoy cae en este mes, si no null. */
+  today: string | null;
+  /** Días con tareas y/o sesiones, ordenados por fecha. */
+  days: MonthDaySummary[];
+};
+
 /** Fila del reporte de tiempo. */
 export type SessionRow = {
   date: string;
@@ -75,6 +95,7 @@ export type RecurringRule = {
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
+export type GetMonthSummaryInput = { month?: string; fileId?: string };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 
 export type CreateTaskInput = {
@@ -121,6 +142,8 @@ export type ApplyRecurringInput = { week?: string; fileId?: string };
 
 export interface TaskStore {
   getWeekView(input: GetWeekViewInput): Promise<WeekView>;
+  /** Resumen por día de un mes: conteo de tareas y horas registradas. */
+  getMonthSummary(input: GetMonthSummaryInput): Promise<MonthSummary>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   listFiles(): Promise<FileEntry[]>;
 

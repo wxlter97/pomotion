@@ -43,6 +43,24 @@ export type TasksResponse = {
   carryOverCount: number;
 };
 
+export type MonthDaySummary = {
+  date: string; // 'YYYY-MM-DD'
+  taskCount: number;
+  doneCount: number;
+  totalSeconds: number;
+};
+
+export type MonthSummary = {
+  /** 'YYYY-MM'. */
+  month: string;
+  previousMonth: string;
+  nextMonth: string;
+  isCurrentMonth: boolean;
+  /** 'YYYY-MM-DD' si hoy cae en este mes, si no null. */
+  today: string | null;
+  days: MonthDaySummary[];
+};
+
 export type RecurringRule = {
   id: string;
   name: string;
