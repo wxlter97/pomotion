@@ -15,8 +15,9 @@ import {
   nowAsHHMM,
   parseDurationToSeconds,
 } from '../duration';
-import type { Session, Task } from '../types';
+import type { DayContainer, Session, Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
+import MoveTaskMenu, { type MoveTarget } from './MoveTaskMenu';
 
 function sumSeconds(task: Task): number {
   return task.sessions.reduce((total, s) => total + s.durationSeconds, 0);
@@ -75,12 +76,18 @@ export default function TaskList({
   onSessionDeleted,
   dayContainerId,
   dayHeadingBlockId,
+  dayContainers,
+  selectedDay,
+  previousWeekLabel,
+  nextWeekLabel,
+  fileId,
   lockedTaskBlockId,
   busyTaskIds,
   onTaskCreated,
   onTaskDeleted,
   onTaskTextUpdated,
   onReorderTask,
+  onMoveTask,
   onSessionUpdated,
   onManualSessionAdded,
 }: {
@@ -92,12 +99,18 @@ export default function TaskList({
   onSessionDeleted: (taskBlockId: string, sessionBlockId: string) => void;
   dayContainerId: string | null;
   dayHeadingBlockId: string | null;
+  dayContainers: DayContainer[];
+  selectedDay: string | null;
+  previousWeekLabel: string | null;
+  nextWeekLabel: string | null;
+  fileId: string | null;
   lockedTaskBlockId: string | null;
   busyTaskIds: Set<string>;
   onTaskCreated: (task: { blockId: string; text: string; checked: boolean }) => void;
   onTaskDeleted: (blockId: string) => void;
   onTaskTextUpdated: (blockId: string, text: string) => void;
   onReorderTask: (task: Task, targetIndex: number) => void;
+  onMoveTask: (task: Task, target: MoveTarget) => void;
   onSessionUpdated: (taskBlockId: string, session: Session) => void;
   onManualSessionAdded: (taskBlockId: string, session: Session) => void;
 }) {
@@ -469,6 +482,15 @@ export default function TaskList({
                       >
                         ↓
                       </button>
+                      <MoveTaskMenu
+                        currentDay={selectedDay}
+                        dayContainers={dayContainers}
+                        previousWeekLabel={previousWeekLabel}
+                        nextWeekLabel={nextWeekLabel}
+                        fileId={fileId}
+                        disabled={disableEdit}
+                        onMove={(target) => onMoveTask(task, target)}
+                      />
                       <button
                         type="button"
                         className="task-delete"

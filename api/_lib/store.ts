@@ -38,9 +38,15 @@ export type WeekView = {
   dayMatched: boolean;
   dayContainerId: string | null;
   dayHeadingBlockId: string | null;
+  dayContainers: DayContainer[];
   tasks: Task[];
   weekTotalSeconds: number;
 };
+
+/** Dónde insertar/mover tareas de un día concreto (contenedor de Notion +
+ *  heading del día como ancla). Se expone para todos los días de la semana,
+ *  no solo el seleccionado, para poder mover una tarea a otro día. */
+export type DayContainer = { day: string; containerId: string; headingBlockId: string };
 
 export type FileEntry = { id: string; label: string };
 

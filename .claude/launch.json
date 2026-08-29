@@ -10,6 +10,15 @@
       ],
       "port": 5173,
       "autoPort": true
+    },
+    {
+      "name": "dev:api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev:api"
+      ],
+      "port": 3000
     }
   ]
 }

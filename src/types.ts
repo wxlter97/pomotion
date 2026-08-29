@@ -15,6 +15,15 @@ export type Task = {
 
 export type WeekSource = 'auto-matched' | 'auto-fallback' | 'requested';
 
+/** Dónde insertar/mover tareas de un día concreto de la semana (contenedor
+ *  de Notion + heading del día como ancla). Se expone para todos los días,
+ *  no solo el seleccionado, para poder mover una tarea a otro día. */
+export type DayContainer = {
+  day: string;
+  containerId: string;
+  headingBlockId: string;
+};
+
 export type FileEntry = {
   id: string;
   label: string;
@@ -33,6 +42,7 @@ export type TasksResponse = {
   dayMatched: boolean;
   dayContainerId: string | null;
   dayHeadingBlockId: string | null;
+  dayContainers: DayContainer[];
   tasks: Task[];
   weekTotalSeconds: number;
 };

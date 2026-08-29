@@ -46,6 +46,7 @@ import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js
 import type {
   CreateTaskInput,
   CreateWeekInput,
+  DayContainer,
   FileEntry,
   GetWeekViewInput,
   LogSessionInput,
@@ -186,6 +187,7 @@ function weekViewShell(overrides: Partial<WeekView> & Pick<WeekView, 'week' | 'w
     dayMatched: true,
     dayContainerId: null,
     dayHeadingBlockId: null,
+    dayContainers: [],
     tasks: [],
     weekTotalSeconds: 0,
     ...overrides,
@@ -263,6 +265,14 @@ async function getWeekView(opts: GetWeekViewInput): Promise<WeekView> {
     0
   );
 
+  // Contenedor + ancla de cada día de la semana (no solo el seleccionado) —
+  // habilita mover una tarea a otro día sin cambiar de vista.
+  const dayContainers: DayContainer[] = dayOrder.flatMap((day) => {
+    const containerId = dayContainerId.get(day);
+    const headingBlockId = dayHeadingBlockId.get(day);
+    return containerId && headingBlockId ? [{ day, containerId, headingBlockId }] : [];
+  });
+
   return {
     week: activeWeek.label,
     weekSource,
@@ -274,6 +284,7 @@ async function getWeekView(opts: GetWeekViewInput): Promise<WeekView> {
     dayMatched,
     dayContainerId: dayContainerId.get(selectedDay) ?? null,
     dayHeadingBlockId: dayHeadingBlockId.get(selectedDay) ?? null,
+    dayContainers,
     tasks,
     weekTotalSeconds,
   };
