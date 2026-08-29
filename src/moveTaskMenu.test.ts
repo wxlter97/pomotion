@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { movableTargets } from './components/MoveTaskMenu';
-import type { DayContainer } from './types';
+import type { DayColumn } from './types';
 
-const days: DayContainer[] = [
-  { day: 'Lunes', containerId: 'c1', headingBlockId: 'h1' },
-  { day: 'Martes', containerId: 'c2', headingBlockId: 'h2' },
-  { day: 'Miércoles', containerId: 'c3', headingBlockId: 'h3' },
+const days: DayColumn[] = [
+  { day: 'Lunes', date: '2026-08-24' },
+  { day: 'Martes', date: '2026-08-25' },
+  { day: 'Miércoles', date: '2026-08-26' },
 ];
 
 describe('movableTargets', () => {

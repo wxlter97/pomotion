@@ -1,19 +1,32 @@
 import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
 import {
   applyRecurring,
-  createTask,
-  deleteTask,
-  ensureRecurringSection,
-  getRecurringTasks,
-  reorderTask,
-  updateTaskText,
+  createRecurringRule,
+  deleteRecurringRule,
+  getRecurringRules,
+  updateRecurringRule,
   UnauthorizedError,
-  type RecurringTask,
 } from '../api';
-import { computeAfterBlockId } from '../taskReorder';
+import type { RecurringRule } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 
-type Section = { containerId: string; headingBlockId: string | null };
+const DAYS: { n: string; label: string }[] = [
+  { n: '1', label: 'L' },
+  { n: '2', label: 'M' },
+  { n: '3', label: 'X' },
+  { n: '4', label: 'J' },
+  { n: '5', label: 'V' },
+  { n: '6', label: 'S' },
+  { n: '7', label: 'D' },
+];
+
+function weekdaysSummary(csv: string): string {
+  const set = new Set(csv.split(','));
+  if (['1', '2', '3', '4', '5'].every((d) => set.has(d)) && set.size === 5) return 'Lun–Vie';
+  return DAYS.filter((d) => set.has(d.n))
+    .map((d) => d.label)
+    .join(' ');
+}
 
 export default function RecurringTasksDialog({
   fileId,
@@ -23,12 +36,11 @@ export default function RecurringTasksDialog({
 }: {
   fileId: string | null;
   /** Semana visible ahora — a la que apunta "Aplicar a esta semana". */
-  currentWeek: string | null;
+  currentWeek: string;
   onClose: () => void;
   onApplied: (added: number) => void;
 }) {
-  const [tasks, setTasks] = useState<RecurringTask[]>([]);
-  const [section, setSection] = useState<Section | null>(null);
+  const [rules, setRules] = useState<RecurringRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +48,7 @@ export default function RecurringTasksDialog({
   const [newText, setNewText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState('');
-  const [pendingDelete, setPendingDelete] = useState<RecurringTask | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<RecurringRule | null>(null);
 
   useEffect(() => {
     function onKeyDown(e: globalThis.KeyboardEvent) {
@@ -52,13 +64,10 @@ export default function RecurringTasksDialog({
       setLoading(true);
       setError(null);
       try {
-        const res = await getRecurringTasks(fileId ?? undefined);
-        if (cancelled) return;
-        setTasks(res.tasks);
-        setSection({ containerId: res.containerId, headingBlockId: res.headingBlockId });
+        const res = await getRecurringRules();
+        if (!cancelled) setRules(res.rules);
       } catch (err) {
-        if (cancelled) return;
-        setError(errMessage(err, 'No se pudieron cargar las tareas recurrentes'));
+        if (!cancelled) setError(errMessage(err, 'No se pudieron cargar las recurrentes'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -66,122 +75,93 @@ export default function RecurringTasksDialog({
     return () => {
       cancelled = true;
     };
-  }, [fileId]);
-
-  const hasSection = Boolean(section?.headingBlockId);
-  const anchorFor = (): string | null => {
-    if (tasks.length > 0) return tasks[tasks.length - 1].blockId;
-    return section?.headingBlockId ?? null;
-  };
-
-  async function handleCreateSection() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await ensureRecurringSection(fileId ?? undefined);
-      setSection({ containerId: res.containerId, headingBlockId: res.headingBlockId });
-    } catch (err) {
-      setError(errMessage(err, 'No se pudo crear la sección'));
-    } finally {
-      setBusy(false);
-    }
-  }
+  }, []);
 
   async function submitNew(e: FormEvent) {
     e.preventDefault();
-    const text = newText.trim();
-    const container = section?.containerId;
-    const anchor = anchorFor();
-    if (!text || !container || !anchor) return;
+    const name = newText.trim();
+    if (!name) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await createTask(container, anchor, text);
-      setTasks((prev) => [...prev, res.task]);
+      const res = await createRecurringRule(name);
+      setRules((prev) => [...prev, res.rule]);
       setNewText('');
     } catch (err) {
-      setError(errMessage(err, 'No se pudo agregar la tarea recurrente'));
+      setError(errMessage(err, 'No se pudo agregar la regla'));
     } finally {
       setBusy(false);
     }
   }
 
-  function startEdit(task: RecurringTask) {
-    setEditingId(task.blockId);
-    setEditingText(task.text);
+  function startEdit(rule: RecurringRule) {
+    setEditingId(rule.id);
+    setEditingText(rule.name);
   }
 
-  async function submitEdit(task: RecurringTask) {
-    const text = editingText.trim();
-    if (!text || text === task.text) {
+  async function submitEdit(rule: RecurringRule) {
+    const name = editingText.trim();
+    if (!name || name === rule.name) {
       setEditingId(null);
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await updateTaskText(task.blockId, text);
-      setTasks((prev) => prev.map((t) => (t.blockId === task.blockId ? { ...t, text } : t)));
+      const res = await updateRecurringRule(rule.id, { name });
+      setRules((prev) => prev.map((r) => (r.id === rule.id ? res.rule : r)));
       setEditingId(null);
     } catch (err) {
-      setError(errMessage(err, 'No se pudo actualizar la tarea recurrente'));
+      setError(errMessage(err, 'No se pudo actualizar la regla'));
     } finally {
       setBusy(false);
     }
   }
 
-  function onEditKeyDown(e: KeyboardEvent<HTMLInputElement>, task: RecurringTask) {
+  function onEditKeyDown(e: KeyboardEvent<HTMLInputElement>, rule: RecurringRule) {
     if (e.key === 'Enter') {
       e.preventDefault();
-      void submitEdit(task);
+      void submitEdit(rule);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setEditingId(null);
     }
   }
 
-  async function confirmDelete() {
-    const task = pendingDelete;
-    if (!task) return;
-    setBusy(true);
-    setError(null);
+  async function toggleDay(rule: RecurringRule, day: string) {
+    const set = new Set(rule.weekdays.split(','));
+    if (set.has(day)) set.delete(day);
+    else set.add(day);
+    if (set.size === 0) return; // al menos un día
+    const weekdays = DAYS.filter((d) => set.has(d.n))
+      .map((d) => d.n)
+      .join(',');
+    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, weekdays } : r)));
     try {
-      await deleteTask(task.blockId);
-      setTasks((prev) => prev.filter((t) => t.blockId !== task.blockId));
-      setPendingDelete(null);
+      await updateRecurringRule(rule.id, { weekdays });
     } catch (err) {
-      setError(errMessage(err, 'No se pudo eliminar la tarea recurrente'));
-    } finally {
-      setBusy(false);
+      setRules((prev) => prev.map((r) => (r.id === rule.id ? rule : r))); // revertir
+      setError(errMessage(err, 'No se pudo actualizar los días'));
     }
   }
 
-  async function move(task: RecurringTask, targetIndex: number) {
-    if (!section?.headingBlockId) return;
-    const from = tasks.findIndex((t) => t.blockId === task.blockId);
-    if (from === -1 || targetIndex < 0 || targetIndex >= tasks.length) return;
-    const afterBlockId = computeAfterBlockId(tasks, task.blockId, targetIndex, section.headingBlockId);
-    const original = tasks;
-    const reordered = [...tasks];
-    reordered.splice(from, 1);
-    reordered.splice(targetIndex, 0, task);
-    setTasks(reordered);
+  async function confirmDelete() {
+    const rule = pendingDelete;
+    if (!rule) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await reorderTask(task.blockId, section.containerId, afterBlockId);
-      // reorderTask recrea el bloque: hay que quedarse con el id nuevo.
-      setTasks((prev) => prev.map((t) => (t.blockId === task.blockId ? { ...t, blockId: res.newBlockId } : t)));
+      await deleteRecurringRule(rule.id);
+      setRules((prev) => prev.filter((r) => r.id !== rule.id));
+      setPendingDelete(null);
     } catch (err) {
-      setTasks(original);
-      setError(errMessage(err, 'No se pudo reordenar'));
+      setError(errMessage(err, 'No se pudo eliminar la regla'));
     } finally {
       setBusy(false);
     }
   }
 
   async function handleApply() {
-    if (!currentWeek) return;
     setBusy(true);
     setError(null);
     try {
@@ -206,44 +186,34 @@ export default function RecurringTasksDialog({
       >
         <h2 id="recurring-title">Tareas recurrentes</h2>
         <p className="muted">
-          Tareas que se repiten todos los días. Viven en la sección «Recurrentes» de tu página de
-          Notion; «Aplicar» las agrega a los días de la semana que falten, sin duplicar.
+          Reglas que se repiten en los días marcados. «Aplicar» las agrega a la semana visible,
+          saltando las que ya estén.
         </p>
 
         {loading ? (
           <p className="muted">Cargando…</p>
-        ) : !hasSection ? (
-          <div className="recurring-empty">
-            <p>
-              Todavía no hay una sección «Recurrentes» en esta página de Notion. Créala (queda encima
-              de las semanas) y agrega tus tareas.
-            </p>
-            <button type="button" className="btn btn-filled" onClick={() => void handleCreateSection()} disabled={busy}>
-              {busy ? 'Creando…' : 'Crear sección «Recurrentes»'}
-            </button>
-          </div>
         ) : (
           <>
-            {tasks.length === 0 ? (
-              <p className="muted">No hay tareas recurrentes todavía.</p>
+            {rules.length === 0 ? (
+              <p className="muted">No hay reglas todavía.</p>
             ) : (
               <ul className="recurring-list">
-                {tasks.map((task, i) => (
-                  <li key={task.blockId}>
-                    {editingId === task.blockId ? (
+                {rules.map((rule) => (
+                  <li key={rule.id}>
+                    {editingId === rule.id ? (
                       <div className="recurring-edit">
                         <input
                           type="text"
                           value={editingText}
                           onChange={(e) => setEditingText(e.target.value)}
-                          onKeyDown={(e) => onEditKeyDown(e, task)}
+                          onKeyDown={(e) => onEditKeyDown(e, rule)}
                           disabled={busy}
                           autoFocus
                         />
                         <button
                           type="button"
                           className="btn btn-icon"
-                          onClick={() => void submitEdit(task)}
+                          onClick={() => void submitEdit(rule)}
                           disabled={busy}
                           aria-label="Guardar"
                           title="Guardar"
@@ -263,12 +233,29 @@ export default function RecurringTasksDialog({
                       </div>
                     ) : (
                       <>
-                        <span className="recurring-text">{task.text}</span>
+                        <span className="recurring-text">{rule.name}</span>
+                        <div className="recurring-days" title={weekdaysSummary(rule.weekdays)}>
+                          {DAYS.map((d) => (
+                            <button
+                              key={d.n}
+                              type="button"
+                              className={
+                                rule.weekdays.split(',').includes(d.n)
+                                  ? 'recurring-day on'
+                                  : 'recurring-day'
+                              }
+                              onClick={() => void toggleDay(rule, d.n)}
+                              aria-label={`Día ${d.label}`}
+                            >
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
                         <div className="recurring-actions">
                           <button
                             type="button"
                             className="task-move"
-                            onClick={() => startEdit(task)}
+                            onClick={() => startEdit(rule)}
                             disabled={busy}
                             aria-label="Editar"
                             title="Editar"
@@ -277,28 +264,8 @@ export default function RecurringTasksDialog({
                           </button>
                           <button
                             type="button"
-                            className="task-move"
-                            onClick={() => void move(task, i - 1)}
-                            disabled={busy || i === 0}
-                            aria-label="Mover arriba"
-                            title="Mover arriba"
-                          >
-                            ↑
-                          </button>
-                          <button
-                            type="button"
-                            className="task-move"
-                            onClick={() => void move(task, i + 1)}
-                            disabled={busy || i === tasks.length - 1}
-                            aria-label="Mover abajo"
-                            title="Mover abajo"
-                          >
-                            ↓
-                          </button>
-                          <button
-                            type="button"
                             className="task-delete"
-                            onClick={() => setPendingDelete(task)}
+                            onClick={() => setPendingDelete(rule)}
                             disabled={busy}
                             aria-label="Eliminar"
                             title="Eliminar"
@@ -318,7 +285,7 @@ export default function RecurringTasksDialog({
                 type="text"
                 value={newText}
                 onChange={(e) => setNewText(e.target.value)}
-                placeholder="Agregar tarea recurrente…"
+                placeholder="Agregar regla recurrente…"
                 disabled={busy}
               />
               <button type="submit" className="btn btn-tinted" disabled={busy || !newText.trim()}>
@@ -334,24 +301,22 @@ export default function RecurringTasksDialog({
           <button type="button" className="btn btn-plain" onClick={onClose}>
             Cerrar
           </button>
-          {hasSection && (
-            <button
-              type="button"
-              className="btn btn-filled"
-              onClick={() => void handleApply()}
-              disabled={busy || !currentWeek || tasks.length === 0}
-              title={currentWeek ? `Aplicar a ${currentWeek}` : 'No hay una semana visible'}
-            >
-              {busy ? 'Aplicando…' : 'Aplicar a esta semana'}
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn-filled"
+            onClick={() => void handleApply()}
+            disabled={busy || rules.length === 0}
+            title={`Aplicar a ${currentWeek}`}
+          >
+            {busy ? 'Aplicando…' : 'Aplicar a esta semana'}
+          </button>
         </div>
       </div>
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Eliminar tarea recurrente"
-          message={`Se quita "${pendingDelete.text}" de la lista de recurrentes. Las tareas que ya se hayan agregado a algún día no se tocan.`}
+          title="Eliminar regla recurrente"
+          message={`Se quita "${pendingDelete.name}". Las tareas ya creadas en algún día no se tocan.`}
           confirmLabel={busy ? 'Eliminando…' : 'Eliminar'}
           destructive
           onConfirm={confirmDelete}
@@ -363,6 +328,7 @@ export default function RecurringTasksDialog({
 }
 
 function errMessage(err: unknown, fallback: string): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página para volver a entrar.';
+  if (err instanceof UnauthorizedError)
+    return 'La sesión expiró. Recargá la página para volver a entrar.';
   return err instanceof Error ? err.message : fallback;
 }

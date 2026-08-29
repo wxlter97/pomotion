@@ -1,189 +1,75 @@
 # pomotion
 
-Timer (pomodoro y libre) que jala las tareas del día/semana actual desde una
-plantilla de Notion, y al detener el timer escribe la sesión de vuelta a
-Notion como bloque hijo del `to_do` correspondiente.
+Planificador semanal de tareas con timer pomodoro y registro de tiempo. Cada
+tarea vive en un día concreto; el timer, al detenerse, guarda la sesión.
 
-- **Frontend:** React + Vite, con un diseño inspirado en Apple HIG (botones
-  pill, segmented control, sheets con blur, tema claro/oscuro).
-- **Backend:** funciones serverless de Vercel (`/api`) que actúan de proxy
-  hacia la API de Notion — el token nunca se expone al cliente.
-- **Auth:** contraseña compartida simple (cookie de sesión firmada).
-- **Costo:** $0, todo en tiers gratuitos de Vercel.
+- **Frontend:** React + Vite, diseño inspirado en Apple HIG (botones pill,
+  segmented control, sheets, tema claro/oscuro).
+- **Backend:** funciones serverless de Vercel (`/api`).
+- **Almacén:** [Turso](https://turso.tech) (libSQL / SQLite). Ver
+  `scripts/migrations/`.
+- **Auth:** login con Google (OAuth2 + PKCE), sesión en cookie httpOnly +
+  tabla `auth_sessions`. Multiusuario: cada cuenta arranca pendiente hasta
+  que un admin la aprueba (`npm run approve -- <email>`); el `SEED_ADMIN_EMAIL`
+  se aprueba solo en su primer login.
 
-**Además del flujo base (ver spec del proyecto):**
-- Marcar/desmarcar tareas como hechas directo desde la app (actualiza el
-  `checked` del `to_do` en Notion, sin tocar el texto).
-- Gestión completa de tareas del día: agregar, eliminar, y reordenar
-  (botones ↑/↓ + drag nativo en desktop). Como Notion no tiene un
-  endpoint para "mover" un bloque, reordenar internamente crea la tarea
-  en la nueva posición (con sus sesiones) y borra la original — mientras
-  haya un timer corriendo, la tarea activa queda con esos controles
-  bloqueados para no arriesgar esa sesión en curso.
-- Total de minutos registrados del día, visible arriba de la lista.
-- Navegación entre semanas (‹ / › y un botón "Hoy" para volver a la actual),
-  no solo la semana activa/detectada — útil para revisar historial.
-- Botón "+" para agregar la semana siguiente (lunes-viernes calculado
-  automáticamente a partir de la última semana existente), con la misma
-  estructura de columnas por día que usa la plantilla real — lista para
-  agregarle tareas con el flujo de arriba.
-- El timer activo se persiste en `localStorage` (sobrevive un refresh o
-  cierre accidental de tab) con limpieza automática si es de un día
-  calendario distinto o demasiado viejo.
-- Confirmación antes de cancelar un timer activo al cambiar de tarea, día o
-  semana.
-- Editar el texto de una tarea sin borrarla y recrearla (conserva sus
-  sesiones), editar una sesión ya registrada (duración/horas), y registrar
-  una sesión manual sin correr el timer en vivo — para cuando se te
-  olvidó iniciarlo.
-- Botón para eliminar una sesión mal registrada (borra el bloque en Notion).
-- Sonido al completar una fase del pomodoro (sintetizado con Web Audio
-  API, sin archivos de audio), con botón para desactivarlo.
-- Título de la pestaña con el countdown en vivo, anillo de progreso visual.
-- Atajos de teclado: `espacio` inicia/detiene, `1`–`5` cambia de día,
-  `[`/`]` cambia de semana, `T` cambia el tema.
-- Favicon + manifest básico (ícono generado con
-  [scripts/gen-icons.mjs](scripts/gen-icons.mjs), sin dependencias).
-- Múltiples archivos (Trabajo, Casa, Hábitos, etc.), cada uno con su
-  propia rotación de semanas — ver sección 5 más abajo. Opcional: sin
-  configurarlo, la app funciona igual que siempre con un solo archivo
-  implícito.
+## Puesta en marcha
 
-## 1. Crear la integración de Notion
+1. `npm install`
+2. Copiar `.env.example` a `.env` y completar:
+   - **Turso:** `turso db create pomotion`, luego `turso db show --url` y
+     `turso db tokens create` → `TURSO_DATABASE_URL` / `TURSO_AUTH_TOKEN`.
+     (Para dev sin cuenta: `TURSO_DATABASE_URL=file:local.db`.)
+   - **Google OAuth:** en Google Cloud → Credentials → *OAuth client ID (Web)*.
+     Redirect URIs: `${APP_BASE_URL}/api/auth/google/callback` y el de
+     `http://localhost:5173/...` para dev.
+   - `APP_BASE_URL`, `SEED_ADMIN_EMAIL`.
+3. `npm run migrate` — crea el schema.
+4. Dev: `npm run dev` (frontend, :5173) + `npm run dev:api` (API, :3000) en
+   dos terminales. El proxy de Vite manda `/api` a :3000.
 
-1. Ve a [notion.so/my-integrations](https://www.notion.so/my-integrations) →
-   **New integration**.
-2. Dale un nombre (ej. `pomotion`), tipo **Internal**, workspace donde vive tu
-   plantilla.
-3. Copia el **Internal Integration Secret** → esto es `NOTION_TOKEN`.
-4. Esta integración solo puede ver páginas que compartas explícitamente con
-   ella (paso 3 abajo).
+## Scripts
 
-## 2. Crear la página índice
+| | |
+|---|---|
+| `npm run dev` / `dev:api` | frontend / API en local |
+| `npm run migrate` | aplica las migraciones SQL pendientes |
+| `npm run approve -- <email>` | aprueba el login de un usuario |
+| `npm run typecheck` / `test` / `build` | CI |
 
-Esta es la página que **nunca se archiva** — le dice a la app cuál es la
-página semanal activa ahora mismo.
+## Modelo de datos
 
-1. Crea una página nueva en Notion, ej. `pomotion — índice`.
-2. Dentro, escribe un solo bloque de texto con la **URL completa** (o el ID)
-   de tu página semanal actual. Ejemplo:
-   `https://www.notion.so/tuworkspace/2026-08-17-Semana-abcdef1234567890abcdef1234567890`
-3. Comparte esta página con la integración: `···` (arriba a la derecha) →
-   **Connections** → agrega la integración `pomotion`.
-4. Copia el ID de **esta página índice** (los 32 caracteres al final de su
-   propia URL) → esto es `NOTION_INDEX_PAGE_ID`.
+- `tasks`: `id`, `user_id`, `name`, `date` (`YYYY-MM-DD`; `NULL` = backlog),
+  `done`, `order` (fraccional), `file` (contexto: "Trabajo"/"Casa"/…), +
+  campos para features futuras (`priority`, `estimate_min`, `notes`, `due`,
+  `tags`).
+- `work_sessions`: relación a `tasks`, `duration_sec`, `start_hhmm`,
+  `end_hhmm`, `date` (denormalizado).
+- `recurring_rules`: `name` + `weekdays` (CSV 1-7) → se materializan en la
+  semana con "Aplicar" desde el diálogo de recurrentes.
 
-Cuando reinicies tu plantilla semanal (archivas la vieja, creas la nueva),
-solo editas el texto de este bloque con la URL de la página nueva —
-compártela también con la integración (paso 3) — y no hay que tocar código
-ni redeploy.
+Las "semanas" no son una entidad: se derivan de la fecha de cada tarea
+(lunes de esa semana). La navegación `‹ ›` es aritmética de fechas.
 
-## 3. Compartir la página semanal activa
+## Funciones
 
-Comparte también la página semanal actual (la que referencia la página
-índice) con la integración `pomotion`, igual que el paso 3 de arriba. Cada
-vez que crees una página semanal nueva, compártela también.
+- Vista por día dentro de la semana (Lun–Vie), con totales de día y semana.
+- Timer pomodoro y libre; el activo se persiste en `localStorage` (sobrevive
+  un refresh) y se descarta si es de otro día.
+- Agregar / editar / marcar / borrar / reordenar tareas (↑↓ y drag).
+- Mover una tarea a otro día de la semana o a la anterior/siguiente,
+  arrastrando sus sesiones.
+- Sesiones: registro automático al parar el timer, o manual; editar y
+  borrar sesiones ya registradas; aviso (no bloqueante) de solapamiento.
+- Reglas recurrentes por días de la semana.
+- Reporte de tiempo por rango de fechas + export CSV.
+- Selector de "archivos" (contextos) si tenés tareas con `file`.
+- Notificación del navegador y sonido al cambiar de fase del pomodoro.
+- Aviso de "timer olvidado" pasadas ~2h en modo libre.
+- Atajos: `espacio` (start/stop), `1`–`5` (día), `[` `]` (semana), `T` (tema).
 
-Formato esperado dentro de esa página (ver spec del proyecto):
+## Migración desde Notion
 
-- `heading_1`: encabezado de semana, ej. `2026.08.17 - 2026.08.21`
-- `heading_3`: encabezado de día, ej. `Lunes`, `Martes`
-- `to_do`: cada tarea
-
-Los días pueden estar como hermanos planos del `heading_1`, o metidos en un
-layout de columnas de Notion (un `column_list` con un `column` por día,
-cada uno con su `heading_3` + `to_do` adentro) — la app soporta ambos casos.
-
-## 4. Variables de entorno
-
-Copia `.env.example` a `.env` para desarrollo local, y configura las mismas
-en Vercel (**Project Settings → Environment Variables**) para producción:
-
-| Variable                | Descripción                                                        |
-| ------------------------ | ------------------------------------------------------------------- |
-| `NOTION_TOKEN`           | Token de la integración interna (paso 1).                          |
-| `NOTION_INDEX_PAGE_ID`   | ID de la página índice permanente (paso 2).                        |
-| `APP_PASSWORD`           | Contraseña compartida para entrar a la app.                        |
-| `APP_TIMEZONE` (opcional)| Zona horaria para "hoy" y para formatear horas. Default: `America/El_Salvador`. |
-| `NOTION_FILES_INDEX_PAGE_ID` (opcional) | Página raíz de archivos (paso 5). Sin esto, modo de un solo archivo. |
-
-## 5. Múltiples archivos (opcional)
-
-Por defecto la app usa un solo archivo (`NOTION_INDEX_PAGE_ID`, pasos
-2-3). Si quieres gestionar varios en paralelo — Trabajo, Casa, Hábitos,
-lo que sea — con cada uno rotando sus propias semanas de forma
-independiente, agrega un nivel más de indirección:
-
-1. Crea una página nueva en Notion, ej. `pomotion — archivos`, y
-   compártela con la integración (mismo paso que la página índice).
-2. Dentro, un bloque por archivo: el texto que quieras como nombre
-   (ej. `Trabajo`) seguido de un link a la página **índice** de ese
-   archivo — la página índice de cada archivo es exactamente lo mismo
-   que describe el paso 2 de arriba (un bloque con el link a su semanal
-   activa), una por archivo. Para el archivo "Trabajo" podés perfectamente
-   reusar la página índice que ya tenías (cero cambios a tu historial).
-3. Copia el ID de esta página raíz → `NOTION_FILES_INDEX_PAGE_ID`.
-
-Con esto configurado aparece un selector de archivos en el header de la
-app (se oculta solo si queda con 0 o 1 archivo). Cada archivo recuerda su
-propia selección de día/semana; cambiar de archivo vuelve a auto-detectar
-"hoy" en el nuevo. Un archivo recién creado (sin ninguna semana todavía)
-no es un error — el botón "+" de arriba crea la primera semana igual que
-en cualquier otro.
-
-## 6. Desarrollo local
-
-```bash
-npm install
-npm run dev:api     # sirve /api en :3000 (lee .env con dotenv)
-```
-
-En otra terminal:
-
-```bash
-npm run dev          # sirve el frontend en :5173, con proxy de /api → :3000
-```
-
-`dev:api` levanta un servidor local mínimo ([scripts/dev-api-server.ts](scripts/dev-api-server.ts))
-que monta los mismos archivos de `/api` sin pasar por el CLI de Vercel —
-evita tener que loguearte a una cuenta de Vercel solo para desarrollar
-localmente. En producción Vercel enruta cada archivo de `/api`
-directamente; este script no se usa ahí.
-
-Alternativa: si prefieres probar con el runtime real de Vercel,
-`npm i -g vercel && vercel dev` funciona igual de bien (requiere login).
-
-Abre `http://localhost:5173`.
-
-## 7. Deploy en Vercel
-
-1. `vercel link` (o importa el repo directo desde el dashboard de Vercel).
-2. Configura las variables de entorno de la tabla de arriba en el
-   proyecto de Vercel.
-3. `vercel --prod`, o simplemente haz push a `main` si conectaste el repo de
-   GitHub.
-
-## Fuera de alcance (por diseño)
-
-- Multiusuario / OAuth de Notion (ver spec, sección 10).
-- Extracción automática de tickets de Jira por regex — se asocian
-  manualmente al iniciar el timer.
-- Export o resumen adicional — las sesiones quedan como bloques hijo en la
-  propia página de Notion.
-
-## Decisiones de implementación no explícitas en la spec
-
-- **Zona horaria:** por defecto `America/El_Salvador` (ajustable con
-  `APP_TIMEZONE`), usada para detectar "hoy"/"qué día de la semana es" y
-  para formatear las horas `(10:15–10:40)` de los bloques de sesión.
-- **Cuándo se registra una sesión en modo Pomodoro:** además de al presionar
-  "Detener" manualmente, también se registra automáticamente cuando el ciclo
-  de trabajo de 25 minutos llega a 0 (transición natural a descanso). Los
-  descansos nunca se registran como sesión.
-- **Sesiones muy cortas:** si el timer corre menos de 30 segundos antes de
-  detenerse, no se escribe nada a Notion (evita ruido por clics accidentales).
-- **Semana/día no detectados automáticamente:** si la fecha de hoy no cae
-  dentro de ningún rango de `heading_1`, o no hay un `heading_3` que
-  coincida con el día actual, la app cae a un valor por defecto (última
-  semana encontrada / primer día de la semana) y muestra un aviso visible en
-  la UI en vez de fallar en silencio.
+Versiones anteriores guardaban todo en una página de Notion. El estado
+final de esa época está en la rama `archive/notion-storage` / tag
+`notion-storage-final`. `ROADMAP.md` documenta la migración.

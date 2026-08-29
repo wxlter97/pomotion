@@ -1,28 +1,23 @@
 export type Session = {
-  blockId: string | undefined;
+  id: string;
+  taskId: string;
   durationSeconds: number;
   start: string;
   end: string;
 };
 
 export type Task = {
-  blockId: string;
-  text: string;
-  checked: boolean;
-  day: string;
+  id: string;
+  name: string;
+  date: string; // 'YYYY-MM-DD'
+  done: boolean;
+  order: number;
+  file: string | null;
   sessions: Session[];
 };
 
-export type WeekSource = 'auto-matched' | 'auto-fallback' | 'requested';
-
-/** Dónde insertar/mover tareas de un día concreto de la semana (contenedor
- *  de Notion + heading del día como ancla). Se expone para todos los días,
- *  no solo el seleccionado, para poder mover una tarea a otro día. */
-export type DayContainer = {
-  day: string;
-  containerId: string;
-  headingBlockId: string;
-};
+/** Un día de la semana visible: su etiqueta ("Lunes") y su fecha. */
+export type DayColumn = { day: string; date: string };
 
 export type FileEntry = {
   id: string;
@@ -30,21 +25,29 @@ export type FileEntry = {
 };
 
 export type TasksResponse = {
-  // null: el archivo activo todavía no tiene ninguna semana (ej. recién
-  // creado) — distinto de una semana existente sin desglose por día.
-  week: string | null;
-  weekSource: WeekSource;
+  /** Etiqueta "2026.08.24 - 2026.08.28". */
+  week: string;
+  /** Lunes de la semana, 'YYYY-MM-DD'. */
+  weekStart: string;
   isCurrentWeek: boolean;
-  previousWeekLabel: string | null;
-  nextWeekLabel: string | null;
-  availableDays: string[];
-  selectedDay: string | null;
-  dayMatched: boolean;
-  dayContainerId: string | null;
-  dayHeadingBlockId: string | null;
-  dayContainers: DayContainer[];
+  previousWeekLabel: string;
+  nextWeekLabel: string;
+  /** Lun–Vie, siempre 5. */
+  days: DayColumn[];
+  selectedDay: string;
+  selectedDate: string;
   tasks: Task[];
+  dayTotalSeconds: number;
   weekTotalSeconds: number;
+};
+
+export type RecurringRule = {
+  id: string;
+  name: string;
+  file: string | null;
+  /** CSV de días 1(Lun)..7(Dom). */
+  weekdays: string;
+  active: boolean;
 };
 
 export type TimerMode = 'pomodoro' | 'free';

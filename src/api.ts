@@ -1,4 +1,4 @@
-import type { FileEntry, TasksResponse } from './types';
+import type { FileEntry, RecurringRule, Session, Task, TasksResponse } from './types';
 
 export class UnauthorizedError extends Error {}
 /** La sesión existe pero la cuenta todavía no está aprobada (403). */
@@ -51,124 +51,121 @@ export function getFiles() {
   return request<{ files: FileEntry[] }>('/api/files');
 }
 
-export function getTasks(day?: string, week?: string, fileId?: string, fresh = false) {
+export function getTasks(day?: string, week?: string, fileId?: string) {
   const params = new URLSearchParams();
   if (day) params.set('day', day);
   if (week) params.set('week', week);
   if (fileId) params.set('file', fileId);
-  if (fresh) params.set('fresh', '1'); // saltea la caché corta del server (post-mutación / botón "Actualizar")
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
 
+// --- Tareas ---
+
+export function createTask(date: string, text: string, fileId?: string, afterId?: string | null) {
+  return request<{ ok: true; task: Task }>('/api/task', {
+    method: 'POST',
+    body: JSON.stringify({ date, text, file: fileId, after_id: afterId }),
+  });
+}
+
+export function updateTaskDone(id: string, done: boolean) {
+  return request<{ ok: true; done: boolean }>('/api/task', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, done }),
+  });
+}
+
+export function updateTaskText(id: string, text: string) {
+  return request<{ ok: true; text: string }>('/api/task', {
+    method: 'PATCH',
+    body: JSON.stringify({ id, text }),
+  });
+}
+
+export function deleteTask(id: string) {
+  return request<{ ok: true }>('/api/task', { method: 'DELETE', body: JSON.stringify({ id }) });
+}
+
+/** Reordena / mueve una tarea. `date` para moverla a otro día; `afterId`
+ *  (o null = al inicio) para la posición dentro del día. */
+export function moveTask(id: string, opts: { date?: string; afterId?: string | null }) {
+  return request<{ ok: true; id: string }>('/api/task-reorder', {
+    method: 'POST',
+    body: JSON.stringify({ id, date: opts.date, after_id: opts.afterId }),
+  });
+}
+
+// --- Sesiones ---
+
 export function postSession(payload: {
-  block_id: string;
+  task_id: string;
   duration_seconds: number;
   start_time: string;
   end_time: string;
 }) {
-  return request<{
-    ok: true;
-    session: { blockId?: string; durationSeconds: number; start: string; end: string };
-  }>('/api/session', { method: 'POST', body: JSON.stringify(payload) });
-}
-
-export function deleteSession(blockId: string) {
-  return request<{ ok: true }>('/api/session', {
-    method: 'DELETE',
-    body: JSON.stringify({ block_id: blockId }),
-  });
-}
-
-export function postManualSession(blockId: string, durationSeconds: number, start: string, end: string) {
-  return request<{
-    ok: true;
-    session: { blockId?: string; durationSeconds: number; start: string; end: string };
-  }>('/api/session', {
+  return request<{ ok: true; session: Session }>('/api/session', {
     method: 'POST',
-    body: JSON.stringify({ block_id: blockId, duration_seconds: durationSeconds, start, end }),
+    body: JSON.stringify(payload),
   });
 }
 
-export function updateSession(blockId: string, durationSeconds: number, start: string, end: string) {
-  return request<{ ok: true; session: { durationSeconds: number; start: string; end: string } }>(
-    '/api/session',
-    {
-      method: 'PATCH',
-      body: JSON.stringify({ block_id: blockId, duration_seconds: durationSeconds, start, end }),
-    }
-  );
+export function postManualSession(taskId: string, durationSeconds: number, start: string, end: string) {
+  return request<{ ok: true; session: Session }>('/api/session', {
+    method: 'POST',
+    body: JSON.stringify({ task_id: taskId, duration_seconds: durationSeconds, start, end }),
+  });
 }
 
-export function updateTaskChecked(blockId: string, checked: boolean) {
-  return request<{ ok: true; checked: boolean }>('/api/task', {
+export function updateSession(id: string, durationSeconds: number, start: string, end: string) {
+  return request<{ ok: true; session: Session }>('/api/session', {
     method: 'PATCH',
-    body: JSON.stringify({ block_id: blockId, checked }),
+    body: JSON.stringify({ id, duration_seconds: durationSeconds, start, end }),
   });
 }
 
-export function updateTaskText(blockId: string, text: string) {
-  return request<{ ok: true; text: string }>('/api/task', {
-    method: 'PATCH',
-    body: JSON.stringify({ block_id: blockId, text }),
-  });
+export function deleteSession(id: string) {
+  return request<{ ok: true }>('/api/session', { method: 'DELETE', body: JSON.stringify({ id }) });
 }
 
-export function createTask(containerId: string, afterBlockId: string, text: string) {
-  return request<{ ok: true; task: { blockId: string; text: string; checked: boolean } }>('/api/task', {
+// --- Recurrentes ---
+
+export function getRecurringRules() {
+  return request<{ rules: RecurringRule[] }>('/api/recurring');
+}
+
+export function createRecurringRule(name: string, weekdays?: string) {
+  return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ container_id: containerId, after_block_id: afterBlockId, text }),
+    body: JSON.stringify({ action: 'create', name, weekdays }),
   });
 }
 
-export function deleteTask(blockId: string) {
-  return request<{ ok: true }>('/api/task', {
-    method: 'DELETE',
-    body: JSON.stringify({ block_id: blockId }),
-  });
-}
-
-export function reorderTask(blockId: string, containerId: string, afterBlockId: string) {
-  return request<{ ok: true; newBlockId: string; warning?: string }>('/api/task-reorder', {
+export function updateRecurringRule(
+  id: string,
+  fields: { name?: string; weekdays?: string; active?: boolean }
+) {
+  return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ block_id: blockId, container_id: containerId, after_block_id: afterBlockId }),
+    body: JSON.stringify({ action: 'update', id, ...fields }),
   });
 }
 
-export type RecurringTask = { blockId: string; text: string; checked: boolean };
-
-export function getRecurringTasks(fileId?: string) {
-  const query = fileId ? `?file=${encodeURIComponent(fileId)}` : '';
-  return request<{ tasks: RecurringTask[]; containerId: string; headingBlockId: string | null }>(
-    `/api/recurring${query}`
-  );
-}
-
-export function ensureRecurringSection(fileId?: string) {
-  return request<{ ok: true; containerId: string; headingBlockId: string }>('/api/recurring', {
+export function deleteRecurringRule(id: string) {
+  return request<{ ok: true }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ action: 'ensure', file: fileId }),
+    body: JSON.stringify({ action: 'delete', id }),
   });
 }
 
 export function applyRecurring(week: string, fileId?: string) {
   return request<{ ok: true; added: number }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ week, file: fileId }),
+    body: JSON.stringify({ action: 'apply', week, file: fileId }),
   });
 }
 
-export function getNextWeekSuggestion(fileId?: string) {
-  const query = fileId ? `?file=${encodeURIComponent(fileId)}` : '';
-  return request<{ start: string; end: string; label: string }>(`/api/week${query}`);
-}
-
-export function createWeek(start: string, end: string, fileId?: string) {
-  return request<{ ok: true; week: { label: string; start: string; end: string } }>('/api/week', {
-    method: 'POST',
-    body: JSON.stringify({ start, end, file: fileId }),
-  });
-}
+// --- Reporte ---
 
 export type ReportRow = {
   date: string;

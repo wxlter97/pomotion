@@ -1,25 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { getTasks } from '../api';
-import type { DayContainer } from '../types';
+import type { DayColumn } from '../types';
 
 export type MoveTarget = {
-  containerId: string;
-  afterBlockId: string;
-  /** Etiqueta legible del destino, para el aviso de confirmación / errores. */
+  /** Fecha del día destino, 'YYYY-MM-DD'. */
+  date: string;
+  /** Etiqueta legible del destino, para el aviso / errores. */
   destLabel: string;
 };
 
-/** Días de una semana a los que se puede mover una tarea: todos menos el
- *  día en que está ahora (si se pasa `excludeDay`). Puro, testeable. */
-export function movableTargets(dayContainers: DayContainer[], excludeDay: string | null): DayContainer[] {
-  return dayContainers.filter((d) => d.day !== excludeDay);
+/** Días a los que se puede mover una tarea: todos menos el día actual. Puro. */
+export function movableTargets(days: DayColumn[], excludeDay: string | null): DayColumn[] {
+  return days.filter((d) => d.day !== excludeDay);
 }
 
-type OtherWeek = { label: string; days: DayContainer[] };
+type OtherWeek = { label: string; days: DayColumn[] };
 
 export default function MoveTaskMenu({
   currentDay,
-  dayContainers,
+  days,
   previousWeekLabel,
   nextWeekLabel,
   fileId,
@@ -27,7 +26,7 @@ export default function MoveTaskMenu({
   onMove,
 }: {
   currentDay: string | null;
-  dayContainers: DayContainer[];
+  days: DayColumn[];
   previousWeekLabel: string | null;
   nextWeekLabel: string | null;
   fileId: string | null;
@@ -68,7 +67,7 @@ export default function MoveTaskMenu({
     setWeekError(null);
     try {
       const res = await getTasks(undefined, label, fileId ?? undefined);
-      setOtherWeek({ label, days: res.dayContainers });
+      setOtherWeek({ label, days: res.days });
     } catch (err) {
       setWeekError(err instanceof Error ? err.message : 'No se pudo cargar esa semana');
     } finally {
@@ -76,16 +75,12 @@ export default function MoveTaskMenu({
     }
   }
 
-  function pick(day: DayContainer, weekLabel?: string) {
-    onMove({
-      containerId: day.containerId,
-      afterBlockId: day.headingBlockId,
-      destLabel: weekLabel ? `${day.day} · ${weekLabel}` : day.day,
-    });
+  function pick(d: DayColumn, weekLabel?: string) {
+    onMove({ date: d.date, destLabel: weekLabel ? `${d.day} · ${weekLabel}` : d.day });
     close();
   }
 
-  const sameWeekTargets = movableTargets(dayContainers, currentDay);
+  const sameWeekTargets = movableTargets(days, currentDay);
 
   return (
     <div className="move-menu-wrap" ref={wrapRef}>
@@ -106,35 +101,32 @@ export default function MoveTaskMenu({
         <div className="move-menu" role="menu">
           {otherWeek ? (
             <>
-              <button type="button" className="move-menu-item move-menu-back" onClick={() => setOtherWeek(null)}>
+              <button
+                type="button"
+                className="move-menu-item move-menu-back"
+                onClick={() => setOtherWeek(null)}
+              >
                 ‹ Esta semana
               </button>
               <div className="move-menu-heading">{otherWeek.label}</div>
-              {otherWeek.days.length === 0 ? (
-                <div className="move-menu-empty">Esa semana no tiene días</div>
-              ) : (
-                otherWeek.days.map((d) => (
-                  <button
-                    key={d.headingBlockId}
-                    type="button"
-                    className="move-menu-item"
-                    role="menuitem"
-                    onClick={() => pick(d, otherWeek.label)}
-                  >
-                    {d.day}
-                  </button>
-                ))
-              )}
+              {otherWeek.days.map((d) => (
+                <button
+                  key={d.date}
+                  type="button"
+                  className="move-menu-item"
+                  role="menuitem"
+                  onClick={() => pick(d, otherWeek.label)}
+                >
+                  {d.day}
+                </button>
+              ))}
             </>
           ) : (
             <>
               <div className="move-menu-heading">Mover a…</div>
-              {sameWeekTargets.length === 0 && !previousWeekLabel && !nextWeekLabel && (
-                <div className="move-menu-empty">No hay otro día disponible</div>
-              )}
               {sameWeekTargets.map((d) => (
                 <button
-                  key={d.headingBlockId}
+                  key={d.date}
                   type="button"
                   className="move-menu-item"
                   role="menuitem"

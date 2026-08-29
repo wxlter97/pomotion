@@ -10,25 +10,19 @@ export default function DaySelector({
   selectedDay,
   onSelectDay,
   isCurrentWeek,
-  hasPreviousWeek,
-  hasNextWeek,
   onPreviousWeek,
   onNextWeek,
   onGoToCurrentWeek,
-  onAddWeek,
   loading,
 }: {
-  week: string | null;
+  week: string;
   days: string[];
-  selectedDay: string | null;
+  selectedDay: string;
   onSelectDay: (day: string) => void;
   isCurrentWeek: boolean;
-  hasPreviousWeek: boolean;
-  hasNextWeek: boolean;
   onPreviousWeek: () => void;
   onNextWeek: () => void;
   onGoToCurrentWeek: () => void;
-  onAddWeek: () => void;
   loading?: boolean;
 }) {
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -47,21 +41,21 @@ export default function DaySelector({
           type="button"
           className="btn btn-icon"
           onClick={onPreviousWeek}
-          disabled={!hasPreviousWeek || loading}
+          disabled={loading}
           aria-label="Semana anterior"
           title="Semana anterior ([)"
         >
           ‹
         </button>
         <span className="week-label">
-          {week ?? 'Sin semanas todavía'}
+          {week}
           {loading && <Spinner />}
         </span>
         <button
           type="button"
           className="btn btn-icon"
           onClick={onNextWeek}
-          disabled={!hasNextWeek || loading}
+          disabled={loading}
           aria-label="Semana siguiente"
           title="Semana siguiente (])"
         >
@@ -77,16 +71,6 @@ export default function DaySelector({
             Hoy
           </button>
         )}
-        <button
-          type="button"
-          className="btn btn-icon week-add-btn"
-          onClick={onAddWeek}
-          disabled={loading}
-          aria-label="Agregar semana"
-          title="Agregar la semana siguiente"
-        >
-          +
-        </button>
       </div>
       <div className="day-tabs" ref={tabsRef}>
         {days.map((day) => (

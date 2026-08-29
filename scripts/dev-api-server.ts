@@ -23,7 +23,6 @@ import sessionHandler from '../api/session';
 import taskHandler from '../api/task';
 import taskReorderHandler from '../api/task-reorder';
 import tasksHandler from '../api/tasks';
-import weekHandler from '../api/week';
 
 type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
 
@@ -36,7 +35,6 @@ const routes: Record<string, Handler> = {
   '/api/session': sessionHandler as Handler,
   '/api/task-reorder': taskReorderHandler as Handler,
   '/api/task': taskHandler as Handler,
-  '/api/week': weekHandler as Handler,
   '/api/files': filesHandler as Handler,
   '/api/report': reportHandler as Handler,
   '/api/recurring': recurringHandler as Handler,
