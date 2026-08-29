@@ -20,6 +20,7 @@ import Login from './components/Login';
 import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
+import MonthView from './components/MonthView';
 import type { MoveTarget } from './components/MoveTaskMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
@@ -68,6 +69,15 @@ function SoundOffIcon() {
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 9v6h4l5 4V5L8 9H4Z" />
       <path d="M16 9l5 6M21 9l-5 6" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="2" />
+      <path d="M3 9.5h18M8 2.5v4M16 2.5v4" />
     </svg>
   );
 }
@@ -140,6 +150,7 @@ export default function App() {
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
   const [showReport, setShowReport] = useState(false);
+  const [showMonth, setShowMonth] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
@@ -269,6 +280,17 @@ export default function App() {
     (weekLabel: string | undefined) => {
       guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () =>
         void refresh(undefined, weekLabel)
+      );
+    },
+    [refresh, guardIfRunning]
+  );
+
+  // Desde la vista mensual: saltar a un día concreto (semana + día ya resueltos).
+  const guardedGoToDate = useCallback(
+    (week: string, day: string) => {
+      setShowMonth(false);
+      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () =>
+        void refresh(day, week)
       );
     },
     [refresh, guardIfRunning]
@@ -614,6 +636,15 @@ export default function App() {
           <button
             type="button"
             className="btn btn-icon"
+            onClick={() => setShowMonth(true)}
+            title="Vista mensual"
+            aria-label="Vista mensual"
+          >
+            <CalendarIcon />
+          </button>
+          <button
+            type="button"
+            className="btn btn-icon"
             onClick={() => setShowReport(true)}
             title="Reporte de tiempo"
             aria-label="Reporte de tiempo"
@@ -746,6 +777,15 @@ export default function App() {
       <Footer />
 
       {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
+
+      {showMonth && (
+        <MonthView
+          fileId={selectedFileId}
+          initialMonth={data?.selectedDate?.slice(0, 7)}
+          onPick={guardedGoToDate}
+          onClose={() => setShowMonth(false)}
+        />
+      )}
 
       {showRecurring && data && (
         <RecurringTasksDialog

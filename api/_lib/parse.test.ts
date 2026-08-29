@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   addDaysToDate,
+  addMonths,
   formatWeekLabel,
+  isValidMonth,
+  monthRange,
   normalize,
   parseWeekRange,
   todayDateStringInTz,
@@ -48,6 +51,37 @@ describe('addDaysToDate', () => {
     expect(addDaysToDate('2026-03-01', -1)).toBe('2026-02-28');
     expect(addDaysToDate('2024-03-01', -1)).toBe('2024-02-29');
     expect(addDaysToDate('2026-08-17', 0)).toBe('2026-08-17');
+  });
+});
+
+describe('isValidMonth', () => {
+  it('acepta "YYYY-MM" con mes 01–12 y rechaza el resto', () => {
+    expect(isValidMonth('2026-08')).toBe(true);
+    expect(isValidMonth('2026-01')).toBe(true);
+    expect(isValidMonth('2026-12')).toBe(true);
+    expect(isValidMonth('2026-00')).toBe(false);
+    expect(isValidMonth('2026-13')).toBe(false);
+    expect(isValidMonth('2026-8')).toBe(false);
+    expect(isValidMonth('2026-08-01')).toBe(false);
+  });
+});
+
+describe('addMonths', () => {
+  it('suma y resta meses cruzando el año', () => {
+    expect(addMonths('2026-08', 1)).toBe('2026-09');
+    expect(addMonths('2026-12', 1)).toBe('2027-01');
+    expect(addMonths('2026-01', -1)).toBe('2025-12');
+    expect(addMonths('2026-08', -8)).toBe('2025-12');
+    expect(addMonths('2026-08', 0)).toBe('2026-08');
+  });
+});
+
+describe('monthRange', () => {
+  it('da el primer y último día del mes, con años bisiestos', () => {
+    expect(monthRange('2026-08')).toEqual({ first: '2026-08-01', last: '2026-08-31' });
+    expect(monthRange('2026-02')).toEqual({ first: '2026-02-01', last: '2026-02-28' });
+    expect(monthRange('2024-02')).toEqual({ first: '2024-02-01', last: '2024-02-29' });
+    expect(monthRange('2026-12')).toEqual({ first: '2026-12-01', last: '2026-12-31' });
   });
 });
 

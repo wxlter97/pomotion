@@ -149,6 +149,48 @@ describe('carry-over', () => {
   });
 });
 
+describe('getMonthSummary (vista mensual)', () => {
+  it('resume tareas y horas por día del mes, solo días con actividad', async () => {
+    const summary = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-03', text: 'A' });
+      const b = await sqliteStore.createTask({ date: '2026-08-03', text: 'B' });
+      await sqliteStore.updateTask({ taskId: b.id, done: true });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 1800, start: '09:00', end: '09:30' });
+      // día con sesión pero sin tarea creada ese día es imposible; día solo-tareas:
+      await sqliteStore.createTask({ date: '2026-08-20', text: 'C' });
+      // otro mes: no debe aparecer
+      await sqliteStore.createTask({ date: '2026-09-01', text: 'D' });
+      return sqliteStore.getMonthSummary({ month: '2026-08' });
+    });
+
+    expect(summary.month).toBe('2026-08');
+    expect(summary.previousMonth).toBe('2026-07');
+    expect(summary.nextMonth).toBe('2026-09');
+    expect(summary.days).toEqual([
+      { date: '2026-08-03', taskCount: 2, doneCount: 1, totalSeconds: 1800 },
+      { date: '2026-08-20', taskCount: 1, doneCount: 0, totalSeconds: 0 },
+    ]);
+  });
+
+  it('marca isCurrentMonth / today según la zona horaria', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    const cur = await as(USER, () => sqliteStore.getMonthSummary({ month: '2026-08' }));
+    expect(cur.isCurrentMonth).toBe(true);
+    expect(cur.today).toBe('2026-08-26');
+    const past = await as(USER, () => sqliteStore.getMonthSummary({ month: '2026-05' }));
+    expect(past.isCurrentMonth).toBe(false);
+    expect(past.today).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('scopea por usuario', async () => {
+    await as(USER, () => sqliteStore.createTask({ date: '2026-08-10', text: 'mía' }));
+    const other = await as(OTHER, () => sqliteStore.getMonthSummary({ month: '2026-08' }));
+    expect(other.days).toEqual([]);
+  });
+});
+
 describe('sesiones + totales', () => {
   it('logSession suma al total del día y de la semana', async () => {
     const view = await as(USER, async () => {

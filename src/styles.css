@@ -1261,6 +1261,118 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- Month view --- */
+.sheet--month {
+  max-width: 460px;
+}
+
+.month-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.month-header h2 {
+  margin: 0;
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.month-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.month-weekdays,
+.month-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.month-weekdays span {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-label-secondary);
+  padding-bottom: 0.2rem;
+}
+
+.month-cell {
+  min-height: 3.4rem;
+  border-radius: 9px;
+  border: 1px solid var(--color-separator);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 4px 5px;
+  font-family: inherit;
+  overflow: hidden;
+}
+
+.month-cell--pad {
+  border-color: transparent;
+}
+
+.month-cell--day {
+  background: var(--color-bg-elevated);
+  color: var(--color-label);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.month-cell--day:hover {
+  background: var(--color-fill);
+}
+
+.month-cell--weekend {
+  background: transparent;
+  opacity: 0.5;
+}
+
+.month-cell-num {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.month-cell-num.is-today {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  border-radius: 999px;
+  min-width: 1.25rem;
+  text-align: center;
+  padding: 0.05rem 0.2rem;
+}
+
+.month-cell-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px 5px;
+  font-size: 0.64rem;
+  line-height: 1.2;
+  color: var(--color-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.month-cell-meta .all-done {
+  color: color-mix(in srgb, var(--color-success) 72%, var(--color-label));
+}
+
+.month-cell-hrs {
+  color: var(--color-accent);
+}
+
+@media (max-width: 480px) {
+  .month-cell-meta {
+    font-size: 0.58rem;
+  }
+}
+
 /* --- Shortcuts footer --- */
 .shortcuts-hint {
   text-align: center;
