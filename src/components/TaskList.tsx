@@ -7,16 +7,64 @@ import {
   updateSession,
   updateTaskText,
 } from '../api';
+import {
+  TIME_RE,
+  addMinutesToTime,
+  formatDurationLabel,
+  isValidTimeLabel,
+  nowAsHHMM,
+  parseDurationToSeconds,
+} from '../duration';
 import type { Session, Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 
-const TIME_RE = /^\d{1,2}:\d{2}$/;
-
-function sumMinutes(task: Task): number {
-  return task.sessions.reduce((total, s) => total + s.durationMinutes, 0);
+function sumSeconds(task: Task): number {
+  return task.sessions.reduce((total, s) => total + s.durationSeconds, 0);
 }
 
 type SessionDraft = { duration: string; start: string; end: string };
+
+function timeLabelToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Rango en minutos-del-día como [inicio, fin); si fin <= inicio se asume
+// que la sesión cruza la medianoche (termina al día siguiente).
+function timeRangeMinutes(start: string, end: string): [number, number] {
+  const s = timeLabelToMinutes(start);
+  let e = timeLabelToMinutes(end);
+  if (e <= s) e += 1440;
+  return [s, e];
+}
+
+function rangesOverlap(a: [number, number], b: [number, number]): boolean {
+  return a[0] < b[1] && b[0] < a[1];
+}
+
+// Aviso (no bloqueante) de solapamiento: compara contra cualquier otra
+// sesión ya registrada ese día, en cualquier tarea — no se puede estar
+// trabajando en dos cosas a la vez. `excludeSessionBlockId` deja afuera la
+// sesión que se está editando, para que no se solape "consigo misma".
+function findOverlap(
+  allTasks: Task[],
+  excludeSessionBlockId: string | null,
+  start: string,
+  end: string
+): { task: Task; session: Session } | null {
+  if (!isValidTimeLabel(start) || !isValidTimeLabel(end)) return null;
+  const candidate = timeRangeMinutes(start, end);
+  for (const t of allTasks) {
+    for (const s of t.sessions) {
+      if (!s.blockId || s.blockId === excludeSessionBlockId) continue;
+      if (!isValidTimeLabel(s.start) || !isValidTimeLabel(s.end)) continue;
+      if (rangesOverlap(candidate, timeRangeMinutes(s.start, s.end))) {
+        return { task: t, session: s };
+      }
+    }
+  }
+  return null;
+}
 
 export default function TaskList({
   tasks,
@@ -208,15 +256,15 @@ export default function TaskList({
   function startEditSession(s: Session) {
     if (!s.blockId) return;
     setEditingSessionId(s.blockId);
-    setSessionDraft({ duration: String(s.durationMinutes), start: s.start, end: s.end });
+    setSessionDraft({ duration: formatDurationLabel(s.durationSeconds), start: s.start, end: s.end });
   }
 
   function validateDraft(draft: SessionDraft): { duration: number; start: string; end: string } | null {
-    const duration = Number(draft.duration);
+    const duration = parseDurationToSeconds(draft.duration);
     const start = draft.start.trim();
     const end = draft.end.trim();
-    if (!Number.isFinite(duration) || duration <= 0) {
-      setError('La duración debe ser un número mayor a 0');
+    if (duration === null || duration <= 0) {
+      setError('La duración debe ser un número mayor a 0 o un formato tipo "1h 30m 45s"');
       return null;
     }
     if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
@@ -224,6 +272,36 @@ export default function TaskList({
       return null;
     }
     return { duration, start, end };
+  }
+
+  // Calcula la hora de fin a partir de inicio + duración; devuelve null si
+  // todavía no hay suficiente información válida para calcularla (para que
+  // el llamador deje el campo `end` tal cual estaba, sin pisarlo). El fin
+  // sigue siendo una etiqueta "HH:MM" (sin segundos), así que la duración
+  // se redondea al minuto más cercano solo para este cálculo — la
+  // duración que se guarda mantiene su precisión real de segundos.
+  function deriveEnd(start: string, durationInput: string): string | null {
+    const seconds = parseDurationToSeconds(durationInput);
+    if (seconds === null || seconds <= 0) return null;
+    const trimmedStart = start.trim();
+    if (!TIME_RE.test(trimmedStart)) return null;
+    return addMinutesToTime(trimmedStart, Math.round(seconds / 60));
+  }
+
+  function handleSessionDurationChange(value: string) {
+    setSessionDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
+  }
+
+  function handleSessionStartChange(value: string) {
+    setSessionDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
+  }
+
+  function handleManualDurationChange(value: string) {
+    setManualDraft((d) => ({ ...d, duration: value, end: deriveEnd(d.start, value) ?? d.end }));
+  }
+
+  function handleManualStartChange(value: string) {
+    setManualDraft((d) => ({ ...d, start: value, end: deriveEnd(value, d.duration) ?? d.end }));
   }
 
   async function submitSessionEdit(taskBlockId: string, sessionBlockId: string) {
@@ -242,9 +320,22 @@ export default function TaskList({
     }
   }
 
+  // Encadena con la sesión más reciente de la tarea (la de mayor hora de
+  // fin) si existe alguna válida; si no hay ninguna, usa la hora actual.
+  function defaultManualStart(task: Task): string {
+    let latestEnd: string | null = null;
+    for (const s of task.sessions) {
+      if (!isValidTimeLabel(s.end)) continue;
+      if (latestEnd === null || timeLabelToMinutes(s.end) > timeLabelToMinutes(latestEnd)) {
+        latestEnd = s.end;
+      }
+    }
+    return latestEnd ?? nowAsHHMM();
+  }
+
   function openManualEntry(task: Task) {
     setManualEntryTaskId(task.blockId);
-    setManualDraft({ duration: '', start: '', end: '' });
+    setManualDraft({ duration: '', start: defaultManualStart(task), end: '' });
   }
 
   async function submitManualEntry(task: Task) {
@@ -270,7 +361,11 @@ export default function TaskList({
       ) : (
         <ul className="task-list">
           {tasks.map((task, i) => {
-            const total = sumMinutes(task);
+            const total = sumSeconds(task);
+            const manualOverlap =
+              manualEntryTaskId === task.blockId
+                ? findOverlap(tasks, null, manualDraft.start, manualDraft.end)
+                : null;
             const isToggling = togglingIds.has(task.blockId);
             const isLocked = lockedTaskBlockId === task.blockId;
             const isBusy = busyTaskIds.has(task.blockId);
@@ -341,7 +436,7 @@ export default function TaskList({
                     </button>
                   )}
 
-                  {total > 0 && <span className="task-total">{total}m</span>}
+                  {total > 0 && <span className="task-total">{formatDurationLabel(total)}</span>}
                   {!isEditingText && (
                     <div className="task-actions">
                       <button
@@ -393,63 +488,75 @@ export default function TaskList({
                     <ul className="session-list">
                       {task.sessions.map((s, si) => {
                         const isEditingSession = s.blockId && editingSessionId === s.blockId;
+                        const editOverlap = isEditingSession
+                          ? findOverlap(tasks, s.blockId ?? null, sessionDraft.start, sessionDraft.end)
+                          : null;
                         return (
                           <li key={s.blockId ?? si}>
                             {isEditingSession ? (
-                              <div className="session-edit-form">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  className="session-edit-duration"
-                                  value={sessionDraft.duration}
-                                  onChange={(e) => setSessionDraft((d) => ({ ...d, duration: e.target.value }))}
-                                  disabled={savingSession}
-                                  autoFocus
-                                />
-                                <span>m (</span>
-                                <input
-                                  type="text"
-                                  placeholder="HH:MM"
-                                  className="session-edit-time"
-                                  value={sessionDraft.start}
-                                  onChange={(e) => setSessionDraft((d) => ({ ...d, start: e.target.value }))}
-                                  disabled={savingSession}
-                                />
-                                <span>–</span>
-                                <input
-                                  type="text"
-                                  placeholder="HH:MM"
-                                  className="session-edit-time"
-                                  value={sessionDraft.end}
-                                  onChange={(e) => setSessionDraft((d) => ({ ...d, end: e.target.value }))}
-                                  disabled={savingSession}
-                                />
-                                <span>)</span>
-                                <button
-                                  type="button"
-                                  className="session-delete"
-                                  onClick={() => s.blockId && void submitSessionEdit(task.blockId, s.blockId)}
-                                  disabled={savingSession}
-                                  aria-label="Guardar sesión"
-                                  title="Guardar"
-                                >
-                                  ✓
-                                </button>
-                                <button
-                                  type="button"
-                                  className="session-delete"
-                                  onClick={() => setEditingSessionId(null)}
-                                  disabled={savingSession}
-                                  aria-label="Cancelar edición"
-                                  title="Cancelar"
-                                >
-                                  ×
-                                </button>
-                              </div>
+                              <>
+                                <div className="session-edit-form">
+                                  <input
+                                    type="text"
+                                    placeholder="90 o 1h 30m"
+                                    className="session-edit-duration"
+                                    value={sessionDraft.duration}
+                                    onChange={(e) => handleSessionDurationChange(e.target.value)}
+                                    disabled={savingSession}
+                                    autoFocus
+                                  />
+                                  <span>(</span>
+                                  <input
+                                    type="text"
+                                    placeholder="HH:MM"
+                                    className="session-edit-time"
+                                    value={sessionDraft.start}
+                                    onChange={(e) => handleSessionStartChange(e.target.value)}
+                                    disabled={savingSession}
+                                  />
+                                  <span>–</span>
+                                  <input
+                                    type="text"
+                                    placeholder="HH:MM"
+                                    className="session-edit-time"
+                                    value={sessionDraft.end}
+                                    onChange={(e) => setSessionDraft((d) => ({ ...d, end: e.target.value }))}
+                                    disabled={savingSession}
+                                    title="Se calcula a partir de inicio + duración, pero puedes editarla"
+                                  />
+                                  <span>)</span>
+                                  <button
+                                    type="button"
+                                    className="session-delete"
+                                    onClick={() => s.blockId && void submitSessionEdit(task.blockId, s.blockId)}
+                                    disabled={savingSession}
+                                    aria-label="Guardar sesión"
+                                    title="Guardar"
+                                  >
+                                    ✓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="session-delete"
+                                    onClick={() => setEditingSessionId(null)}
+                                    disabled={savingSession}
+                                    aria-label="Cancelar edición"
+                                    title="Cancelar"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                                {editOverlap && (
+                                  <p className="warning">
+                                    ⚠ Se solapa con "{editOverlap.task.text || '(sin texto)'}" (
+                                    {editOverlap.session.start}–{editOverlap.session.end})
+                                  </p>
+                                )}
+                              </>
                             ) : (
                               <>
                                 <span>
-                                  ⏱ {s.durationMinutes}m ({s.start}–{s.end})
+                                  ⏱ {formatDurationLabel(s.durationSeconds)} ({s.start}–{s.end})
                                 </span>
                                 {s.blockId && (
                                   <span className="session-row-actions">
@@ -484,51 +591,59 @@ export default function TaskList({
                   )}
 
                   {manualEntryTaskId === task.blockId ? (
-                    <div className="manual-session-form">
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="min"
-                        className="session-edit-duration"
-                        value={manualDraft.duration}
-                        onChange={(e) => setManualDraft((d) => ({ ...d, duration: e.target.value }))}
-                        disabled={addingManualSession}
-                        autoFocus
-                      />
-                      <input
-                        type="text"
-                        placeholder="HH:MM"
-                        className="session-edit-time"
-                        value={manualDraft.start}
-                        onChange={(e) => setManualDraft((d) => ({ ...d, start: e.target.value }))}
-                        disabled={addingManualSession}
-                      />
-                      <span>–</span>
-                      <input
-                        type="text"
-                        placeholder="HH:MM"
-                        className="session-edit-time"
-                        value={manualDraft.end}
-                        onChange={(e) => setManualDraft((d) => ({ ...d, end: e.target.value }))}
-                        disabled={addingManualSession}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-tinted btn-small"
-                        onClick={() => void submitManualEntry(task)}
-                        disabled={addingManualSession}
-                      >
-                        {addingManualSession ? 'Guardando…' : 'Guardar'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-plain btn-small"
-                        onClick={() => setManualEntryTaskId(null)}
-                        disabled={addingManualSession}
-                      >
-                        Cancelar
-                      </button>
-                    </div>
+                    <>
+                      <div className="manual-session-form">
+                        <input
+                          type="text"
+                          placeholder="90 o 1h 30m"
+                          className="session-edit-duration"
+                          value={manualDraft.duration}
+                          onChange={(e) => handleManualDurationChange(e.target.value)}
+                          disabled={addingManualSession}
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          placeholder="HH:MM"
+                          className="session-edit-time"
+                          value={manualDraft.start}
+                          onChange={(e) => handleManualStartChange(e.target.value)}
+                          disabled={addingManualSession}
+                        />
+                        <span>–</span>
+                        <input
+                          type="text"
+                          placeholder="HH:MM"
+                          className="session-edit-time"
+                          value={manualDraft.end}
+                          onChange={(e) => setManualDraft((d) => ({ ...d, end: e.target.value }))}
+                          disabled={addingManualSession}
+                          title="Se calcula a partir de inicio + duración, pero puedes editarla"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-tinted btn-small"
+                          onClick={() => void submitManualEntry(task)}
+                          disabled={addingManualSession}
+                        >
+                          {addingManualSession ? 'Guardando…' : 'Guardar'}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-plain btn-small"
+                          onClick={() => setManualEntryTaskId(null)}
+                          disabled={addingManualSession}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {manualOverlap && (
+                        <p className="warning">
+                          ⚠ Se solapa con "{manualOverlap.task.text || '(sin texto)'}" (
+                          {manualOverlap.session.start}–{manualOverlap.session.end})
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <button type="button" className="manual-session-trigger" onClick={() => openManualEntry(task)}>
                       + Agregar sesión manual
@@ -574,9 +689,9 @@ export default function TaskList({
           title="Eliminar tarea"
           message={
             pendingTaskDelete.sessions.length > 0
-              ? `Esta tarea tiene ${pendingTaskDelete.sessions.length} sesión(es) registradas (${sumMinutes(
-                  pendingTaskDelete
-                )}m). Borrarla también borra ese historial. No se puede deshacer.`
+              ? `Esta tarea tiene ${pendingTaskDelete.sessions.length} sesión(es) registradas (${formatDurationLabel(
+                  sumSeconds(pendingTaskDelete)
+                )}). Borrarla también borra ese historial. No se puede deshacer.`
               : 'Esto borra la tarea en Notion. No se puede deshacer.'
           }
           confirmLabel={deletingTask ? 'Eliminando…' : 'Eliminar'}

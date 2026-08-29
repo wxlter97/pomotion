@@ -100,6 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         dayContainerId: null,
         dayHeadingBlockId: null,
         tasks: [],
+        weekTotalSeconds: 0,
       });
     }
 
@@ -202,6 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         dayContainerId: null,
         dayHeadingBlockId: null,
         tasks: [],
+        weekTotalSeconds: 0,
       });
     }
 
@@ -224,16 +226,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (!selectedDay) selectedDay = dayOrder[0];
 
-    const todoBlocks = dayBlocks.get(selectedDay) ?? [];
-
-    // 3. Para cada to_do del día seleccionado, traer sus hijos (sesiones ya registradas).
-    const tasks = await Promise.all(
-      todoBlocks.map(async (block) => {
+    // 3. Para cada to_do de la semana (todos los días, no solo el
+    //    seleccionado), traer sus hijos (sesiones ya registradas). Se hace
+    //    para toda la semana de una — no solo el día elegido — para poder
+    //    calcular el total semanal sin pedirle a Notion los mismos bloques
+    //    otra vez día por día.
+    const allTodoEntries = dayOrder.flatMap((day) => (dayBlocks.get(day) ?? []).map((block) => ({ day, block })));
+    const allResults = await Promise.all(
+      allTodoEntries.map(async ({ day, block }) => {
         const content = block.to_do as { rich_text?: { plain_text?: string }[]; checked?: boolean };
         const text = plainText(content?.rich_text);
         const checked = Boolean(content?.checked);
 
-        let sessions: { blockId: string; durationMinutes: number; start: string; end: string }[] = [];
+        let sessions: { blockId: string; durationSeconds: number; start: string; end: string }[] = [];
         if (block.has_children) {
           const children = await listBlockChildren(block.id);
           sessions = children
@@ -244,8 +249,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .filter((s): s is NonNullable<typeof s> => s !== null);
         }
 
-        return { blockId: block.id, text, checked, day: selectedDay as string, sessions };
+        return { day, blockId: block.id, text, checked, sessions };
       })
+    );
+
+    const tasks = allResults
+      .filter((r) => r.day === selectedDay)
+      .map(({ blockId, text, checked, sessions }) => ({ blockId, text, checked, day: selectedDay as string, sessions }));
+
+    const weekTotalSeconds = allResults.reduce(
+      (sum, r) => sum + r.sessions.reduce((s, ses) => s + ses.durationSeconds, 0),
+      0
     );
 
     return res.status(200).json({
@@ -260,6 +274,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dayContainerId: dayContainerId.get(selectedDay) ?? null,
       dayHeadingBlockId: dayHeadingBlockId.get(selectedDay) ?? null,
       tasks,
+      weekTotalSeconds,
     });
   } catch (err) {
     console.error(err);

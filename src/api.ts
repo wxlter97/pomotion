@@ -49,13 +49,13 @@ export function getTasks(day?: string, week?: string, fileId?: string) {
 
 export function postSession(payload: {
   block_id: string;
-  duration_minutes: number;
+  duration_seconds: number;
   start_time: string;
   end_time: string;
 }) {
   return request<{
     ok: true;
-    session: { blockId?: string; durationMinutes: number; start: string; end: string };
+    session: { blockId?: string; durationSeconds: number; start: string; end: string };
   }>('/api/session', { method: 'POST', body: JSON.stringify(payload) });
 }
 
@@ -66,22 +66,22 @@ export function deleteSession(blockId: string) {
   });
 }
 
-export function postManualSession(blockId: string, durationMinutes: number, start: string, end: string) {
+export function postManualSession(blockId: string, durationSeconds: number, start: string, end: string) {
   return request<{
     ok: true;
-    session: { blockId?: string; durationMinutes: number; start: string; end: string };
+    session: { blockId?: string; durationSeconds: number; start: string; end: string };
   }>('/api/session', {
     method: 'POST',
-    body: JSON.stringify({ block_id: blockId, duration_minutes: durationMinutes, start, end }),
+    body: JSON.stringify({ block_id: blockId, duration_seconds: durationSeconds, start, end }),
   });
 }
 
-export function updateSession(blockId: string, durationMinutes: number, start: string, end: string) {
-  return request<{ ok: true; session: { durationMinutes: number; start: string; end: string } }>(
+export function updateSession(blockId: string, durationSeconds: number, start: string, end: string) {
+  return request<{ ok: true; session: { durationSeconds: number; start: string; end: string } }>(
     '/api/session',
     {
       method: 'PATCH',
-      body: JSON.stringify({ block_id: blockId, duration_minutes: durationMinutes, start, end }),
+      body: JSON.stringify({ block_id: blockId, duration_seconds: durationSeconds, start, end }),
     }
   );
 }
