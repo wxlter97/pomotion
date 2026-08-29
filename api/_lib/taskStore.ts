@@ -17,6 +17,9 @@ export type Session = {
   end: string;
 };
 
+/** Prioridad de una tarea; null = sin prioridad. */
+export type TaskPriority = 'low' | 'med' | 'high';
+
 export type Task = {
   id: string;
   name: string;
@@ -24,6 +27,11 @@ export type Task = {
   done: boolean;
   order: number;
   file: string | null;
+  priority: TaskPriority | null;
+  /** Notas libres; null = sin notas. */
+  notes: string | null;
+  /** Vencimiento 'YYYY-MM-DD', distinto de la agenda (`date`). */
+  due: string | null;
   sessions: Session[];
 };
 
@@ -42,6 +50,8 @@ export type WeekView = {
   days: DayColumn[];
   selectedDay: string;
   selectedDate: string;
+  /** 'YYYY-MM-DD' de hoy en APP_TIMEZONE. */
+  today: string;
   /** Tareas del día seleccionado, ordenadas por `order`. */
   tasks: Task[];
   dayTotalSeconds: number;
@@ -129,7 +139,17 @@ export type CreateTaskInput = {
   /** id de la tarea tras la cual insertar; ausente/null = al inicio del día. */
   afterId?: string | null;
 };
-export type UpdateTaskInput = { taskId?: string; done?: boolean; text?: string };
+export type UpdateTaskInput = {
+  taskId?: string;
+  done?: boolean;
+  text?: string;
+  /** 'low' | 'med' | 'high' para setear, null para quitar. */
+  priority?: TaskPriority | null;
+  /** Texto de notas; '' o null para vaciar. */
+  notes?: string | null;
+  /** 'YYYY-MM-DD' para setear, null para quitar. */
+  due?: string | null;
+};
 export type UpdateTaskPositionInput = {
   taskId?: string;
   /** Nuevo día (mover entre días). Si cambia, arrastra la fecha de sus sesiones. */
@@ -164,6 +184,15 @@ export type UpdateRecurringRuleInput = {
 };
 export type ApplyRecurringInput = { week?: string; fileId?: string };
 
+/** Campos efectivamente aplicados por `updateTask` (para el eco al cliente). */
+export type UpdateTaskResult = {
+  done?: boolean;
+  text?: string;
+  priority?: TaskPriority | null;
+  notes?: string | null;
+  due?: string | null;
+};
+
 export interface TaskStore {
   getWeekView(input: GetWeekViewInput): Promise<WeekView>;
   /** Resumen por día de un mes: conteo de tareas y horas registradas. */
@@ -174,7 +203,7 @@ export interface TaskStore {
   listFiles(): Promise<FileEntry[]>;
 
   createTask(input: CreateTaskInput): Promise<Task>;
-  updateTask(input: UpdateTaskInput): Promise<{ done?: boolean; text?: string }>;
+  updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult>;
   deleteTask(taskId?: string): Promise<void>;
   updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id: string }>;
   /** Trae a hoy las tareas pendientes sin sesiones de días pasados. */

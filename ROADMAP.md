@@ -365,7 +365,9 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
 - **Tags/proyectos**: alta de tags, asignar a tareas, filtrar la vista, reporte por tag.
 - **Estimación vs real**: campo `estimate_min` en la UI + comparativa en el reporte.
 - **Backlog/inbox**: sección para tareas con `date` NULL; arrastrar al día.
-- **Prioridad / notas / due date**: campos ya en el schema.
+- ~~**Prioridad / notas / due date**~~ ✅ PR #26 — panel de detalle al editar la tarea
+  (pills de prioridad, fecha de vencimiento, notas). Franja de color por prioridad y chip
+  de "vence" (relativo, rojo si venció) en la fila. `WeekView.today` nuevo.
 
 ### Tier 3 — más grande
 - **Analítica**: tiempo por día de semana / por hora del día, tendencia semanal,

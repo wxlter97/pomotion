@@ -5,6 +5,7 @@ import type {
   RecurringRule,
   Session,
   Task,
+  TaskPriority,
   TasksResponse,
 } from './types';
 
@@ -116,6 +117,17 @@ export function updateTaskText(id: string, text: string) {
     method: 'PATCH',
     body: JSON.stringify({ id, text }),
   });
+}
+
+/** Prioridad / notas / vencimiento. `null` en un campo lo limpia; omitirlo lo deja igual. */
+export function updateTaskFields(
+  id: string,
+  fields: { priority?: TaskPriority | null; notes?: string | null; due?: string | null }
+) {
+  return request<{ ok: true; priority?: TaskPriority | null; notes?: string | null; due?: string | null }>(
+    '/api/task',
+    { method: 'PATCH', body: JSON.stringify({ id, ...fields }) }
+  );
 }
 
 export function deleteTask(id: string) {
