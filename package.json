@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:api": "tsx scripts/dev-api-server.ts",
     "migrate": "tsx scripts/migrate.ts",
+    "migrate:notion": "tsx scripts/migrate-notion-to-turso.ts",
     "approve": "tsx scripts/approve-user.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
