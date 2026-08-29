@@ -23,7 +23,8 @@ export type TaskPriority = 'low' | 'med' | 'high';
 export type Task = {
   id: string;
   name: string;
-  date: string; // 'YYYY-MM-DD'
+  /** 'YYYY-MM-DD'; null = sin fecha (inbox / backlog). */
+  date: string | null;
   done: boolean;
   order: number;
   file: string | null;
@@ -56,6 +57,8 @@ export type WeekView = {
   today: string;
   /** Tareas del día seleccionado, ordenadas por `order`. */
   tasks: Task[];
+  /** Tareas sin fecha (inbox / backlog) del contexto actual, ordenadas por `order`. */
+  inbox: Task[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes (sin sesiones) de días pasados, candidatas a "traer a hoy". */
@@ -138,7 +141,8 @@ export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 
 export type CreateTaskInput = {
-  date?: string;
+  /** 'YYYY-MM-DD'; ausente/null = va al inbox (sin fecha). */
+  date?: string | null;
   text?: string;
   fileId?: string;
   /** id de la tarea tras la cual insertar; ausente/null = al inicio del día. */
@@ -159,8 +163,12 @@ export type UpdateTaskInput = {
 };
 export type UpdateTaskPositionInput = {
   taskId?: string;
-  /** Nuevo día (mover entre días). Si cambia, arrastra la fecha de sus sesiones. */
-  date?: string;
+  /**
+   * Destino: 'YYYY-MM-DD' para un día (arrastra la fecha de sus sesiones),
+   * `null` para mandarla al inbox (sin fecha), `undefined` para no cambiar
+   * el día (solo reordenar).
+   */
+  date?: string | null;
   /** id tras el cual reubicar; ausente/null = al inicio del día destino. */
   afterId?: string | null;
 };

@@ -12,7 +12,8 @@ export type TaskPriority = 'low' | 'med' | 'high';
 export type Task = {
   id: string;
   name: string;
-  date: string; // 'YYYY-MM-DD'
+  /** 'YYYY-MM-DD'; null = sin fecha (inbox / backlog). */
+  date: string | null;
   done: boolean;
   order: number;
   file: string | null;
@@ -49,6 +50,8 @@ export type TasksResponse = {
   /** 'YYYY-MM-DD' de hoy en la zona horaria del server. */
   today: string;
   tasks: Task[];
+  /** Tareas sin fecha (inbox / backlog) del contexto actual. */
+  inbox: Task[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes de días pasados que se pueden "traer a hoy". */

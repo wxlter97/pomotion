@@ -1192,6 +1192,102 @@ h3 {
   opacity: 0.6;
 }
 
+/* --- Inbox / backlog (tareas sin fecha) --- */
+.inbox {
+  margin: 0 1.5rem 1rem;
+}
+
+.inbox-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-label-secondary);
+  cursor: pointer;
+  padding: 0.4rem 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.inbox-chevron {
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.inbox.is-open .inbox-chevron {
+  transform: rotate(90deg);
+}
+
+.inbox-count {
+  background: var(--color-fill-strong);
+  color: var(--color-label);
+  border-radius: 980px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.inbox-body {
+  margin-top: 0.5rem;
+  padding: 0.85rem;
+  background: var(--color-bg-elevated);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.inbox-body .task-add-form {
+  margin: 0 0 0.6rem;
+}
+
+.inbox-empty {
+  margin: 0.2rem 0 0;
+  font-size: 0.85rem;
+}
+
+.inbox-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.inbox-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-fill);
+  border-radius: 12px;
+  padding: 0.5rem 0.7rem;
+  font-size: 0.9rem;
+}
+
+.inbox-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.inbox-edit-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  color: var(--color-label);
+  border-radius: 8px;
+  padding: 0.25rem 0.5rem;
+  outline: none;
+}
+
 .session-list {
   margin: 0;
   padding: 0;

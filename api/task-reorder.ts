@@ -10,10 +10,15 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = (req.body ?? {}) as { id?: string; date?: string; after_id?: string | null };
+    const body = (req.body ?? {}) as {
+      id?: string;
+      /** 'YYYY-MM-DD' para un día, null para el inbox, ausente para no cambiar. */
+      date?: string | null;
+      after_id?: string | null;
+    };
     const result = await sqliteStore.updateTaskPosition({
       taskId: body.id,
-      date: body.date,
+      date: 'date' in body ? body.date : undefined,
       afterId: body.after_id,
     });
     return res.status(200).json({ ok: true, ...result });

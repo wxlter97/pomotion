@@ -29,7 +29,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (req.method === 'POST') {
       const body = (req.body ?? {}) as {
-        date?: string;
+        date?: string | null;
         text?: string;
         file?: string;
         after_id?: string | null;

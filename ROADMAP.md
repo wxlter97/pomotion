@@ -367,7 +367,11 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   (acepta "90" o "1h 30m"). En la fila: `registrado / estimado` (o `est. 2h` sin
   registro), rojo si se pasó. Pill del día gana segmento "Est". Reporte: total
   "Estimado" + columna `estimado_min` en el CSV. `Task.estimateMinutes` nuevo.
-- **Backlog/inbox**: sección para tareas con `date` NULL; arrastrar al día.
+- ~~**Backlog/inbox**~~ ✅ PR #29 — cajón plegable "Sin fecha" arriba de la agenda:
+  anotar pendientes sin fecha, "Programar" a un día desde su menú, y "Sacar de la
+  agenda" (→ inbox) en el menú de una tarea del día (solo si no tiene tiempo
+  registrado). `Task.date` pasa a nullable; `WeekView.inbox` nuevo. Sin arrastre
+  todavía (menú "Programar").
 - ~~**Prioridad / notas / due date**~~ ✅ PR #26 — panel de detalle al editar la tarea
   (pills de prioridad, fecha de vencimiento, notas). Franja de color por prioridad y chip
   de "vence" (relativo, rojo si venció) en la fila. `WeekView.today` nuevo.

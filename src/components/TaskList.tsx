@@ -94,6 +94,7 @@ export default function TaskList({
   onTaskUpdated,
   onReorderTask,
   onMoveTask,
+  onSendToInbox,
   onSessionUpdated,
   onManualSessionAdded,
 }: {
@@ -118,6 +119,7 @@ export default function TaskList({
   onTaskUpdated: (id: string, patch: Partial<Task>) => void;
   onReorderTask: (task: Task, targetIndex: number) => void;
   onMoveTask: (task: Task, target: MoveTarget) => void;
+  onSendToInbox: (task: Task) => void;
   onSessionUpdated: (taskId: string, session: Session) => void;
   onManualSessionAdded: (taskId: string, session: Session) => void;
 }) {
@@ -479,6 +481,9 @@ export default function TaskList({
                         canMoveUp={i > 0}
                         canMoveDown={i < tasks.length - 1}
                         onDelete={() => setPendingTaskDelete(task)}
+                        onSendToInbox={
+                          task.sessions.length === 0 ? () => onSendToInbox(task) : undefined
+                        }
                         disabled={disableEdit}
                         editDisabled={isBusy}
                         isSet={Boolean(task.priority || task.notes || task.due)}

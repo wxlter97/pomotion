@@ -105,6 +105,14 @@ export function createTask(date: string, text: string, fileId?: string, afterId?
   });
 }
 
+/** Crea una tarea sin fecha (inbox / backlog). */
+export function createInboxTask(text: string, fileId?: string) {
+  return request<{ ok: true; task: Task }>('/api/task', {
+    method: 'POST',
+    body: JSON.stringify({ text, file: fileId }),
+  });
+}
+
 export function updateTaskDone(id: string, done: boolean) {
   return request<{ ok: true; done: boolean }>('/api/task', {
     method: 'PATCH',
@@ -140,13 +148,21 @@ export function deleteTask(id: string) {
   return request<{ ok: true }>('/api/task', { method: 'DELETE', body: JSON.stringify({ id }) });
 }
 
-/** Reordena / mueve una tarea. `date` para moverla a otro día; `afterId`
- *  (o null = al inicio) para la posición dentro del día. */
-export function moveTask(id: string, opts: { date?: string; afterId?: string | null }) {
+/** Reordena / mueve una tarea. `date`: 'YYYY-MM-DD' para otro día, `null`
+ *  para el inbox, omitido para no cambiar el día. `afterId` (o null = al
+ *  inicio) para la posición dentro del día. */
+export function moveTask(id: string, opts: { date?: string | null; afterId?: string | null }) {
+  const body: Record<string, unknown> = { id, after_id: opts.afterId };
+  if ('date' in opts) body.date = opts.date;
   return request<{ ok: true; id: string }>('/api/task-reorder', {
     method: 'POST',
-    body: JSON.stringify({ id, date: opts.date, after_id: opts.afterId }),
+    body: JSON.stringify(body),
   });
+}
+
+/** Saca una tarea de la agenda: vuelve al inbox (sin fecha). */
+export function moveTaskToInbox(id: string) {
+  return moveTask(id, { date: null });
 }
 
 // --- Sesiones ---
