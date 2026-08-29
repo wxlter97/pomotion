@@ -83,13 +83,13 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 // las definiciones recurrentes.
 const RECURRING_HEADING = 'Recurrentes';
 
-function isRecurringHeadingLabel(label: string): boolean {
+export function isRecurringHeadingLabel(label: string): boolean {
   return normalize(label) === normalize(RECURRING_HEADING);
 }
 
 // --- Lectura de la vista semanal ---
 
-type WeekGroup = {
+export type WeekGroup = {
   label: string;
   range: { start: string; end: string } | null;
   blocks: NotionBlock[];
@@ -105,7 +105,7 @@ type DayGrouping = {
 };
 
 /** Agrupa los bloques de la página por heading_1 (cada uno = una semana). */
-function groupBlocksByWeek(blocks: NotionBlock[]): WeekGroup[] {
+export function groupBlocksByWeek(blocks: NotionBlock[]): WeekGroup[] {
   const weeks: WeekGroup[] = [];
   let current: WeekGroup | null = null;
   for (const block of blocks) {
@@ -132,7 +132,7 @@ function groupBlocksByWeek(blocks: NotionBlock[]): WeekGroup[] {
  * específico) — es el contenedor donde hay que insertar/agregar tareas
  * nuevas de ese día.
  */
-async function expandColumns(
+export async function expandColumns(
   blocks: NotionBlock[],
   parentId: string,
   depth = 0
@@ -157,7 +157,7 @@ async function expandColumns(
 
 /** Agrupa los to_do de la semana activa por heading_3 (día), guardando
  *  dónde insertar tareas nuevas de cada día (contenedor + ancla). */
-function groupPositionedBlocksByDay(positioned: PositionedBlock[]): DayGrouping {
+export function groupPositionedBlocksByDay(positioned: PositionedBlock[]): DayGrouping {
   const dayOrder: string[] = [];
   const dayBlocks = new Map<string, NotionBlock[]>();
   const dayContainerId = new Map<string, string>();
@@ -180,7 +180,7 @@ function groupPositionedBlocksByDay(positioned: PositionedBlock[]): DayGrouping 
 }
 
 /** Lee las sesiones (bloques hijos) de un to_do y las parsea. */
-async function readSessions(block: NotionBlock): Promise<Session[]> {
+export async function readSessions(block: NotionBlock): Promise<Session[]> {
   if (!block.has_children) return [];
   const children = await listBlockChildren(block.id);
   return children

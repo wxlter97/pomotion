@@ -9,7 +9,9 @@ function getToken(): string {
   return token;
 }
 
-async function notionFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function notionFetch<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<T> {
   const res = await fetch(`${NOTION_API}${path}`, {
     ...init,
     headers: {
@@ -20,6 +22,14 @@ async function notionFetch<T>(path: string, init: RequestInit = {}): Promise<T> 
     },
   });
   if (!res.ok) {
+    // 429 (rate limit) y 5xx: reintento acotado. Notion limita a ~3 req/s;
+    // esto sobre todo salva a la migración one-off (que hace cientos de GET).
+    if ((res.status === 429 || res.status >= 500) && attempt < 5) {
+      const retryAfter = Number(res.headers.get('retry-after'));
+      const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 2 ** attempt * 500;
+      await sleep(waitMs);
+      return notionFetch<T>(path, init, attempt + 1);
+    }
     const body = await res.text();
     throw new Error(`Notion API respondió ${res.status}: ${body}`);
   }
