@@ -1,5 +1,4 @@
-import { parseDurationToSeconds, roundDurationSeconds } from '../../shared/duration.js';
-import type { NotionRichText } from './notion.js';
+import type { NotionRichText } from './notionClient.js';
 
 export function plainText(richText: NotionRichText[] | undefined): string {
   if (!richText) return '';
@@ -42,25 +41,6 @@ export function todayDateStringInTz(timeZone: string): string {
 export function todayWeekdayNameInTz(timeZone: string): string {
   const name = new Intl.DateTimeFormat('es-ES', { timeZone, weekday: 'long' }).format(new Date());
   return normalize(name);
-}
-
-// Bloques de sesión escritos por la app: "⏱ 25m (10:15–10:40)" (formato
-// legado, solo minutos) o "⏱ 1h 30m 45s (10:15–10:40)" (con precisión de
-// segundos). El primer grupo captura el token de duración tal cual, sin
-// asumir su forma — se interpreta con el mismo parser que se usa para leer
-// lo que el usuario escribe en el formulario, así ambos caminos quedan
-// consistentes.
-const SESSION_RE = /⏱\s*([^()]+?)\s*\(([^–\-)]+)[–-]([^)]+)\)/u;
-
-export function parseSessionText(
-  text: string
-): { durationSeconds: number; start: string; end: string } | null {
-  const match = text.match(SESSION_RE);
-  if (!match) return null;
-  const [, durationToken, start, end] = match;
-  const seconds = parseDurationToSeconds(durationToken.trim());
-  if (seconds === null) return null;
-  return { durationSeconds: roundDurationSeconds(seconds), start: start.trim(), end: end.trim() };
 }
 
 /** Suma (o resta, con negativo) días a una fecha "YYYY-MM-DD". En UTC para no

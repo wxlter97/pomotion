@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { requireAuth } from './_lib/auth.js';
-import { resolveFiles } from './_lib/notionPage.js';
+import { sendError } from './_lib/errors.js';
+import { listFiles } from './_lib/notionStore.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -10,11 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireAuth(req, res)) return;
 
   try {
-    const files = await resolveFiles();
+    const files = await listFiles();
     return res.status(200).json({ files });
   } catch (err) {
-    console.error(err);
-    const message = err instanceof Error ? err.message : 'Error desconocido';
-    return res.status(500).json({ error: 'internal_error', message });
+    return sendError(res, err);
   }
 }
