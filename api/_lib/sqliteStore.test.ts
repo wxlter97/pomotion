@@ -1,0 +1,222 @@
+import { createClient, type Client } from '@libsql/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runMigrations } from '../../scripts/migrate.js';
+import { resetDb, setDb } from './db.js';
+import { runWithUser } from './requestContext.js';
+import { sqliteStore } from './sqliteStore.js';
+
+const USER = 'user-1';
+const OTHER = 'user-2';
+
+async function seedUser(db: Client, id: string): Promise<void> {
+  await db.execute({
+    sql: `INSERT INTO users (id, email, google_sub, created_at) VALUES (?, ?, ?, ?)`,
+    args: [id, `${id}@x.com`, `sub-${id}`, new Date().toISOString()],
+  });
+}
+
+function as<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  return runWithUser({ userId, isAdmin: false }, fn);
+}
+
+let db: Client;
+
+beforeEach(async () => {
+  db = createClient({ url: ':memory:' });
+  await runMigrations(db, { log: () => {} });
+  setDb(db);
+  await seedUser(db, USER);
+  await seedUser(db, OTHER);
+  vi.useRealTimers();
+});
+
+describe('createTask + getWeekView', () => {
+  it('crea tareas y las devuelve en el día correcto, ordenadas', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'B' });
+      await sqliteStore.createTask({ date: '2026-08-25', text: 'C' });
+    });
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(view.tasks.map((t) => t.name)).toEqual(['A', 'B']);
+    expect(view.days.map((d) => d.day)).toEqual(['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']);
+    expect(view.days[0].date).toBe('2026-08-24');
+    expect(view.week).toBe('2026.08.24 - 2026.08.28');
+    expect(view.previousWeekLabel).toBe('2026.08.17 - 2026.08.21');
+    expect(view.nextWeekLabel).toBe('2026.08.31 - 2026.09.04');
+
+    const martes = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Martes' })
+    );
+    expect(martes.tasks.map((t) => t.name)).toEqual(['C']);
+  });
+
+  it('scopea por usuario', async () => {
+    await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'mía' }));
+    const otherView = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(otherView.tasks).toHaveLength(0);
+  });
+
+  it('afterId ubica la tarea entre dos', async () => {
+    const view = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const c = await sqliteStore.createTask({ date: '2026-08-24', text: 'C' });
+      void c;
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'B', afterId: a.id });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks.map((t) => t.name)).toEqual(['A', 'B', 'C']);
+  });
+});
+
+describe('updateTask / deleteTask', () => {
+  it('marca hecha y renombra', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: t.id, done: true });
+      await sqliteStore.updateTask({ taskId: t.id, text: 'X renombrada' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0]).toMatchObject({ name: 'X renombrada', done: true });
+  });
+
+  it('deleteTask borra la tarea y sus sesiones', async () => {
+    await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.logSession({ taskId: t.id, durationSeconds: 60, start: '09:00', end: '09:01' });
+      await sqliteStore.deleteTask(t.id);
+    });
+    expect((await db.execute('SELECT count(*) c FROM tasks')).rows[0].c).toBe(0);
+    expect((await db.execute('SELECT count(*) c FROM work_sessions')).rows[0].c).toBe(0);
+  });
+
+  it('no deja tocar la tarea de otro usuario', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(as(OTHER, () => sqliteStore.updateTask({ taskId: t.id, done: true }))).rejects.toThrow();
+  });
+});
+
+describe('updateTaskPosition (mover entre días)', () => {
+  it('cambia la fecha de la tarea y de sus sesiones', async () => {
+    await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.logSession({ taskId: t.id, durationSeconds: 1800, start: '09:00', end: '09:30' });
+      await sqliteStore.updateTaskPosition({ taskId: t.id, date: '2026-08-27' });
+    });
+    const jueves = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    expect(jueves.tasks).toHaveLength(1);
+    expect(jueves.tasks[0].sessions[0].durationSeconds).toBe(1800);
+    expect(jueves.dayTotalSeconds).toBe(1800);
+  });
+});
+
+describe('sesiones + totales', () => {
+  it('logSession suma al total del día y de la semana', async () => {
+    const view = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const b = await sqliteStore.createTask({ date: '2026-08-25', text: 'B' });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 1500, start: '09:00', end: '09:25' });
+      await sqliteStore.logSession({ taskId: b.id, durationSeconds: 600, start: '10:00', end: '10:10' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.dayTotalSeconds).toBe(1500);
+    expect(view.weekTotalSeconds).toBe(2100);
+    expect(view.tasks[0].sessions).toHaveLength(1);
+  });
+
+  it('updateSession y deleteSession', async () => {
+    await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const s = await sqliteStore.logSession({ taskId: t.id, durationSeconds: 60, start: '09:00', end: '09:01' });
+      const upd = await sqliteStore.updateSession({ sessionId: s.id, durationSeconds: 120, start: '09:00', end: '09:02' });
+      expect(upd.durationSeconds).toBe(120);
+      await sqliteStore.deleteSession(s.id);
+    });
+    expect((await db.execute('SELECT count(*) c FROM work_sessions')).rows[0].c).toBe(0);
+  });
+});
+
+describe('getSessionsInRange (reporte)', () => {
+  it('devuelve las sesiones del rango con el nombre de la tarea', async () => {
+    await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Tarea A' });
+      const b = await sqliteStore.createTask({ date: '2026-09-02', text: 'Tarea B' });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 1500, start: '09:00', end: '09:25' });
+      await sqliteStore.logSession({ taskId: b.id, durationSeconds: 600, start: '10:00', end: '10:10' });
+    });
+    const rows = await as(USER, () =>
+      sqliteStore.getSessionsInRange({ from: '2026-08-01', to: '2026-08-31' })
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ task: 'Tarea A', date: '2026-08-24', day: 'Lunes', durationSeconds: 1500 });
+  });
+
+  it('valida el rango', async () => {
+    await expect(
+      as(USER, () => sqliteStore.getSessionsInRange({ from: '2026-08-10', to: '2026-08-01' }))
+    ).rejects.toThrow();
+  });
+});
+
+describe('listFiles', () => {
+  it('lista los valores distintos de file', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Trabajo' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'b', fileId: 'Casa' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'c', fileId: 'Trabajo' });
+    });
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files.map((f) => f.id).sort()).toEqual(['Casa', 'Trabajo']);
+  });
+});
+
+describe('recurrentes', () => {
+  it('applyRecurringToWeek crea las que faltan, dedup por nombre, respeta weekdays', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Standup' }); // Lun–Vie
+      await sqliteStore.createRecurringRule({ name: 'Repaso semanal', weekdays: '5' }); // solo Vie
+      // ya existe "standup" el lunes → no se duplica
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'standup' });
+    });
+
+    const first = await as(USER, () =>
+      sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' })
+    );
+    // Standup en Mar/Mié/Jue/Vie (4) + Repaso el Vie (1) = 5
+    expect(first.added).toBe(5);
+
+    const second = await as(USER, () =>
+      sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' })
+    );
+    expect(second.added).toBe(0);
+
+    const vie = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Viernes' })
+    );
+    expect(vie.tasks.map((t) => t.name).sort()).toEqual(['Repaso semanal', 'Standup']);
+  });
+
+  it('CRUD de reglas', async () => {
+    const rules = await as(USER, async () => {
+      const r = await sqliteStore.createRecurringRule({ name: 'X' });
+      await sqliteStore.updateRecurringRule({ id: r.id, name: 'X2', active: false });
+      return sqliteStore.listRecurringRules();
+    });
+    expect(rules).toHaveLength(1);
+    expect(rules[0]).toMatchObject({ name: 'X2', active: false });
+
+    await as(USER, () => sqliteStore.deleteRecurringRule(rules[0].id));
+    expect(await as(USER, () => sqliteStore.listRecurringRules())).toHaveLength(0);
+  });
+});
+
+afterEach(() => {
+  resetDb();
+});
