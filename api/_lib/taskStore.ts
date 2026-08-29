@@ -9,6 +9,9 @@
  * scopea al usuario de `requestContext` — la interfaz no lo recibe.
  */
 
+import type { Analytics } from './analytics.js';
+export type { Analytics } from './analytics.js';
+
 export type Session = {
   id: string;
   taskId: string;
@@ -147,6 +150,7 @@ export type RecurringRule = {
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
 export type GetMonthSummaryInput = { month?: string; fileId?: string };
 export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
+export type GetAnalyticsInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 
 export type CreateTaskInput = {
@@ -231,6 +235,8 @@ export interface TaskStore {
   getMonthSummary(input: GetMonthSummaryInput): Promise<MonthSummary>;
   /** Horas registradas por día en las últimas N semanas, para el heatmap. */
   getFocusHeatmap(input: GetFocusHeatmapInput): Promise<FocusHeatmap>;
+  /** Agregados para el panel de analítica (por día de semana, hora, semana…). */
+  getAnalytics(input: GetAnalyticsInput): Promise<Analytics>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   listFiles(): Promise<FileEntry[]>;
   listTags(): Promise<Tag[]>;

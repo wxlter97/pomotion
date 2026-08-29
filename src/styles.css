@@ -2149,6 +2149,200 @@ h3 {
   margin-left: 4px;
 }
 
+/* --- Analítica --- */
+.sheet--analytics {
+  max-width: min(94vw, 560px);
+}
+
+.an-range {
+  margin-bottom: 1rem;
+}
+
+.an-body {
+  transition: opacity 0.15s ease;
+}
+
+.an-body[aria-busy='true'] {
+  opacity: 0.55;
+}
+
+.an-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.an-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--color-fill);
+  border-radius: 12px;
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+}
+
+.an-stat-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.an-stat-label {
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-label-secondary);
+  font-weight: 600;
+}
+
+.an-section {
+  margin-bottom: 1.25rem;
+}
+
+.an-section h3 {
+  font-size: 0.82rem;
+  margin: 0 0 0.55rem;
+  color: var(--color-label);
+}
+
+/* Tasa de completado */
+.an-completion {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.an-completion-track {
+  flex: 1;
+  height: 0.6rem;
+  border-radius: 980px;
+  background: var(--color-fill);
+  overflow: hidden;
+}
+
+.an-completion-fill {
+  height: 100%;
+  background: var(--color-success);
+  border-radius: 980px;
+  transition: width 0.2s ease;
+}
+
+.an-completion-text {
+  font-size: 0.78rem;
+  color: var(--color-label-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Por día de la semana — barras horizontales */
+.an-weekday {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.an-weekday-row {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr 4.5rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.an-weekday-name {
+  font-size: 0.75rem;
+  color: var(--color-label-secondary);
+  font-weight: 600;
+}
+
+.an-weekday-track {
+  height: 0.85rem;
+  background: var(--color-fill);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.an-weekday-fill {
+  height: 100%;
+  min-width: 2px;
+  background: var(--color-accent);
+  border-radius: 6px;
+  transition: width 0.2s ease;
+}
+
+.an-weekday-value {
+  font-size: 0.72rem;
+  color: var(--color-label-secondary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tira de barras verticales — horas / semanas */
+.an-strip {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0 0.4rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.an-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.an-strip-col {
+  flex: 1 0 0.55rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0.55rem;
+}
+
+.an-strip-track {
+  width: 100%;
+  height: 74px;
+  display: flex;
+  align-items: flex-end;
+  background: var(--color-fill);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.an-strip-fill {
+  width: 100%;
+  background: var(--color-accent);
+  border-radius: 4px 4px 0 0;
+  transition: height 0.2s ease;
+}
+
+.an-strip-fill.is-empty {
+  background: transparent;
+}
+
+.an-strip-label {
+  font-size: 0.6rem;
+  color: var(--color-label-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.an-strip-label.is-hidden {
+  visibility: hidden;
+}
+
+@media (max-width: 480px) {
+  .an-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .an-weekday-row {
+    grid-template-columns: 2.2rem 1fr 3.6rem;
+  }
+}
+
 /* --- Shortcuts footer --- */
 .shortcuts-hint {
   text-align: center;

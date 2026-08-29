@@ -23,6 +23,15 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return res.status(200).json(heatmap);
       }
+      // ?analytics=1 → agregados del panel de analítica.
+      if (typeof req.query.analytics === 'string') {
+        const weeks = Number(req.query.weeks);
+        const analytics = await sqliteStore.getAnalytics({
+          fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
+          weeks: Number.isFinite(weeks) ? weeks : undefined,
+        });
+        return res.status(200).json(analytics);
+      }
       const view = await sqliteStore.getWeekView({
         fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
         week: typeof req.query.week === 'string' ? req.query.week : undefined,

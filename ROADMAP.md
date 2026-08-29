@@ -386,8 +386,10 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   se fusionaron en una. Componente `Menu` reutilizable.
 
 ### Tier 3 — más grande
-- **Analítica**: tiempo por día de semana / por hora del día, tendencia semanal,
-  tasa de completado, rachas. (Queries de agregación SQL.)
+- ~~**Analítica**~~ ✅ PR #31 — panel (menú "Ver" → Analítica): tiempo por día de
+  semana, por hora del día, tendencia semanal, tasa de completado, racha actual/mejor.
+  Ventana 4/12/26 sem. `GET /api/tasks?analytics=1` (2 queries + `computeAnalytics`
+  puro). Sin función serverless nueva.
 - **Time-blocking**: asignar la tarea a un bloque horario, ver el día como timeline.
 - **Templates de día**: estampar un set de tareas.
 - **Metas**: "X horas en Proyecto Y este mes" con burn-down.
