@@ -38,11 +38,12 @@ export function getFiles() {
   return request<{ files: FileEntry[] }>('/api/files');
 }
 
-export function getTasks(day?: string, week?: string, fileId?: string) {
+export function getTasks(day?: string, week?: string, fileId?: string, fresh = false) {
   const params = new URLSearchParams();
   if (day) params.set('day', day);
   if (week) params.set('week', week);
   if (fileId) params.set('file', fileId);
+  if (fresh) params.set('fresh', '1'); // saltea la caché corta del server (post-mutación / botón "Actualizar")
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
