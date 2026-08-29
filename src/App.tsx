@@ -20,6 +20,7 @@ import Footer from './components/Footer';
 import Login from './components/Login';
 import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
+import DayTemplatesDialog from './components/DayTemplatesDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
@@ -96,6 +97,7 @@ export default function App() {
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
@@ -600,6 +602,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
+          <MenuItem onClick={() => { setShowTemplates(true); close(); }}>Plantillas de día</MenuItem>
           <MenuItem onClick={() => { setShowTags(true); close(); }}>Etiquetas</MenuItem>
         </>
       )}
@@ -892,6 +895,28 @@ export default function App() {
             }));
             void refresh(data.selectedDay, data.week);
           }}
+        />
+      )}
+
+      {showTemplates && data && (
+        <DayTemplatesDialog
+          templates={data.dayTemplates}
+          selectedDate={data.selectedDate}
+          dayLabel={data.selectedDay}
+          dayTaskCount={data.tasks.length}
+          fileId={selectedFileId}
+          onChanged={() => void refresh(data.selectedDay, data.week)}
+          onApplied={(added) => {
+            setRecurringNotice((prev) => ({
+              n: (prev?.n ?? 0) + 1,
+              text:
+                added === 0
+                  ? 'La plantilla ya estaba en el día.'
+                  : `${added} ${added === 1 ? 'tarea agregada' : 'tareas agregadas'} desde la plantilla.`,
+            }));
+            void refresh(data.selectedDay, data.week);
+          }}
+          onClose={() => setShowTemplates(false)}
         />
       )}
 

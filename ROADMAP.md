@@ -391,7 +391,10 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   Ventana 4/12/26 sem. `GET /api/tasks?analytics=1` (2 queries + `computeAnalytics`
   puro). Sin función serverless nueva.
 - **Time-blocking**: asignar la tarea a un bloque horario, ver el día como timeline.
-- **Templates de día**: estampar un set de tareas.
+- ~~**Templates de día**~~ ✅ PR #32 — diálogo "Plantillas de día" (menú "Ver"): guardar
+  un set de tareas (a mano, o copiando el día visible con su prioridad/estimación) y
+  "Aplicar" al día visible (dedup por nombre). Migración `003_day_templates.sql`
+  (`day_templates` + `day_template_items`). CRUD plegado en `POST /api/tasks`.
 - **Metas**: "X horas en Proyecto Y este mes" con burn-down.
 
 ### Fuera de alcance por ahora

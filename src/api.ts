@@ -1,5 +1,7 @@
 import type {
   Analytics,
+  DayTemplate,
+  DayTemplateItem,
   FileEntry,
   FocusHeatmap,
   MonthSummary,
@@ -177,6 +179,49 @@ export function deleteTag(id: string) {
   return request<{ ok: true }>('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({ action: 'delete_tag', id }),
+  });
+}
+
+// --- Plantillas de día ---
+
+type TemplateItemInput = { name: string; priority?: DayTemplateItem['priority']; estimateMinutes?: number | null };
+
+/** Crea una plantilla con ítems explícitos o como snapshot de un día. */
+export function createDayTemplate(
+  name: string,
+  opts: { items?: TemplateItemInput[]; fromDate?: string; fileId?: string }
+) {
+  return request<{ ok: true; template: DayTemplate }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({
+      action: 'create_template',
+      name,
+      items: opts.items,
+      from_date: opts.fromDate,
+      file: opts.fileId,
+    }),
+  });
+}
+
+export function updateDayTemplate(id: string, fields: { name?: string; items?: TemplateItemInput[] }) {
+  return request<{ ok: true; template: DayTemplate }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_template', id, ...fields }),
+  });
+}
+
+export function deleteDayTemplate(id: string) {
+  return request<{ ok: true }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_template', id }),
+  });
+}
+
+/** Estampa la plantilla en `date` ('YYYY-MM-DD'). */
+export function applyDayTemplate(id: string, date: string, fileId?: string) {
+  return request<{ ok: true; added: number }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'apply_template', id, date, file: fileId }),
   });
 }
 

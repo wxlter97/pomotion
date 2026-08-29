@@ -241,6 +241,77 @@ describe('etiquetas / proyectos', () => {
   });
 });
 
+describe('plantillas de día', () => {
+  it('crea con ítems explícitos y aparece en getWeekView', async () => {
+    const view = await as(USER, async () => {
+      await sqliteStore.createDayTemplate({
+        name: '  Mañana enfocada  ',
+        items: [
+          { name: 'Revisar inbox', priority: 'med' },
+          { name: 'Bloque de foco', estimateMinutes: 90 },
+          { name: '' }, // se descarta
+        ],
+      });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.dayTemplates).toHaveLength(1);
+    expect(view.dayTemplates[0].name).toBe('Mañana enfocada');
+    expect(view.dayTemplates[0].items.map((i) => i.name)).toEqual(['Revisar inbox', 'Bloque de foco']);
+    expect(view.dayTemplates[0].items[0].priority).toBe('med');
+    expect(view.dayTemplates[0].items[1].estimateMinutes).toBe(90);
+  });
+
+  it('crea como snapshot de un día (captura prioridad/estimación)', async () => {
+    const tpl = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'B' });
+      await sqliteStore.updateTask({ taskId: a.id, priority: 'high', estimateMinutes: 60 });
+      void b;
+      return sqliteStore.createDayTemplate({ name: 'Día tipo', fromDate: '2026-08-24' });
+    });
+    expect(tpl.items.map((i) => i.name)).toEqual(['A', 'B']);
+    expect(tpl.items[0]).toMatchObject({ priority: 'high', estimateMinutes: 60 });
+  });
+
+  it('aplicar estampa las tareas en el día, con dedup por nombre', async () => {
+    const view = await as(USER, async () => {
+      const tpl = await sqliteStore.createDayTemplate({
+        name: 't',
+        items: [{ name: 'Standup', priority: 'low' }, { name: 'Deep work' }],
+      });
+      await sqliteStore.createTask({ date: '2026-08-25', text: 'standup' }); // ya existe (normalizado)
+      const r1 = await sqliteStore.applyDayTemplate({ id: tpl.id, date: '2026-08-25' });
+      expect(r1.added).toBe(1); // solo "Deep work"
+      const r2 = await sqliteStore.applyDayTemplate({ id: tpl.id, date: '2026-08-25' });
+      expect(r2.added).toBe(0); // idempotente
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Martes' });
+    });
+    expect(view.tasks.map((t) => t.name).sort()).toEqual(['Deep work', 'standup']);
+  });
+
+  it('renombra, reemplaza ítems y borra; scope por usuario', async () => {
+    const tpl = await as(USER, () =>
+      sqliteStore.createDayTemplate({ name: 'orig', items: [{ name: 'x' }] })
+    );
+    const upd = await as(USER, () =>
+      sqliteStore.updateDayTemplate({ id: tpl.id, name: 'nuevo', items: [{ name: 'a' }, { name: 'b' }] })
+    );
+    expect(upd).toMatchObject({ name: 'nuevo' });
+    expect(upd.items.map((i) => i.name)).toEqual(['a', 'b']);
+
+    await expect(
+      as(OTHER, () => sqliteStore.updateDayTemplate({ id: tpl.id, name: 'hack' }))
+    ).rejects.toThrow();
+
+    await as(USER, () => sqliteStore.deleteDayTemplate(tpl.id));
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(view.dayTemplates).toHaveLength(0);
+    expect((await db.execute('SELECT count(*) c FROM day_template_items')).rows[0].c).toBe(0);
+  });
+});
+
 describe('inbox (tareas sin fecha)', () => {
   it('createTask sin fecha va al inbox, no a un día', async () => {
     const view = await as(USER, async () => {

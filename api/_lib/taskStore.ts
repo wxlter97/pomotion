@@ -69,6 +69,8 @@ export type WeekView = {
   inbox: Task[];
   /** Todas las etiquetas del usuario (globales, no dependen del contexto). */
   tags: Tag[];
+  /** Plantillas de día del usuario. */
+  dayTemplates: DayTemplate[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes (sin sesiones) de días pasados, candidatas a "traer a hoy". */
@@ -145,6 +147,21 @@ export type RecurringRule = {
   active: boolean;
 };
 
+/** Un ítem de una plantilla de día. */
+export type DayTemplateItem = {
+  name: string;
+  priority: TaskPriority | null;
+  estimateMinutes: number | null;
+};
+
+/** Plantilla de día: un set de tareas con nombre para "estampar" en un día. */
+export type DayTemplate = {
+  id: string;
+  name: string;
+  file: string | null;
+  items: DayTemplateItem[];
+};
+
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
@@ -179,6 +196,27 @@ export type UpdateTaskInput = {
 
 export type CreateTagInput = { name?: string; color?: string };
 export type UpdateTagInput = { id?: string; name?: string; color?: string };
+
+export type DayTemplateItemInput = {
+  name?: string;
+  priority?: TaskPriority | null;
+  estimateMinutes?: number | null;
+};
+export type CreateDayTemplateInput = {
+  name?: string;
+  fileId?: string;
+  /** Ítems explícitos, o… */
+  items?: DayTemplateItemInput[];
+  /** …tomar como snapshot las tareas de este día ('YYYY-MM-DD'). */
+  fromDate?: string;
+};
+export type UpdateDayTemplateInput = {
+  id?: string;
+  name?: string;
+  /** Si viene, reemplaza todos los ítems. */
+  items?: DayTemplateItemInput[];
+};
+export type ApplyDayTemplateInput = { id?: string; date?: string; fileId?: string };
 
 export type UpdateTaskPositionInput = {
   taskId?: string;
@@ -260,4 +298,10 @@ export interface TaskStore {
   updateRecurringRule(input: UpdateRecurringRuleInput): Promise<RecurringRule>;
   deleteRecurringRule(id?: string): Promise<void>;
   applyRecurringToWeek(input: ApplyRecurringInput): Promise<{ added: number }>;
+
+  createDayTemplate(input: CreateDayTemplateInput): Promise<DayTemplate>;
+  updateDayTemplate(input: UpdateDayTemplateInput): Promise<DayTemplate>;
+  deleteDayTemplate(id?: string): Promise<void>;
+  /** "Estampa" la plantilla en un día: crea sus tareas (dedup por nombre). */
+  applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: number }>;
 }

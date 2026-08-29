@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sendError } from './_lib/errors.js';
 import { withAuth } from './_lib/handler.js';
 import { sqliteStore } from './_lib/sqliteStore.js';
+import type { DayTemplateItemInput } from './_lib/taskStore.js';
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -48,6 +49,9 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         id?: string;
         name?: string;
         color?: string;
+        date?: string;
+        from_date?: string;
+        items?: DayTemplateItemInput[];
       };
       if (body.action === 'carry_over') {
         const result = await sqliteStore.carryOverToToday({ fileId: body.file });
@@ -64,6 +68,35 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (body.action === 'delete_tag') {
         await sqliteStore.deleteTag(body.id);
         return res.status(200).json({ ok: true });
+      }
+      if (body.action === 'create_template') {
+        const template = await sqliteStore.createDayTemplate({
+          name: body.name,
+          fileId: body.file,
+          items: body.items,
+          fromDate: body.from_date,
+        });
+        return res.status(200).json({ ok: true, template });
+      }
+      if (body.action === 'update_template') {
+        const template = await sqliteStore.updateDayTemplate({
+          id: body.id,
+          name: body.name,
+          items: body.items,
+        });
+        return res.status(200).json({ ok: true, template });
+      }
+      if (body.action === 'delete_template') {
+        await sqliteStore.deleteDayTemplate(body.id);
+        return res.status(200).json({ ok: true });
+      }
+      if (body.action === 'apply_template') {
+        const result = await sqliteStore.applyDayTemplate({
+          id: body.id,
+          date: body.date,
+          fileId: body.file,
+        });
+        return res.status(200).json({ ok: true, ...result });
       }
       return res.status(400).json({ error: 'invalid_action' });
     }
