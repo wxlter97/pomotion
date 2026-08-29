@@ -154,9 +154,19 @@ describe('weekdayOffset', () => {
     expect(weekdayOffset('  Viernes  ')).toBe(4);
   });
 
+  it('tolera anotaciones después del nombre del día', () => {
+    expect(weekdayOffset('Lunes (Asueto)')).toBe(0);
+    expect(weekdayOffset('Martes 17 (Puente)')).toBe(1);
+    expect(weekdayOffset('Miércoles Santo (Libre)')).toBe(2);
+    expect(weekdayOffset('Viernes  (Compensatorio)')).toBe(4);
+    expect(weekdayOffset('Jueves(Cyber)')).toBe(3);
+  });
+
   it('devuelve null para etiquetas que no son un día laboral', () => {
     expect(weekdayOffset('Sábado')).toBeNull();
+    expect(weekdayOffset('Sábado (Extra)')).toBeNull();
     expect(weekdayOffset('Feriado')).toBeNull();
+    expect(weekdayOffset('Semana rara, no anoté tareas.')).toBeNull();
     expect(weekdayOffset('')).toBeNull();
   });
 });
