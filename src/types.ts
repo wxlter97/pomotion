@@ -6,6 +6,9 @@ export type Session = {
   end: string;
 };
 
+/** Prioridad de una tarea; null = sin prioridad. */
+export type TaskPriority = 'low' | 'med' | 'high';
+
 export type Task = {
   id: string;
   name: string;
@@ -13,6 +16,11 @@ export type Task = {
   done: boolean;
   order: number;
   file: string | null;
+  priority: TaskPriority | null;
+  /** Notas libres; null o '' = sin notas. */
+  notes: string | null;
+  /** Fecha de vencimiento 'YYYY-MM-DD', distinta de la agenda (`date`). */
+  due: string | null;
   sessions: Session[];
 };
 
@@ -36,6 +44,8 @@ export type TasksResponse = {
   days: DayColumn[];
   selectedDay: string;
   selectedDate: string;
+  /** 'YYYY-MM-DD' de hoy en la zona horaria del server. */
+  today: string;
   tasks: Task[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;

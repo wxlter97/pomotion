@@ -16,8 +16,14 @@ import {
   parseDurationToSeconds,
 } from '../duration';
 import type { DayColumn, Session, Task } from '../types';
+import { daysBetween, dueChipLabel, dueLabel, isOverdue } from '../taskMeta';
+
+/** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
+ *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
+const DUE_CHIP_WINDOW_DAYS = 3;
 import ConfirmDialog from './ConfirmDialog';
 import MoveTaskMenu, { type MoveTarget } from './MoveTaskMenu';
+import TaskDetails from './TaskDetails';
 
 function sumSeconds(task: Task): number {
   return task.sessions.reduce((total, s) => total + s.durationSeconds, 0);
@@ -75,6 +81,7 @@ export default function TaskList({
   onSessionDeleted,
   selectedDay,
   selectedDate,
+  today,
   days,
   previousWeekLabel,
   nextWeekLabel,
@@ -84,6 +91,7 @@ export default function TaskList({
   onTaskCreated,
   onTaskDeleted,
   onTaskTextUpdated,
+  onTaskUpdated,
   onReorderTask,
   onMoveTask,
   onSessionUpdated,
@@ -97,6 +105,7 @@ export default function TaskList({
   onSessionDeleted: (taskId: string, sessionId: string) => void;
   selectedDay: string;
   selectedDate: string;
+  today: string;
   days: DayColumn[];
   previousWeekLabel: string;
   nextWeekLabel: string;
@@ -106,6 +115,7 @@ export default function TaskList({
   onTaskCreated: (task: Task) => void;
   onTaskDeleted: (id: string) => void;
   onTaskTextUpdated: (id: string, name: string) => void;
+  onTaskUpdated: (id: string, patch: Partial<Task>) => void;
   onReorderTask: (task: Task, targetIndex: number) => void;
   onMoveTask: (task: Task, target: MoveTarget) => void;
   onSessionUpdated: (taskId: string, session: Session) => void;
@@ -384,6 +394,7 @@ export default function TaskList({
                         ? 'task-item locked'
                         : 'task-item'
                   }
+                  data-priority={task.priority ?? undefined}
                   title={isLocked ? 'Detén el timer para mover o borrar esta tarea' : undefined}
                 >
                   <button
@@ -434,16 +445,34 @@ export default function TaskList({
                     </button>
                   )}
 
+                  {task.due &&
+                    !isEditingText &&
+                    daysBetween(today, task.due) <= DUE_CHIP_WINDOW_DAYS && (
+                      <span
+                        className={
+                          isOverdue(task.due, task.done, today)
+                            ? 'task-due-chip overdue'
+                            : 'task-due-chip'
+                        }
+                        title={dueLabel(task.due, today)}
+                      >
+                        {dueChipLabel(task.due, today)}
+                      </span>
+                    )}
                   {total > 0 && <span className="task-total">{formatDurationLabel(total)}</span>}
                   {!isEditingText && (
                     <div className="task-actions">
                       <button
                         type="button"
-                        className="task-move"
+                        className={
+                          task.priority || task.notes || task.due
+                            ? 'task-move task-detail-toggle is-set'
+                            : 'task-move task-detail-toggle'
+                        }
                         onClick={() => startEditTask(task)}
                         disabled={isBusy}
                         aria-label="Editar tarea"
-                        title="Editar texto"
+                        title="Editar tarea, prioridad, vencimiento y notas"
                       >
                         ✎
                       </button>
@@ -489,6 +518,14 @@ export default function TaskList({
                     </div>
                   )}
                 </div>
+
+                {isEditingText && (
+                  <TaskDetails
+                    task={task}
+                    disabled={isBusy}
+                    onChange={(patch) => onTaskUpdated(task.id, patch)}
+                  />
+                )}
 
                 <div className="session-area">
                   {task.sessions.length > 0 && (

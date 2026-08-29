@@ -438,6 +438,13 @@ export default function App() {
     setSelectedTask((prev) => (prev?.id === id ? { ...prev, name } : prev));
   }
 
+  function handleTaskUpdated(id: string, patch: Partial<Task>) {
+    setData((prev) =>
+      prev ? { ...prev, tasks: prev.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) } : prev
+    );
+    setSelectedTask((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
+  }
+
   function handleSessionUpdated(taskId: string, session: Session) {
     setData((prev) => {
       if (!prev) return prev;
@@ -761,6 +768,7 @@ export default function App() {
                 onSessionDeleted={handleSessionDeleted}
                 selectedDay={data.selectedDay}
                 selectedDate={data.selectedDate}
+                today={data.today}
                 days={data.days}
                 previousWeekLabel={data.previousWeekLabel}
                 nextWeekLabel={data.nextWeekLabel}
@@ -770,6 +778,7 @@ export default function App() {
                 onTaskCreated={handleTaskCreated}
                 onTaskDeleted={handleTaskDeleted}
                 onTaskTextUpdated={handleTaskTextUpdated}
+                onTaskUpdated={handleTaskUpdated}
                 onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
                 onMoveTask={(task, target) => void handleMoveTask(task, target)}
                 onSessionUpdated={handleSessionUpdated}

@@ -2,12 +2,27 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sendError } from './_lib/errors.js';
 import { withAuth } from './_lib/handler.js';
 import { sqliteStore } from './_lib/sqliteStore.js';
+import type { TaskPriority } from './_lib/taskStore.js';
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method === 'PATCH') {
-      const body = (req.body ?? {}) as { id?: string; done?: boolean; text?: string };
-      const result = await sqliteStore.updateTask({ taskId: body.id, done: body.done, text: body.text });
+      const body = (req.body ?? {}) as {
+        id?: string;
+        done?: boolean;
+        text?: string;
+        priority?: TaskPriority | null;
+        notes?: string | null;
+        due?: string | null;
+      };
+      const result = await sqliteStore.updateTask({
+        taskId: body.id,
+        done: body.done,
+        text: body.text,
+        priority: body.priority,
+        notes: body.notes,
+        due: body.due,
+      });
       return res.status(200).json({ ok: true, ...result });
     }
     if (req.method === 'POST') {

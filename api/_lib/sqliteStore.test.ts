@@ -99,6 +99,49 @@ describe('updateTask / deleteTask', () => {
     const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
     await expect(as(OTHER, () => sqliteStore.updateTask({ taskId: t.id, done: true }))).rejects.toThrow();
   });
+
+  it('setea prioridad / notas / vencimiento y los limpia con null', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({
+        taskId: t.id,
+        priority: 'high',
+        notes: '  con notas  ',
+        due: '2026-08-27',
+      });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0]).toMatchObject({
+      priority: 'high',
+      notes: 'con notas',
+      due: '2026-08-27',
+    });
+    expect(view.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const cleared = await as(USER, async () => {
+      const t = (
+        await sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+      ).tasks[0];
+      await sqliteStore.updateTask({ taskId: t.id, priority: null, notes: '', due: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0]).toMatchObject({ priority: null, notes: null, due: null });
+  });
+
+  it('rechaza prioridad y vencimiento inválidos', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, priority: 'urgente' as never }))
+    ).rejects.toThrow();
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, due: '27-08-2026' }))
+    ).rejects.toThrow();
+  });
+
+  it('updateTask sin campos falla', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(as(USER, () => sqliteStore.updateTask({ taskId: t.id }))).rejects.toThrow();
+  });
 });
 
 describe('updateTaskPosition (mover entre días)', () => {

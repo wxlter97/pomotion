@@ -47,11 +47,13 @@ import type {
   Session,
   SessionRow,
   Task,
+  TaskPriority,
   TaskStore,
   UpdateRecurringRuleInput,
   UpdateSessionInput,
   UpdateTaskInput,
   UpdateTaskPositionInput,
+  UpdateTaskResult,
   WeekView,
 } from './taskStore.js';
 
@@ -71,7 +73,11 @@ function toSession(r: Row): Session {
   };
 }
 
+const PRIORITIES = new Set(['low', 'med', 'high']);
+
 function toTask(r: Row, sessions: Session[]): Task {
+  const priority = r.priority == null ? null : String(r.priority);
+  const notes = r.notes == null ? null : String(r.notes);
   return {
     id: String(r.id),
     name: String(r.name),
@@ -79,6 +85,9 @@ function toTask(r: Row, sessions: Session[]): Task {
     done: Number(r.done) === 1,
     order: Number(r.order),
     file: r.file == null ? null : String(r.file),
+    priority: priority && PRIORITIES.has(priority) ? (priority as TaskPriority) : null,
+    notes: notes && notes.length > 0 ? notes : null,
+    due: r.due == null ? null : String(r.due),
     sessions,
   };
 }
@@ -180,7 +189,8 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
   const userId = currentUserId();
   const weekStart = resolveWeekStart(input.week, TIMEZONE);
   const dates = weekDates(weekStart);
-  const thisMonday = mondayOf(todayDateStringInTz(TIMEZONE));
+  const today = todayDateStringInTz(TIMEZONE);
+  const thisMonday = mondayOf(today);
   const isCurrentWeek = weekStart === thisMonday;
   const selectedDay = selectDay({ requestedDay: input.day, isCurrentWeek, timeZone: TIMEZONE });
   const selectedDate = dates[weekdayIndex(selectedDay) ?? 0];
@@ -244,6 +254,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     days: WEEKDAY_NAMES.map((day, i) => ({ day, date: dates[i] })),
     selectedDay,
     selectedDate,
+    today,
     tasks,
     dayTotalSeconds,
     weekTotalSeconds,
@@ -485,31 +496,74 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
           VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`,
     args: [id, userId, name, input.date, order, file, now, now],
   });
-  return { id, name, date: input.date, done: false, order, file, sessions: [] };
+  return {
+    id,
+    name,
+    date: input.date,
+    done: false,
+    order,
+    file,
+    priority: null,
+    notes: null,
+    due: null,
+    sessions: [],
+  };
 }
 
-async function updateTask(input: UpdateTaskInput): Promise<{ done?: boolean; text?: string }> {
+const NOTES_MAX = 4000;
+
+async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
   const userId = currentUserId();
   if (!input.taskId) throw new BadRequestError('invalid_task_id', 'Falta task_id');
-  if (input.done === undefined && input.text === undefined) {
-    throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
-  }
 
   const sets: string[] = [];
   const args: unknown[] = [];
-  let trimmed: string | undefined;
+  const result: UpdateTaskResult = {};
 
   if (input.done !== undefined) {
     if (typeof input.done !== 'boolean') throw new BadRequestError('invalid_done', 'done debe ser booleano');
     sets.push('done = ?');
     args.push(input.done ? 1 : 0);
+    result.done = input.done;
   }
   if (input.text !== undefined) {
-    trimmed = typeof input.text === 'string' ? input.text.trim() : '';
+    const trimmed = typeof input.text === 'string' ? input.text.trim() : '';
     if (!trimmed) throw new BadRequestError('invalid_text', 'El texto no puede estar vacío');
     sets.push('name = ?');
     args.push(trimmed);
+    result.text = trimmed;
   }
+  if (input.priority !== undefined) {
+    const p = input.priority;
+    if (p !== null && !PRIORITIES.has(p)) {
+      throw new BadRequestError('invalid_priority', 'priority debe ser low/med/high o null');
+    }
+    sets.push('priority = ?');
+    args.push(p);
+    result.priority = p;
+  }
+  if (input.notes !== undefined) {
+    const raw = typeof input.notes === 'string' ? input.notes.trim() : '';
+    if (raw.length > NOTES_MAX) {
+      throw new BadRequestError('invalid_notes', `Las notas no pueden pasar de ${NOTES_MAX} caracteres`);
+    }
+    const notes = raw.length > 0 ? raw : null;
+    sets.push('notes = ?');
+    args.push(notes);
+    result.notes = notes;
+  }
+  if (input.due !== undefined) {
+    const d = input.due;
+    if (d !== null && !DATE_RE.test(d)) {
+      throw new BadRequestError('invalid_due', 'due debe ser "YYYY-MM-DD" o null');
+    }
+    sets.push('due = ?');
+    args.push(d);
+    result.due = d;
+  }
+
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+
   sets.push('updated_at = ?');
   args.push(new Date().toISOString());
 
@@ -518,7 +572,7 @@ async function updateTask(input: UpdateTaskInput): Promise<{ done?: boolean; tex
     args: [...args, input.taskId, userId] as InValue[],
   });
   if (res.rowsAffected === 0) throw new NotFoundError('task_not_found', 'Tarea no encontrada');
-  return { done: input.done, text: trimmed };
+  return result;
 }
 
 async function deleteTask(taskId?: string): Promise<void> {
