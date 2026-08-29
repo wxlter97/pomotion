@@ -81,7 +81,7 @@ function toTask(r: Row, sessions: Session[]): Task {
   return {
     id: String(r.id),
     name: String(r.name),
-    date: String(r.date),
+    date: r.date == null ? null : String(r.date),
     done: Number(r.done) === 1,
     order: Number(r.order),
     file: r.file == null ? null : String(r.file),
@@ -110,6 +110,11 @@ function fileFilter(fileId: string | undefined, column = 'file'): { clause: stri
     : { clause: `${column} IS NULL`, args: [] };
 }
 
+/** `date = ?` / `date IS NULL` (para el inbox) + los args correspondientes. */
+function dateEq(date: string | null): { clause: string; args: InValue[] } {
+  return date == null ? { clause: 'date IS NULL', args: [] } : { clause: 'date = ?', args: [date] };
+}
+
 function formatTimeFromIso(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) {
@@ -130,18 +135,21 @@ function formatTimeFromIso(iso: string): string {
 
 async function computeOrder(
   userId: string,
-  date: string,
+  date: string | null,
   file: string | null,
   afterId: string | null | undefined
 ): Promise<number> {
   const db = getDb();
   const f = fileFilter(file ?? undefined);
+  const d = dateEq(date);
+  const scope = `user_id = ? AND ${f.clause} AND ${d.clause}`;
+  const scopeArgs = [userId, ...f.args, ...d.args];
 
   if (afterId === undefined) {
     const max = (
       await db.execute({
-        sql: `SELECT max("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
-        args: [userId, ...f.args, date],
+        sql: `SELECT max("order") AS o FROM tasks WHERE ${scope}`,
+        args: scopeArgs,
       })
     ).rows[0]?.o;
     return (max == null ? 0 : Number(max)) + 1;
@@ -150,8 +158,8 @@ async function computeOrder(
   if (afterId === null) {
     const min = (
       await db.execute({
-        sql: `SELECT min("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
-        args: [userId, ...f.args, date],
+        sql: `SELECT min("order") AS o FROM tasks WHERE ${scope}`,
+        args: scopeArgs,
       })
     ).rows[0]?.o;
     return (min == null ? 1 : Number(min)) - 1;
@@ -167,8 +175,8 @@ async function computeOrder(
   if (after == null) {
     const max = (
       await db.execute({
-        sql: `SELECT max("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
-        args: [userId, ...f.args, date],
+        sql: `SELECT max("order") AS o FROM tasks WHERE ${scope}`,
+        args: scopeArgs,
       })
     ).rows[0]?.o;
     return (max == null ? 0 : Number(max)) + 1;
@@ -177,8 +185,8 @@ async function computeOrder(
   const afterOrder = Number(after);
   const next = (
     await db.execute({
-      sql: `SELECT min("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ? AND "order" > ?`,
-      args: [userId, ...f.args, date, afterOrder],
+      sql: `SELECT min("order") AS o FROM tasks WHERE ${scope} AND "order" > ?`,
+      args: [...scopeArgs, afterOrder],
     })
   ).rows[0]?.o;
   return next == null ? afterOrder + 1 : (afterOrder + Number(next)) / 2;
@@ -241,6 +249,16 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     .filter((r) => String(r.date) === selectedDate)
     .map((r) => toTask(r, sessionsByTask.get(String(r.id)) ?? []));
 
+  // Inbox: tareas sin fecha del contexto actual (independiente de la semana).
+  const inbox = (
+    await db.execute({
+      sql: `SELECT * FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND date IS NULL
+            ORDER BY "order", created_at`,
+      args: [userId, ...f.args],
+    })
+  ).rows.map((r) => toTask(r, []));
+
   const dayTotalSeconds = sessRows
     .filter((r) => String(r.date) === selectedDate)
     .reduce((sum, r) => sum + Number(r.duration_sec), 0);
@@ -257,6 +275,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     selectedDate,
     today,
     tasks,
+    inbox,
     dayTotalSeconds,
     weekTotalSeconds,
     carryOverCount: await countCarryOver(userId, input.fileId),
@@ -484,26 +503,28 @@ async function listFiles(): Promise<FileEntry[]> {
 
 async function createTask(input: CreateTaskInput): Promise<Task> {
   const userId = currentUserId();
-  if (!input.date || !DATE_RE.test(input.date)) {
-    throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD"');
+  // date ausente/null → tarea de inbox (sin fecha).
+  const date = input.date == null ? null : input.date;
+  if (date != null && !DATE_RE.test(date)) {
+    throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD" o null');
   }
   const name = typeof input.text === 'string' ? input.text.trim() : '';
   if (!name) throw new BadRequestError('invalid_text', 'El texto no puede estar vacío');
 
   const file = input.fileId ?? null;
-  const order = await computeOrder(userId, input.date, file, input.afterId);
+  const order = await computeOrder(userId, date, file, input.afterId);
   const now = new Date().toISOString();
   const id = crypto.randomUUID();
 
   await getDb().execute({
     sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, created_at, updated_at)
           VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?)`,
-    args: [id, userId, name, input.date, order, file, now, now],
+    args: [id, userId, name, date, order, file, now, now],
   });
   return {
     id,
     name,
-    date: input.date,
+    date,
     done: false,
     order,
     file,
@@ -625,8 +646,35 @@ async function updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id:
   if (!cur) throw new NotFoundError('task_not_found', 'Tarea no encontrada');
 
   const file = cur.file == null ? null : String(cur.file);
-  const currentDate = String(cur.date);
-  const targetDate = input.date && DATE_RE.test(input.date) ? input.date : currentDate;
+  const currentDate = cur.date == null ? null : String(cur.date);
+
+  // date: null → inbox; undefined → no cambiar el día; 'YYYY-MM-DD' → ese día.
+  let targetDate: string | null;
+  if (input.date === null) targetDate = null;
+  else if (input.date === undefined) targetDate = currentDate;
+  else if (DATE_RE.test(input.date)) targetDate = input.date;
+  else targetDate = currentDate;
+
+  // Al inbox no van tareas con tiempo registrado: sus sesiones están atadas
+  // a un día real (work_sessions.date NOT NULL). El inbox es para pendientes
+  // sin arrancar.
+  if (targetDate === null) {
+    const count = Number(
+      (
+        await getDb().execute({
+          sql: 'SELECT count(*) AS c FROM work_sessions WHERE task_id = ? AND user_id = ?',
+          args: [input.taskId, userId],
+        })
+      ).rows[0]?.c ?? 0
+    );
+    if (count > 0) {
+      throw new BadRequestError(
+        'task_has_sessions',
+        'La tarea tiene tiempo registrado; no se puede mandar al inbox.'
+      );
+    }
+  }
+
   const order = await computeOrder(userId, targetDate, file, input.afterId);
   const now = new Date().toISOString();
 
@@ -636,7 +684,7 @@ async function updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id:
       args: [targetDate, order, now, input.taskId, userId],
     },
   ];
-  if (targetDate !== currentDate) {
+  if (targetDate !== currentDate && targetDate !== null) {
     stmts.push({
       sql: 'UPDATE work_sessions SET date = ? WHERE task_id = ? AND user_id = ?',
       args: [targetDate, input.taskId, userId],
@@ -681,6 +729,9 @@ async function logSession(input: LogSessionInput): Promise<Session> {
     })
   ).rows[0];
   if (!task) throw new NotFoundError('task_not_found', 'Tarea no encontrada');
+  if (task.date == null) {
+    throw new BadRequestError('task_has_no_date', 'Programá la tarea antes de registrar tiempo.');
+  }
 
   const rounded = roundDurationSeconds(input.durationSeconds);
   const id = crypto.randomUUID();

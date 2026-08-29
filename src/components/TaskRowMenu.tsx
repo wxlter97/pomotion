@@ -28,6 +28,7 @@ export default function TaskRowMenu({
   canMoveUp,
   canMoveDown,
   onDelete,
+  onSendToInbox,
   disabled,
   editDisabled,
   isSet,
@@ -44,6 +45,9 @@ export default function TaskRowMenu({
   canMoveUp: boolean;
   canMoveDown: boolean;
   onDelete: () => void;
+  /** Sacar la tarea de la agenda (→ inbox). Ausente = no se ofrece
+   *  (p. ej. la tarea ya tiene tiempo registrado). */
+  onSendToInbox?: () => void;
   /** Timer corriendo o fila ocupada → bloquea mover/reordenar/eliminar. */
   disabled: boolean;
   /** Fila ocupada → bloquea también editar. */
@@ -227,19 +231,28 @@ export default function TaskRowMenu({
               >
                 Bajar
               </button>
+              {(canMove || onSendToInbox) && <div className="move-menu-sep" />}
               {canMove && (
-                <>
-                  <div className="move-menu-sep" />
-                  <button
-                    type="button"
-                    className="move-menu-item"
-                    role="menuitem"
-                    onClick={() => setView('move')}
-                    disabled={disabled}
-                  >
-                    Mover a otro día…
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className="move-menu-item"
+                  role="menuitem"
+                  onClick={() => setView('move')}
+                  disabled={disabled}
+                >
+                  Mover a otro día…
+                </button>
+              )}
+              {onSendToInbox && (
+                <button
+                  type="button"
+                  className="move-menu-item"
+                  role="menuitem"
+                  onClick={() => run(onSendToInbox)}
+                  disabled={disabled}
+                >
+                  Sacar de la agenda
+                </button>
               )}
               <div className="move-menu-sep" />
               <button

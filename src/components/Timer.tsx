@@ -81,7 +81,14 @@ const Timer = forwardRef<
   // Persistir/limpiar el timer activo en localStorage.
   useEffect(() => {
     if (task && startedAt != null && (phase === 'work' || phase === 'break')) {
-      saveActiveTimer({ taskId: task.id, taskName: task.name, mode, phase, startedAt, date: task.date });
+      saveActiveTimer({
+        taskId: task.id,
+        taskName: task.name,
+        mode,
+        phase,
+        startedAt,
+        date: task.date ?? '',
+      });
     } else if (phase === 'idle') {
       clearActiveTimer();
     }

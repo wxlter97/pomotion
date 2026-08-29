@@ -6,6 +6,7 @@ import {
   getTasks,
   logout,
   moveTask,
+  moveTaskToInbox,
   PendingApprovalError,
   UnauthorizedError,
   updateTaskDone,
@@ -22,6 +23,7 @@ import RecurringTasksDialog from './components/RecurringTasksDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
+import Inbox from './components/Inbox';
 import Menu, { MenuItem } from './components/Menu';
 import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
@@ -481,6 +483,63 @@ export default function App() {
     })();
   }, [carryOverAuto, data, refresh]);
 
+  // --- Inbox (tareas sin fecha) ---
+
+  function handleInboxCreated(task: Task) {
+    setData((prev) => (prev ? { ...prev, inbox: [...prev.inbox, task] } : prev));
+  }
+
+  function handleInboxDeleted(id: string) {
+    setData((prev) => (prev ? { ...prev, inbox: prev.inbox.filter((t) => t.id !== id) } : prev));
+  }
+
+  function handleInboxTextUpdated(id: string, name: string) {
+    setData((prev) =>
+      prev ? { ...prev, inbox: prev.inbox.map((t) => (t.id === id ? { ...t, name } : t)) } : prev
+    );
+  }
+
+  async function handleScheduleTask(task: Task, date: string) {
+    if (!data) return;
+    const { selectedDay, week } = data;
+    setData((prev) => (prev ? { ...prev, inbox: prev.inbox.filter((t) => t.id !== task.id) } : prev));
+    setBusyTaskIds((prev) => new Set(prev).add(task.id));
+    try {
+      await moveTask(task.id, { date });
+      void refresh(selectedDay, week);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo programar la tarea');
+      void refresh(selectedDay, week); // restaura el inbox
+    } finally {
+      setBusyTaskIds((prev) => {
+        const s = new Set(prev);
+        s.delete(task.id);
+        return s;
+      });
+    }
+  }
+
+  async function handleSendToInbox(task: Task) {
+    if (!data) return;
+    const { selectedDay, week } = data;
+    setData((prev) => (prev ? { ...prev, tasks: prev.tasks.filter((t) => t.id !== task.id) } : prev));
+    setSelectedTask((prev) => (prev?.id === task.id ? null : prev));
+    setBusyTaskIds((prev) => new Set(prev).add(task.id));
+    try {
+      await moveTaskToInbox(task.id);
+      void refresh(selectedDay, week);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo sacar de la agenda');
+      void refresh(selectedDay, week);
+    } finally {
+      setBusyTaskIds((prev) => {
+        const s = new Set(prev);
+        s.delete(task.id);
+        return s;
+      });
+    }
+  }
+
   async function handleLogout() {
     try {
       await logout();
@@ -680,6 +739,16 @@ export default function App() {
             )}
           </div>
 
+          <Inbox
+            tasks={data.inbox}
+            days={data.days}
+            fileId={selectedFileId}
+            onCreated={handleInboxCreated}
+            onDeleted={handleInboxDeleted}
+            onTextUpdated={handleInboxTextUpdated}
+            onSchedule={(task, date) => void handleScheduleTask(task, date)}
+          />
+
           <div className="main-grid">
             <section className="tasks-panel card">
               <TaskList
@@ -704,6 +773,7 @@ export default function App() {
                 onTaskUpdated={handleTaskUpdated}
                 onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
                 onMoveTask={(task, target) => void handleMoveTask(task, target)}
+                onSendToInbox={(task) => void handleSendToInbox(task)}
                 onSessionUpdated={handleSessionUpdated}
                 onManualSessionAdded={handleSessionLogged}
               />

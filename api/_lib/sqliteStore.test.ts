@@ -169,6 +169,69 @@ describe('updateTask / deleteTask', () => {
   });
 });
 
+describe('inbox (tareas sin fecha)', () => {
+  it('createTask sin fecha va al inbox, no a un día', async () => {
+    const view = await as(USER, async () => {
+      await sqliteStore.createTask({ text: 'idea suelta' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'con fecha' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks.map((t) => t.name)).toEqual(['con fecha']);
+    expect(view.inbox.map((t) => t.name)).toEqual(['idea suelta']);
+    expect(view.inbox[0].date).toBeNull();
+  });
+
+  it('programar una tarea del inbox la saca del inbox y la pone en el día', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ text: 'programame' });
+      await sqliteStore.updateTaskPosition({ taskId: t.id, date: '2026-08-25' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Martes' });
+    });
+    expect(view.inbox).toHaveLength(0);
+    expect(view.tasks.map((t) => t.name)).toEqual(['programame']);
+  });
+
+  it('sacar de la agenda: date null manda la tarea al inbox', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'a inbox' });
+      await sqliteStore.updateTaskPosition({ taskId: t.id, date: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks).toHaveLength(0);
+    expect(view.inbox.map((t) => t.name)).toEqual(['a inbox']);
+  });
+
+  it('no deja mandar al inbox una tarea con tiempo registrado', async () => {
+    await expect(
+      as(USER, async () => {
+        const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'con sesión' });
+        await sqliteStore.logSession({ taskId: t.id, durationSeconds: 60, start: '09:00', end: '09:01' });
+        await sqliteStore.updateTaskPosition({ taskId: t.id, date: null });
+      })
+    ).rejects.toThrow();
+  });
+
+  it('no deja registrar tiempo en una tarea sin fecha', async () => {
+    await expect(
+      as(USER, async () => {
+        const t = await sqliteStore.createTask({ text: 'sin fecha' });
+        await sqliteStore.logSession({ taskId: t.id, durationSeconds: 60, start: '09:00', end: '09:01' });
+      })
+    ).rejects.toThrow();
+  });
+
+  it('el inbox se scopea por usuario y por contexto', async () => {
+    await as(USER, () => sqliteStore.createTask({ text: 'trabajo', fileId: 'Trabajo' }));
+    await as(USER, () => sqliteStore.createTask({ text: 'casa', fileId: 'Casa' }));
+    await as(OTHER, () => sqliteStore.createTask({ text: 'ajena' }));
+
+    const trabajo = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes', fileId: 'Trabajo' })
+    );
+    expect(trabajo.inbox.map((t) => t.name)).toEqual(['trabajo']);
+  });
+});
+
 describe('updateTaskPosition (mover entre días)', () => {
   it('cambia la fecha de la tarea y de sus sesiones', async () => {
     await as(USER, async () => {
