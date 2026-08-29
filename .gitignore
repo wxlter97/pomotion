@@ -7,6 +7,9 @@ dist
 *.log
 .DS_Store
 *.tsbuildinfo
+*.db
+*.db-shm
+*.db-wal
 vite.config.js
 vite.config.d.ts
 vitest.config.js
