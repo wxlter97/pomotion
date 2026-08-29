@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { movableTargets } from './components/MoveTaskMenu';
+import { movableTargets } from './components/TaskRowMenu';
 import type { DayColumn } from './types';
 
 const days: DayColumn[] = [

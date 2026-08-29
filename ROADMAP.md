@@ -368,6 +368,11 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
 - ~~**Prioridad / notas / due date**~~ ✅ PR #26 — panel de detalle al editar la tarea
   (pills de prioridad, fecha de vencimiento, notas). Franja de color por prioridad y chip
   de "vence" (relativo, rojo si venció) en la fila. `WeekView.today` nuevo.
+- ~~**Limpieza de UX / barra superior**~~ ✅ PR #26 — la barra pasó de 9 íconos sueltos a
+  `pomotion` + tema + menú "Ver" (Mes/Heatmap/Reporte/Recurrentes) + menú "⋮"
+  (Sonidos/Notificaciones/Carry-over/Actualizar/Salir). Las 5 acciones de cada fila de
+  tarea se colapsaron en un menú "⋮" (`TaskRowMenu`). Las 2 pills de total (Día/Semana)
+  se fusionaron en una. Componente `Menu` reutilizable.
 
 ### Tier 3 — más grande
 - **Analítica**: tiempo por día de semana / por hora del día, tendencia semanal,
