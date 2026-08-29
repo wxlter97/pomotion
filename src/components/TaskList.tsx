@@ -1,4 +1,11 @@
-import { useState, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react';
 import {
   createTask,
   deleteSession,
@@ -66,41 +73,51 @@ function findOverlap(
   return null;
 }
 
-export default function TaskList({
-  tasks,
-  selectedBlockId,
-  onSelect,
-  onToggleChecked,
-  togglingIds,
-  onSessionDeleted,
-  dayContainerId,
-  dayHeadingBlockId,
-  lockedTaskBlockId,
-  busyTaskIds,
-  onTaskCreated,
-  onTaskDeleted,
-  onTaskTextUpdated,
-  onReorderTask,
-  onSessionUpdated,
-  onManualSessionAdded,
-}: {
-  tasks: Task[];
-  selectedBlockId: string | null;
-  onSelect: (task: Task) => void;
-  onToggleChecked: (task: Task) => void;
-  togglingIds: Set<string>;
-  onSessionDeleted: (taskBlockId: string, sessionBlockId: string) => void;
-  dayContainerId: string | null;
-  dayHeadingBlockId: string | null;
-  lockedTaskBlockId: string | null;
-  busyTaskIds: Set<string>;
-  onTaskCreated: (task: { blockId: string; text: string; checked: boolean }) => void;
-  onTaskDeleted: (blockId: string) => void;
-  onTaskTextUpdated: (blockId: string, text: string) => void;
-  onReorderTask: (task: Task, targetIndex: number) => void;
-  onSessionUpdated: (taskBlockId: string, session: Session) => void;
-  onManualSessionAdded: (taskBlockId: string, session: Session) => void;
-}) {
+/** Permite abrir el formulario de "+ Agregar sesión manual" desde afuera
+ *  (App.tsx lo usa para el atajo de teclado `m`). */
+export type TaskListHandle = { openManualEntry: (taskBlockId: string) => void };
+
+const TaskList = forwardRef<
+  TaskListHandle,
+  {
+    tasks: Task[];
+    selectedBlockId: string | null;
+    onSelect: (task: Task) => void;
+    onToggleChecked: (task: Task) => void;
+    togglingIds: Set<string>;
+    onSessionDeleted: (taskBlockId: string, sessionBlockId: string) => void;
+    dayContainerId: string | null;
+    dayHeadingBlockId: string | null;
+    lockedTaskBlockId: string | null;
+    busyTaskIds: Set<string>;
+    onTaskCreated: (task: { blockId: string; text: string; checked: boolean }) => void;
+    onTaskDeleted: (blockId: string) => void;
+    onTaskTextUpdated: (blockId: string, text: string) => void;
+    onReorderTask: (task: Task, targetIndex: number) => void;
+    onSessionUpdated: (taskBlockId: string, session: Session) => void;
+    onManualSessionAdded: (taskBlockId: string, session: Session) => void;
+  }
+>(function TaskList(
+  {
+    tasks,
+    selectedBlockId,
+    onSelect,
+    onToggleChecked,
+    togglingIds,
+    onSessionDeleted,
+    dayContainerId,
+    dayHeadingBlockId,
+    lockedTaskBlockId,
+    busyTaskIds,
+    onTaskCreated,
+    onTaskDeleted,
+    onTaskTextUpdated,
+    onReorderTask,
+    onSessionUpdated,
+    onManualSessionAdded,
+  },
+  ref
+) {
   const [pendingDelete, setPendingDelete] = useState<{ taskBlockId: string; sessionBlockId: string } | null>(
     null
   );
@@ -333,10 +350,24 @@ export default function TaskList({
     return latestEnd ?? nowAsHHMM();
   }
 
-  function openManualEntry(task: Task) {
+  function beginManualEntry(task: Task) {
     setManualEntryTaskId(task.blockId);
     setManualDraft({ duration: '', start: defaultManualStart(task), end: '' });
   }
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openManualEntry(taskBlockId: string) {
+        // No-op si el form de esa tarea ya está abierto — no pisar lo que
+        // el usuario esté tipeando (ej. doble `m` sin querer).
+        if (manualEntryTaskId === taskBlockId) return;
+        const task = tasks.find((t) => t.blockId === taskBlockId);
+        if (task) beginManualEntry(task);
+      },
+    }),
+    [tasks, manualEntryTaskId]
+  );
 
   async function submitManualEntry(task: Task) {
     setError(null);
@@ -645,7 +676,7 @@ export default function TaskList({
                       )}
                     </>
                   ) : (
-                    <button type="button" className="manual-session-trigger" onClick={() => openManualEntry(task)}>
+                    <button type="button" className="manual-session-trigger" onClick={() => beginManualEntry(task)}>
                       + Agregar sesión manual
                     </button>
                   )}
@@ -702,4 +733,6 @@ export default function TaskList({
       )}
     </>
   );
-}
+});
+
+export default TaskList;
