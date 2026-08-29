@@ -8,7 +8,9 @@
     "dev:api": "tsx scripts/dev-api-server.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b && tsc -p api/tsconfig.json --noEmit"
+    "typecheck": "tsc -b && tsc -p api/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -23,6 +25,7 @@
     "dotenv": "^17.4.2",
     "tsx": "^4.23.12",
     "typescript": "^5.5.4",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vitest": "^2.1.9"
   }
 }
