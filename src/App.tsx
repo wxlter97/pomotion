@@ -25,10 +25,12 @@ import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
 import Inbox from './components/Inbox';
 import Menu, { MenuItem } from './components/Menu';
+import TagsDialog from './components/TagsDialog';
 import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import { formatDurationLabel } from './duration';
+import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
@@ -92,6 +94,8 @@ export default function App() {
   const [showMonth, setShowMonth] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [showTags, setShowTags] = useState(false);
+  const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
   const [theme, toggleTheme] = useTheme();
@@ -117,6 +121,19 @@ export default function App() {
   // "plan vs. real"). En segundos, para reusar formatDurationLabel.
   const dayEstimateSeconds =
     (data?.tasks ?? []).reduce((sum, t) => sum + (t.estimateMinutes ?? 0), 0) * 60;
+
+  // Si la etiqueta del filtro dejó de existir (se borró, o cambió de
+  // contexto), limpiar el filtro.
+  useEffect(() => {
+    if (filterTagId && data && !data.tags.some((t) => t.id === filterTagId)) {
+      setFilterTagId(null);
+    }
+  }, [data, filterTagId]);
+
+  const visibleTasks =
+    filterTagId && data
+      ? data.tasks.filter((t) => t.tagIds.includes(filterTagId))
+      : (data?.tasks ?? []);
 
   const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
     setLoading(true);
@@ -580,6 +597,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
+          <MenuItem onClick={() => { setShowTags(true); close(); }}>Etiquetas</MenuItem>
         </>
       )}
     </Menu>
@@ -751,8 +769,34 @@ export default function App() {
 
           <div className="main-grid">
             <section className="tasks-panel card">
+              {data.tags.length > 0 && (
+                <div className="tag-filter" role="group" aria-label="Filtrar por etiqueta">
+                  <button
+                    type="button"
+                    className={filterTagId ? 'tag-filter-chip' : 'tag-filter-chip is-on'}
+                    onClick={() => setFilterTagId(null)}
+                  >
+                    Todas
+                  </button>
+                  {data.tags.map((t) => (
+                    <button
+                      key={t.id}
+                      type="button"
+                      data-tag-color={tagColorOf(t.color)}
+                      className={
+                        filterTagId === t.id
+                          ? 'tag-filter-chip tag-filter-chip--color is-on'
+                          : 'tag-filter-chip tag-filter-chip--color'
+                      }
+                      onClick={() => setFilterTagId((cur) => (cur === t.id ? null : t.id))}
+                    >
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <TaskList
-                tasks={data.tasks}
+                tasks={visibleTasks}
                 selectedTaskId={selectedTask?.id ?? null}
                 onSelect={guardedSelectTask}
                 onToggleDone={(task) => void handleToggleDone(task)}
@@ -765,6 +809,9 @@ export default function App() {
                 previousWeekLabel={data.previousWeekLabel}
                 nextWeekLabel={data.nextWeekLabel}
                 fileId={selectedFileId}
+                allTags={data.tags}
+                onManageTags={() => setShowTags(true)}
+                canReorder={!filterTagId}
                 lockedTaskId={lockedTaskId}
                 busyTaskIds={busyTaskIds}
                 onTaskCreated={handleTaskCreated}
@@ -813,6 +860,14 @@ export default function App() {
 
       {showHeatmap && (
         <FocusHeatmap fileId={selectedFileId} onClose={() => setShowHeatmap(false)} />
+      )}
+
+      {showTags && data && (
+        <TagsDialog
+          tags={data.tags}
+          onChanged={() => void refresh(data.selectedDay, data.week)}
+          onClose={() => setShowTags(false)}
+        />
       )}
 
       {showRecurring && data && (

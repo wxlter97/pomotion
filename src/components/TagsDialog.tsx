@@ -1,0 +1,214 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { createTag, deleteTag, updateTag, UnauthorizedError } from '../api';
+import { DEFAULT_TAG_COLOR, TAG_COLORS, tagColorOf, type TagColor } from '../tags';
+import type { Tag } from '../types';
+import ConfirmDialog from './ConfirmDialog';
+
+function errText(err: unknown): string {
+  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
+  return err instanceof Error ? err.message : 'Algo salió mal';
+}
+
+function Swatches({
+  value,
+  onPick,
+  disabled,
+}: {
+  value: TagColor;
+  onPick: (c: TagColor) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="tag-swatches">
+      {TAG_COLORS.map((c) => (
+        <button
+          key={c.key}
+          type="button"
+          className={c.key === value ? 'tag-swatch is-active' : 'tag-swatch'}
+          data-tag-color={c.key}
+          onClick={() => onPick(c.key)}
+          disabled={disabled}
+          aria-label={c.label}
+          title={c.label}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Alta / edición / borrado de etiquetas. Tras cualquier cambio llama a
+ *  `onChanged` para que la app recargue la lista. */
+export default function TagsDialog({
+  tags,
+  onChanged,
+  onClose,
+}: {
+  tags: Tag[];
+  onChanged: () => void;
+  onClose: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [newName, setNewName] = useState('');
+  const [newColor, setNewColor] = useState<TagColor>(DEFAULT_TAG_COLOR);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+
+  const [pendingDelete, setPendingDelete] = useState<Tag | null>(null);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !editingId && !pendingDelete) onClose();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose, editingId, pendingDelete]);
+
+  async function run(fn: () => Promise<unknown>) {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+      onChanged();
+    } catch (err) {
+      setError(errText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitNew(e: FormEvent) {
+    e.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    await run(async () => {
+      await createTag(name, newColor);
+      setNewName('');
+      setNewColor(DEFAULT_TAG_COLOR);
+    });
+  }
+
+  async function saveName(tag: Tag) {
+    const name = editingName.trim();
+    setEditingId(null);
+    if (!name || name === tag.name) return;
+    await run(() => updateTag(tag.id, { name }));
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const tag = pendingDelete;
+    setPendingDelete(null);
+    await run(() => deleteTag(tag.id));
+  }
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="sheet sheet--tags"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tags-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="tags-title">Etiquetas</h2>
+
+        <form className="tag-new-form" onSubmit={submitNew}>
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Nueva etiqueta…"
+            disabled={busy}
+            maxLength={40}
+          />
+          <Swatches value={newColor} onPick={setNewColor} disabled={busy} />
+          <button type="submit" className="btn btn-tinted btn-small" disabled={busy || !newName.trim()}>
+            Crear
+          </button>
+        </form>
+
+        {tags.length === 0 ? (
+          <p className="muted">Todavía no creaste etiquetas.</p>
+        ) : (
+          <ul className="tag-manage-list">
+            {tags.map((tag) => (
+              <li key={tag.id} className="tag-manage-item">
+                <span className="tag-dot" data-tag-color={tagColorOf(tag.color)} aria-hidden="true" />
+                {editingId === tag.id ? (
+                  <input
+                    type="text"
+                    className="tag-rename-input"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => void saveName(tag)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void saveName(tag);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setEditingId(null);
+                      }
+                    }}
+                    disabled={busy}
+                    autoFocus
+                    maxLength={40}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="tag-manage-name"
+                    onClick={() => {
+                      setEditingId(tag.id);
+                      setEditingName(tag.name);
+                    }}
+                    title="Renombrar"
+                  >
+                    {tag.name}
+                  </button>
+                )}
+                <Swatches
+                  value={tagColorOf(tag.color)}
+                  onPick={(c) => void run(() => updateTag(tag.id, { color: c }))}
+                  disabled={busy}
+                />
+                <button
+                  type="button"
+                  className="tag-manage-delete"
+                  onClick={() => setPendingDelete(tag)}
+                  disabled={busy}
+                  aria-label={`Eliminar ${tag.name}`}
+                  title="Eliminar etiqueta"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {error && <p className="error">{error}</p>}
+
+        <div className="sheet-actions">
+          <button type="button" className="btn btn-plain" onClick={onClose}>
+            Cerrar
+          </button>
+        </div>
+      </div>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title={`Eliminar "${pendingDelete.name}"`}
+          message="Se quita de todas las tareas que la tengan. No borra las tareas."
+          confirmLabel="Eliminar"
+          destructive
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
+    </div>
+  );
+}

@@ -361,8 +361,12 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   semana (tabla `recurring_runs` marca cada semana/contexto, una sola vez). El "Aplicar"
   manual queda como override para reglas agregadas a mitad de semana.
 
-### Tier 2 — requiere UI nueva, schema ya listo
-- **Tags/proyectos**: alta de tags, asignar a tareas, filtrar la vista, reporte por tag.
+### Tier 2 — requiere UI nueva, schema ya listo — ✅ COMPLETO
+- ~~**Tags/proyectos**~~ ✅ PR #30 — diálogo de gestión (alta/rename/color/borrar) en el
+  menú "Ver"; toggles en el panel de detalle de la tarea; chips de color en la fila;
+  barra de filtro por etiqueta arriba de la lista; desglose "Por etiqueta" en el reporte.
+  `Task.tagIds` + `WeekView.tags` nuevos; CRUD plegado en `POST /api/tasks` (sin función
+  nueva). Paleta de 9 colores en `src/tags.ts`.
 - ~~**Estimación vs real**~~ ✅ PR #28 — campo "Estimado" en el panel de detalle
   (acepta "90" o "1h 30m"). En la fila: `registrado / estimado` (o `est. 2h` sin
   registro), rojo si se pasó. Pill del día gana segmento "Est". Reporte: total

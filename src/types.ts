@@ -24,8 +24,13 @@ export type Task = {
   due: string | null;
   /** Estimación de esfuerzo en minutos; null = sin estimar. */
   estimateMinutes: number | null;
+  /** ids de las etiquetas asignadas. */
+  tagIds: string[];
   sessions: Session[];
 };
+
+/** Etiqueta / proyecto. `color` es una clave de paleta (ver tags.ts). */
+export type Tag = { id: string; name: string; color: string };
 
 /** Un día de la semana visible: su etiqueta ("Lunes") y su fecha. */
 export type DayColumn = { day: string; date: string };
@@ -52,6 +57,8 @@ export type TasksResponse = {
   tasks: Task[];
   /** Tareas sin fecha (inbox / backlog) del contexto actual. */
   inbox: Task[];
+  /** Todas las etiquetas del usuario. */
+  tags: Tag[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes de días pasados que se pueden "traer a hoy". */
