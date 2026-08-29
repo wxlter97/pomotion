@@ -59,6 +59,8 @@ export type TasksResponse = {
   inbox: Task[];
   /** Todas las etiquetas del usuario. */
   tags: Tag[];
+  /** Plantillas de día del usuario. */
+  dayTemplates: DayTemplate[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes de días pasados que se pueden "traer a hoy". */
@@ -121,6 +123,19 @@ export type RecurringRule = {
   /** CSV de días 1(Lun)..7(Dom). */
   weekdays: string;
   active: boolean;
+};
+
+export type DayTemplateItem = {
+  name: string;
+  priority: TaskPriority | null;
+  estimateMinutes: number | null;
+};
+
+export type DayTemplate = {
+  id: string;
+  name: string;
+  file: string | null;
+  items: DayTemplateItem[];
 };
 
 export type TimerMode = 'pomodoro' | 'free';

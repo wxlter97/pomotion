@@ -32,10 +32,15 @@ import {
 import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
 import type {
   Analytics,
+  ApplyDayTemplateInput,
   ApplyRecurringInput,
+  CreateDayTemplateInput,
   CreateRecurringRuleInput,
   CreateTagInput,
   CreateTaskInput,
+  DayTemplate,
+  DayTemplateItem,
+  DayTemplateItemInput,
   FileEntry,
   FocusHeatmap,
   FocusHeatmapDay,
@@ -54,6 +59,7 @@ import type {
   Task,
   TaskPriority,
   TaskStore,
+  UpdateDayTemplateInput,
   UpdateRecurringRuleInput,
   UpdateSessionInput,
   UpdateTagInput,
@@ -318,6 +324,8 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     })
   ).rows.map(toTag);
 
+  const dayTemplates = await listDayTemplatesFor(userId);
+
   const dayTotalSeconds = sessRows
     .filter((r) => String(r.date) === selectedDate)
     .reduce((sum, r) => sum + Number(r.duration_sec), 0);
@@ -336,6 +344,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     tasks,
     inbox,
     tags,
+    dayTemplates,
     dayTotalSeconds,
     weekTotalSeconds,
     carryOverCount: await countCarryOver(userId, input.fileId),
@@ -1220,6 +1229,257 @@ async function applyRulesToWeek(
   return { added: inserts.length };
 }
 
+// --- Plantillas de día ---
+
+const TEMPLATE_NAME_MAX = 60;
+const TEMPLATE_MAX_ITEMS = 40;
+
+function toDayTemplate(r: Row, items: DayTemplateItem[]): DayTemplate {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    file: r.file == null ? null : String(r.file),
+    items,
+  };
+}
+
+function toTemplateItem(r: Row): DayTemplateItem {
+  const p = r.priority == null ? null : String(r.priority);
+  return {
+    name: String(r.name),
+    priority: p && PRIORITIES.has(p) ? (p as TaskPriority) : null,
+    estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
+  };
+}
+
+async function listDayTemplatesFor(userId: string): Promise<DayTemplate[]> {
+  const db = getDb();
+  const tplRows = (
+    await db.execute({
+      sql: 'SELECT * FROM day_templates WHERE user_id = ? ORDER BY name COLLATE NOCASE',
+      args: [userId],
+    })
+  ).rows;
+  if (tplRows.length === 0) return [];
+
+  const itemRows = (
+    await db.execute({
+      sql: `SELECT ti.* FROM day_template_items ti
+            JOIN day_templates t ON t.id = ti.template_id
+            WHERE t.user_id = ?
+            ORDER BY ti."order", ti.rowid`,
+      args: [userId],
+    })
+  ).rows;
+  const byTemplate = new Map<string, DayTemplateItem[]>();
+  for (const r of itemRows) {
+    const tid = String(r.template_id);
+    (byTemplate.get(tid) ?? byTemplate.set(tid, []).get(tid)!).push(toTemplateItem(r));
+  }
+  return tplRows.map((r) => toDayTemplate(r, byTemplate.get(String(r.id)) ?? []));
+}
+
+function cleanItems(items: DayTemplateItemInput[] | undefined): DayTemplateItem[] {
+  if (!Array.isArray(items)) return [];
+  const out: DayTemplateItem[] = [];
+  for (const raw of items) {
+    const name = typeof raw?.name === 'string' ? raw.name.trim() : '';
+    if (!name) continue;
+    const p = raw.priority ?? null;
+    if (p !== null && !PRIORITIES.has(p)) {
+      throw new BadRequestError('invalid_priority', 'priority de un ítem inválida');
+    }
+    let est: number | null = null;
+    if (raw.estimateMinutes != null) {
+      const e = raw.estimateMinutes;
+      if (typeof e !== 'number' || !Number.isFinite(e) || e <= 0 || e > ESTIMATE_MAX_MIN) {
+        throw new BadRequestError('invalid_estimate', 'estimate_min de un ítem inválido');
+      }
+      est = Math.round(e);
+    }
+    out.push({ name, priority: p as TaskPriority | null, estimateMinutes: est });
+    if (out.length >= TEMPLATE_MAX_ITEMS) break;
+  }
+  return out;
+}
+
+function cleanTemplateName(name: string | undefined): string {
+  const trimmed = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+  if (!trimmed) throw new BadRequestError('invalid_template_name', 'La plantilla necesita un nombre');
+  if (trimmed.length > TEMPLATE_NAME_MAX) {
+    throw new BadRequestError('invalid_template_name', `El nombre no puede pasar de ${TEMPLATE_NAME_MAX} caracteres`);
+  }
+  return trimmed;
+}
+
+async function itemsFromDay(
+  userId: string,
+  date: string,
+  file: string | null
+): Promise<DayTemplateItem[]> {
+  const f = fileFilter(file ?? undefined);
+  const rows = (
+    await getDb().execute({
+      sql: `SELECT name, priority, estimate_min FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND date = ?
+            ORDER BY "order", created_at`,
+      args: [userId, ...f.args, date],
+    })
+  ).rows;
+  return rows.slice(0, TEMPLATE_MAX_ITEMS).map(toTemplateItem);
+}
+
+async function writeItems(templateId: string, items: DayTemplateItem[]): Promise<void> {
+  if (items.length === 0) return;
+  await getDb().batch(
+    items.map((it, i) => ({
+      sql: `INSERT INTO day_template_items (id, template_id, name, "order", priority, estimate_min)
+            VALUES (?, ?, ?, ?, ?, ?)`,
+      args: [crypto.randomUUID(), templateId, it.name, i, it.priority, it.estimateMinutes],
+    })),
+    'write'
+  );
+}
+
+async function createDayTemplate(input: CreateDayTemplateInput): Promise<DayTemplate> {
+  const userId = currentUserId();
+  const name = cleanTemplateName(input.name);
+  const file = input.fileId ?? null;
+
+  let items: DayTemplateItem[];
+  if (input.fromDate) {
+    if (!DATE_RE.test(input.fromDate)) {
+      throw new BadRequestError('invalid_date', 'from_date debe ser "YYYY-MM-DD"');
+    }
+    items = await itemsFromDay(userId, input.fromDate, file);
+  } else {
+    items = cleanItems(input.items);
+  }
+
+  const id = crypto.randomUUID();
+  await getDb().execute({
+    sql: 'INSERT INTO day_templates (id, user_id, name, file, created_at) VALUES (?, ?, ?, ?, ?)',
+    args: [id, userId, name, file, new Date().toISOString()],
+  });
+  await writeItems(id, items);
+  return { id, name, file, items };
+}
+
+async function updateDayTemplate(input: UpdateDayTemplateInput): Promise<DayTemplate> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_id', 'Falta id');
+
+  const cur = (
+    await getDb().execute({
+      sql: 'SELECT * FROM day_templates WHERE id = ? AND user_id = ?',
+      args: [input.id, userId],
+    })
+  ).rows[0];
+  if (!cur) throw new NotFoundError('template_not_found', 'Plantilla no encontrada');
+
+  if (input.name !== undefined) {
+    await getDb().execute({
+      sql: 'UPDATE day_templates SET name = ? WHERE id = ? AND user_id = ?',
+      args: [cleanTemplateName(input.name), input.id, userId],
+    });
+  }
+  if (input.items !== undefined) {
+    const items = cleanItems(input.items);
+    await getDb().execute({
+      sql: 'DELETE FROM day_template_items WHERE template_id = ?',
+      args: [input.id],
+    });
+    await writeItems(input.id, items);
+  }
+
+  const [tpl] = await listDayTemplatesFor(userId).then((all) => all.filter((t) => t.id === input.id));
+  return tpl;
+}
+
+async function deleteDayTemplate(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_id', 'Falta id');
+  await getDb().batch(
+    [
+      { sql: 'DELETE FROM day_template_items WHERE template_id = ?', args: [id] },
+      { sql: 'DELETE FROM day_templates WHERE id = ? AND user_id = ?', args: [id, userId] },
+    ],
+    'write'
+  );
+}
+
+async function applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: number }> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_id', 'Falta id');
+  if (!input.date || !DATE_RE.test(input.date)) {
+    throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD"');
+  }
+  const date = input.date;
+  const file = input.fileId ?? null;
+  const f = fileFilter(file ?? undefined);
+  const db = getDb();
+
+  const tplRow = (
+    await db.execute({
+      sql: 'SELECT id FROM day_templates WHERE id = ? AND user_id = ?',
+      args: [input.id, userId],
+    })
+  ).rows[0];
+  if (!tplRow) throw new NotFoundError('template_not_found', 'Plantilla no encontrada');
+
+  const items = (
+    await db.execute({
+      sql: 'SELECT * FROM day_template_items WHERE template_id = ? ORDER BY "order", rowid',
+      args: [input.id],
+    })
+  ).rows.map(toTemplateItem);
+  if (items.length === 0) return { added: 0 };
+
+  const existing = new Set(
+    (
+      await db.execute({
+        sql: `SELECT name FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
+        args: [userId, ...f.args, date],
+      })
+    ).rows.map((r) => normalize(String(r.name)))
+  );
+  let order = Number(
+    (
+      await db.execute({
+        sql: `SELECT max("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date = ?`,
+        args: [userId, ...f.args, date],
+      })
+    ).rows[0]?.o ?? 0
+  );
+
+  const now = new Date().toISOString();
+  const inserts: { sql: string; args: InValue[] }[] = [];
+  for (const it of items) {
+    const key = normalize(it.name);
+    if (existing.has(key)) continue;
+    existing.add(key);
+    order += 1;
+    inserts.push({
+      sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, priority, estimate_min, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        crypto.randomUUID(),
+        userId,
+        it.name,
+        date,
+        order,
+        file,
+        it.priority,
+        it.estimateMinutes,
+        now,
+        now,
+      ],
+    });
+  }
+  if (inserts.length > 0) await db.batch(inserts, 'write');
+  return { added: inserts.length };
+}
+
 export const sqliteStore: TaskStore = {
   getWeekView,
   getMonthSummary,
@@ -1244,4 +1504,8 @@ export const sqliteStore: TaskStore = {
   updateRecurringRule,
   deleteRecurringRule,
   applyRecurringToWeek,
+  createDayTemplate,
+  updateDayTemplate,
+  deleteDayTemplate,
+  applyDayTemplate,
 };
