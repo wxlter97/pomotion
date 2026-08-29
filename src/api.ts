@@ -4,6 +4,7 @@ import type {
   MonthSummary,
   RecurringRule,
   Session,
+  Tag,
   Task,
   TaskPriority,
   TasksResponse,
@@ -136,12 +137,37 @@ export function updateTaskFields(
     notes?: string | null;
     due?: string | null;
     estimateMinutes?: number | null;
+    tagIds?: string[];
   }
 ) {
-  const { estimateMinutes, ...rest } = fields;
+  const { estimateMinutes, tagIds, ...rest } = fields;
   const body: Record<string, unknown> = { id, ...rest };
   if (estimateMinutes !== undefined) body.estimate_min = estimateMinutes;
+  if (tagIds !== undefined) body.tag_ids = tagIds;
   return request<{ ok: true }>('/api/task', { method: 'PATCH', body: JSON.stringify(body) });
+}
+
+// --- Etiquetas / proyectos ---
+
+export function createTag(name: string, color: string) {
+  return request<{ ok: true; tag: Tag }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_tag', name, color }),
+  });
+}
+
+export function updateTag(id: string, fields: { name?: string; color?: string }) {
+  return request<{ ok: true; tag: Tag }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_tag', id, ...fields }),
+  });
+}
+
+export function deleteTag(id: string) {
+  return request<{ ok: true }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_tag', id }),
+  });
 }
 
 export function deleteTask(id: string) {
@@ -243,6 +269,7 @@ export type ReportRow = {
   taskId: string;
   task: string;
   estimateMinutes: number | null;
+  tagIds: string[];
   durationSeconds: number;
   start: string;
   end: string;
@@ -255,9 +282,12 @@ function reportParams(from: string, to: string, fileId?: string, extra?: Record<
 }
 
 export function getReport(from: string, to: string, fileId?: string) {
-  return request<{ rows: ReportRow[]; totalSeconds: number; estimatedMinutes: number }>(
-    `/api/report?${reportParams(from, to, fileId)}`
-  );
+  return request<{
+    rows: ReportRow[];
+    totalSeconds: number;
+    estimatedMinutes: number;
+    tags: Tag[];
+  }>(`/api/report?${reportParams(from, to, fileId)}`);
 }
 
 /** URL de descarga directa del CSV (navegación normal del navegador — la

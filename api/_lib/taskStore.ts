@@ -35,8 +35,13 @@ export type Task = {
   due: string | null;
   /** Estimación de esfuerzo en minutos; null = sin estimar. */
   estimateMinutes: number | null;
+  /** ids de las etiquetas asignadas (ver `Tag`). */
+  tagIds: string[];
   sessions: Session[];
 };
+
+/** Etiqueta / proyecto. `color` es una clave de paleta (ver src/tags.ts). */
+export type Tag = { id: string; name: string; color: string };
 
 /** Un día de la semana visible: su etiqueta ("Lunes") y su fecha. */
 export type DayColumn = { day: string; date: string };
@@ -59,6 +64,8 @@ export type WeekView = {
   tasks: Task[];
   /** Tareas sin fecha (inbox / backlog) del contexto actual, ordenadas por `order`. */
   inbox: Task[];
+  /** Todas las etiquetas del usuario (globales, no dependen del contexto). */
+  tags: Tag[];
   dayTotalSeconds: number;
   weekTotalSeconds: number;
   /** Tareas pendientes (sin sesiones) de días pasados, candidatas a "traer a hoy". */
@@ -117,6 +124,8 @@ export type SessionRow = {
   task: string;
   /** Estimación de la tarea en minutos; null = sin estimar. */
   estimateMinutes: number | null;
+  /** ids de las etiquetas de la tarea (para el desglose por etiqueta). */
+  tagIds: string[];
   durationSeconds: number;
   start: string;
   end: string;
@@ -160,7 +169,13 @@ export type UpdateTaskInput = {
   due?: string | null;
   /** Minutos estimados (entero > 0) para setear, null para quitar. */
   estimateMinutes?: number | null;
+  /** Reemplaza el conjunto completo de etiquetas de la tarea. */
+  tagIds?: string[];
 };
+
+export type CreateTagInput = { name?: string; color?: string };
+export type UpdateTagInput = { id?: string; name?: string; color?: string };
+
 export type UpdateTaskPositionInput = {
   taskId?: string;
   /**
@@ -207,6 +222,7 @@ export type UpdateTaskResult = {
   notes?: string | null;
   due?: string | null;
   estimateMinutes?: number | null;
+  tagIds?: string[];
 };
 
 export interface TaskStore {
@@ -217,6 +233,10 @@ export interface TaskStore {
   getFocusHeatmap(input: GetFocusHeatmapInput): Promise<FocusHeatmap>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   listFiles(): Promise<FileEntry[]>;
+  listTags(): Promise<Tag[]>;
+  createTag(input: CreateTagInput): Promise<Tag>;
+  updateTag(input: UpdateTagInput): Promise<Tag>;
+  deleteTag(id?: string): Promise<void>;
 
   createTask(input: CreateTaskInput): Promise<Task>;
   updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult>;

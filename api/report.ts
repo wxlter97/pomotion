@@ -60,7 +60,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const totalSeconds = rows.reduce((sum, r) => sum + r.durationSeconds, 0);
-    return res.status(200).json({ rows, totalSeconds, estimatedMinutes: estimatedMinutes(rows) });
+    return res.status(200).json({
+      rows,
+      totalSeconds,
+      estimatedMinutes: estimatedMinutes(rows),
+      tags: await sqliteStore.listTags(),
+    });
   } catch (err) {
     return sendError(res, err);
   }

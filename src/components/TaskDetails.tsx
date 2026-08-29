@@ -1,23 +1,30 @@
 import { useState } from 'react';
 import { updateTaskFields, UnauthorizedError } from '../api';
 import { estimateLabel, parseEstimateMinutes, PRIORITY_OPTIONS } from '../taskMeta';
-import type { Task, TaskPriority } from '../types';
+import { tagColorOf } from '../tags';
+import type { Tag, Task, TaskPriority } from '../types';
 
 type Fields = {
   priority?: TaskPriority | null;
   notes?: string | null;
   due?: string | null;
   estimateMinutes?: number | null;
+  tagIds?: string[];
 };
 
-/** Panel expandible bajo una tarea: prioridad, estimación, vencimiento y notas. */
+/** Panel expandible bajo una tarea: prioridad, estimación, vencimiento,
+ *  etiquetas y notas. */
 export default function TaskDetails({
   task,
+  allTags,
   onChange,
+  onManageTags,
   disabled,
 }: {
   task: Task;
+  allTags: Tag[];
   onChange: (patch: Fields) => void;
+  onManageTags: () => void;
   disabled?: boolean;
 }) {
   const [notes, setNotes] = useState(task.notes ?? '');
@@ -117,6 +124,41 @@ export default function TaskDetails({
             Quitar
           </button>
         )}
+      </div>
+
+      <div className="task-details-row">
+        <span className="task-details-label">Etiquetas</span>
+        <div className="tag-toggle-row">
+          {allTags.map((t) => {
+            const on = task.tagIds.includes(t.id);
+            return (
+              <button
+                key={t.id}
+                type="button"
+                className={on ? 'tag-toggle is-on' : 'tag-toggle'}
+                data-tag-color={tagColorOf(t.color)}
+                onClick={() =>
+                  void save({
+                    tagIds: on
+                      ? task.tagIds.filter((x) => x !== t.id)
+                      : [...task.tagIds, t.id],
+                  })
+                }
+                disabled={busy}
+              >
+                {t.name}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="btn btn-plain btn-small"
+            onClick={onManageTags}
+            disabled={busy}
+          >
+            {allTags.length ? 'Gestionar…' : 'Nueva…'}
+          </button>
+        </div>
       </div>
 
       <div className="task-details-row">

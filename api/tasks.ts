@@ -30,12 +30,31 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       });
       return res.status(200).json(view);
     }
-    // Acciones a nivel de semana/día (no de una tarea puntual — eso es /api/task).
+    // Acciones a nivel de semana/día + CRUD de etiquetas (no de una tarea
+    // puntual — eso es /api/task).
     if (req.method === 'POST') {
-      const body = (req.body ?? {}) as { action?: string; file?: string };
+      const body = (req.body ?? {}) as {
+        action?: string;
+        file?: string;
+        id?: string;
+        name?: string;
+        color?: string;
+      };
       if (body.action === 'carry_over') {
         const result = await sqliteStore.carryOverToToday({ fileId: body.file });
         return res.status(200).json({ ok: true, ...result });
+      }
+      if (body.action === 'create_tag') {
+        const tag = await sqliteStore.createTag({ name: body.name, color: body.color });
+        return res.status(200).json({ ok: true, tag });
+      }
+      if (body.action === 'update_tag') {
+        const tag = await sqliteStore.updateTag({ id: body.id, name: body.name, color: body.color });
+        return res.status(200).json({ ok: true, tag });
+      }
+      if (body.action === 'delete_tag') {
+        await sqliteStore.deleteTag(body.id);
+        return res.status(200).json({ ok: true });
       }
       return res.status(400).json({ error: 'invalid_action' });
     }

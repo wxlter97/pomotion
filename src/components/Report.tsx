@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getReport, reportCsvUrl, UnauthorizedError, type ReportRow } from '../api';
 import { formatDurationLabel } from '../duration';
+import type { Tag } from '../types';
+
+const NO_TAG = '__none__';
 
 function ymdLocal(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -28,6 +31,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
     rows: ReportRow[];
     totalSeconds: number;
     estimatedMinutes: number;
+    tags: Tag[];
   } | null>(null);
 
   useEffect(() => {
@@ -61,6 +65,20 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
 
   const byTask = useMemo(() => (result ? aggregate(result.rows, (r) => r.task) : []), [result]);
   const byDay = useMemo(() => (result ? aggregate(result.rows, (r) => r.date) : []), [result]);
+  const byTag = useMemo(() => {
+    if (!result) return [];
+    const totals = new Map<string, number>();
+    for (const r of result.rows) {
+      const keys = r.tagIds.length > 0 ? r.tagIds : [NO_TAG];
+      for (const k of keys) totals.set(k, (totals.get(k) ?? 0) + r.durationSeconds);
+    }
+    return [...totals].sort((a, b) => b[1] - a[1]);
+  }, [result]);
+  const tagName = useMemo(
+    () => new Map((result?.tags ?? []).map((t) => [t.id, t.name] as const)),
+    [result]
+  );
+  const hasTaggedRows = byTag.some(([k]) => k !== NO_TAG);
 
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
@@ -154,6 +172,26 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
                     ))}
                   </tbody>
                 </table>
+
+                {hasTaggedRows && (
+                  <>
+                    <h3>Por etiqueta</h3>
+                    <p className="report-note">
+                      Una sesión cuenta en cada etiqueta de su tarea, así que la suma
+                      puede pasar el total.
+                    </p>
+                    <table className="report-table">
+                      <tbody>
+                        {byTag.map(([key, secs]) => (
+                          <tr key={key}>
+                            <td>{key === NO_TAG ? 'Sin etiqueta' : (tagName.get(key) ?? '(borrada)')}</td>
+                            <td>{formatDurationLabel(secs)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </>
+                )}
               </>
             )}
           </div>

@@ -6,7 +6,7 @@
  */
 import crypto from 'node:crypto';
 import type { InValue, Row } from '@libsql/client';
-import { BadRequestError, NotFoundError } from './errors.js';
+import { BadRequestError, ConflictError, NotFoundError } from './errors.js';
 import { getDb } from './db.js';
 import {
   addDaysToDate,
@@ -32,6 +32,7 @@ import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js
 import type {
   ApplyRecurringInput,
   CreateRecurringRuleInput,
+  CreateTagInput,
   CreateTaskInput,
   FileEntry,
   FocusHeatmap,
@@ -46,11 +47,13 @@ import type {
   ReportInput,
   Session,
   SessionRow,
+  Tag,
   Task,
   TaskPriority,
   TaskStore,
   UpdateRecurringRuleInput,
   UpdateSessionInput,
+  UpdateTagInput,
   UpdateTaskInput,
   UpdateTaskPositionInput,
   UpdateTaskResult,
@@ -75,7 +78,22 @@ function toSession(r: Row): Session {
 
 const PRIORITIES = new Set(['low', 'med', 'high']);
 
-function toTask(r: Row, sessions: Session[]): Task {
+// Paleta de etiquetas — mantener en sync con src/tags.ts.
+const TAG_COLORS = new Set([
+  'slate',
+  'red',
+  'orange',
+  'amber',
+  'green',
+  'teal',
+  'blue',
+  'violet',
+  'pink',
+]);
+const DEFAULT_TAG_COLOR = 'slate';
+const TAG_NAME_MAX = 40;
+
+function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
   const priority = r.priority == null ? null : String(r.priority);
   const notes = r.notes == null ? null : String(r.notes);
   return {
@@ -89,8 +107,36 @@ function toTask(r: Row, sessions: Session[]): Task {
     notes: notes && notes.length > 0 ? notes : null,
     due: r.due == null ? null : String(r.due),
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
+    tagIds,
     sessions,
   };
+}
+
+function toTag(r: Row): Tag {
+  const color = r.color == null ? DEFAULT_TAG_COLOR : String(r.color);
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    color: TAG_COLORS.has(color) ? color : DEFAULT_TAG_COLOR,
+  };
+}
+
+/** `SELECT task_id, tag_id` para un set de tareas → Map<taskId, tagId[]>. */
+async function tagIdsByTask(taskIds: string[]): Promise<Map<string, string[]>> {
+  const map = new Map<string, string[]>();
+  if (taskIds.length === 0) return map;
+  const placeholders = taskIds.map(() => '?').join(',');
+  const rows = (
+    await getDb().execute({
+      sql: `SELECT task_id, tag_id FROM task_tags WHERE task_id IN (${placeholders})`,
+      args: taskIds,
+    })
+  ).rows;
+  for (const r of rows) {
+    const t = String(r.task_id);
+    (map.get(t) ?? map.set(t, []).get(t)!).push(String(r.tag_id));
+  }
+  return map;
 }
 
 function toRule(r: Row): RecurringRule {
@@ -245,19 +291,29 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     else sessionsByTask.set(s.taskId, [s]);
   }
 
-  const tasks = taskRows
-    .filter((r) => String(r.date) === selectedDate)
-    .map((r) => toTask(r, sessionsByTask.get(String(r.id)) ?? []));
+  const dayRows = taskRows.filter((r) => String(r.date) === selectedDate);
 
   // Inbox: tareas sin fecha del contexto actual (independiente de la semana).
-  const inbox = (
+  const inboxRows = (
     await db.execute({
       sql: `SELECT * FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date IS NULL
             ORDER BY "order", created_at`,
       args: [userId, ...f.args],
     })
-  ).rows.map((r) => toTask(r, []));
+  ).rows;
+
+  const tagsByTask = await tagIdsByTask([...dayRows, ...inboxRows].map((r) => String(r.id)));
+  const tasks = dayRows.map((r) =>
+    toTask(r, sessionsByTask.get(String(r.id)) ?? [], tagsByTask.get(String(r.id)) ?? [])
+  );
+  const inbox = inboxRows.map((r) => toTask(r, [], tagsByTask.get(String(r.id)) ?? []));
+  const tags = (
+    await db.execute({
+      sql: 'SELECT * FROM tags WHERE user_id = ? ORDER BY name COLLATE NOCASE',
+      args: [userId],
+    })
+  ).rows.map(toTag);
 
   const dayTotalSeconds = sessRows
     .filter((r) => String(r.date) === selectedDate)
@@ -276,6 +332,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     today,
     tasks,
     inbox,
+    tags,
     dayTotalSeconds,
     weekTotalSeconds,
     carryOverCount: await countCarryOver(userId, input.fileId),
@@ -472,15 +529,19 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
     })
   ).rows;
 
+  const tagsByTask = await tagIdsByTask([...new Set(rows.map((r) => String(r.task_id)))]);
+
   return rows.map((r) => {
     const date = String(r.date);
+    const taskId = String(r.task_id);
     return {
       date,
       day: weekdayNameOf(date) ?? '',
       week: weekLabelOf(mondayOf(date)),
-      taskId: String(r.task_id),
+      taskId,
       task: String(r.task_name),
       estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
+      tagIds: tagsByTask.get(taskId) ?? [],
       durationSeconds: Number(r.duration_sec),
       start: String(r.start_hhmm),
       end: String(r.end_hhmm),
@@ -497,6 +558,100 @@ async function listFiles(): Promise<FileEntry[]> {
     })
   ).rows;
   return rows.map((r) => ({ id: String(r.file), label: String(r.file) }));
+}
+
+// --- Etiquetas / proyectos ---
+
+function normalizeTagColor(color: string | undefined): string {
+  if (color == null) return DEFAULT_TAG_COLOR;
+  return TAG_COLORS.has(color) ? color : DEFAULT_TAG_COLOR;
+}
+
+function cleanTagName(name: string | undefined): string {
+  const trimmed = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+  if (!trimmed) throw new BadRequestError('invalid_tag_name', 'El nombre de la etiqueta no puede estar vacío');
+  if (trimmed.length > TAG_NAME_MAX) {
+    throw new BadRequestError('invalid_tag_name', `La etiqueta no puede pasar de ${TAG_NAME_MAX} caracteres`);
+  }
+  return trimmed;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Error && /UNIQUE constraint failed/i.test(err.message);
+}
+
+async function listTags(): Promise<Tag[]> {
+  const userId = currentUserId();
+  const rows = (
+    await getDb().execute({
+      sql: 'SELECT * FROM tags WHERE user_id = ? ORDER BY name COLLATE NOCASE',
+      args: [userId],
+    })
+  ).rows;
+  return rows.map(toTag);
+}
+
+async function createTag(input: CreateTagInput): Promise<Tag> {
+  const userId = currentUserId();
+  const name = cleanTagName(input.name);
+  const color = normalizeTagColor(input.color);
+  const id = crypto.randomUUID();
+  try {
+    await getDb().execute({
+      sql: 'INSERT INTO tags (id, user_id, name, color) VALUES (?, ?, ?, ?)',
+      args: [id, userId, name, color],
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new ConflictError('tag_exists', `Ya existe una etiqueta "${name}"`);
+    throw err;
+  }
+  return { id, name, color };
+}
+
+async function updateTag(input: UpdateTagInput): Promise<Tag> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_tag_id', 'Falta id');
+
+  const sets: string[] = [];
+  const args: InValue[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    args.push(cleanTagName(input.name));
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    args.push(normalizeTagColor(input.color));
+  }
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+
+  let res;
+  try {
+    res = await getDb().execute({
+      sql: `UPDATE tags SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`,
+      args: [...args, input.id, userId],
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new ConflictError('tag_exists', 'Ya existe una etiqueta con ese nombre');
+    throw err;
+  }
+  if (res.rowsAffected === 0) throw new NotFoundError('tag_not_found', 'Etiqueta no encontrada');
+
+  const row = (
+    await getDb().execute({ sql: 'SELECT * FROM tags WHERE id = ?', args: [input.id] })
+  ).rows[0];
+  return toTag(row);
+}
+
+async function deleteTag(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_tag_id', 'Falta id');
+  await getDb().batch(
+    [
+      { sql: 'DELETE FROM task_tags WHERE tag_id = ?', args: [id] },
+      { sql: 'DELETE FROM tags WHERE id = ? AND user_id = ?', args: [id, userId] },
+    ],
+    'write'
+  );
 }
 
 // --- Tareas ---
@@ -532,6 +687,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     notes: null,
     due: null,
     estimateMinutes: null,
+    tagIds: [],
     sessions: [],
   };
 }
@@ -606,7 +762,29 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     result.estimateMinutes = value;
   }
 
-  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+  let nextTagIds: string[] | undefined;
+  if (input.tagIds !== undefined) {
+    if (!Array.isArray(input.tagIds) || input.tagIds.some((t) => typeof t !== 'string')) {
+      throw new BadRequestError('invalid_tag_ids', 'tag_ids debe ser una lista de ids');
+    }
+    nextTagIds = [...new Set(input.tagIds)];
+    if (nextTagIds.length > 0) {
+      const placeholders = nextTagIds.map(() => '?').join(',');
+      const owned = (
+        await getDb().execute({
+          sql: `SELECT id FROM tags WHERE user_id = ? AND id IN (${placeholders})`,
+          args: [userId, ...nextTagIds],
+        })
+      ).rows.map((r) => String(r.id));
+      if (owned.length !== nextTagIds.length) {
+        throw new BadRequestError('unknown_tag', 'Alguna etiqueta no existe');
+      }
+    }
+  }
+
+  if (sets.length === 0 && nextTagIds === undefined) {
+    throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+  }
 
   sets.push('updated_at = ?');
   args.push(new Date().toISOString());
@@ -616,6 +794,20 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     args: [...args, input.taskId, userId] as InValue[],
   });
   if (res.rowsAffected === 0) throw new NotFoundError('task_not_found', 'Tarea no encontrada');
+
+  if (nextTagIds !== undefined) {
+    const stmts: { sql: string; args: InValue[] }[] = [
+      { sql: 'DELETE FROM task_tags WHERE task_id = ?', args: [input.taskId] },
+    ];
+    for (const tagId of nextTagIds) {
+      stmts.push({
+        sql: 'INSERT INTO task_tags (task_id, tag_id) VALUES (?, ?)',
+        args: [input.taskId, tagId],
+      });
+    }
+    await getDb().batch(stmts, 'write');
+    result.tagIds = nextTagIds;
+  }
   return result;
 }
 
@@ -623,10 +815,11 @@ async function deleteTask(taskId?: string): Promise<void> {
   const userId = currentUserId();
   if (!taskId) throw new BadRequestError('invalid_task_id', 'Falta task_id');
   // El enforcement de FK ON DELETE CASCADE no es fiable por conexión en
-  // Turso → borro las sesiones explícitamente.
+  // Turso → borro las filas dependientes explícitamente.
   await getDb().batch(
     [
       { sql: 'DELETE FROM work_sessions WHERE task_id = ? AND user_id = ?', args: [taskId, userId] },
+      { sql: 'DELETE FROM task_tags WHERE task_id = ?', args: [taskId] },
       { sql: 'DELETE FROM tasks WHERE id = ? AND user_id = ?', args: [taskId, userId] },
     ],
     'write'
@@ -984,6 +1177,10 @@ export const sqliteStore: TaskStore = {
   getFocusHeatmap,
   getSessionsInRange,
   listFiles,
+  listTags,
+  createTag,
+  updateTag,
+  deleteTag,
   createTask,
   updateTask,
   deleteTask,

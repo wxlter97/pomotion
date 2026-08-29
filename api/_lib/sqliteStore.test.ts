@@ -169,6 +169,78 @@ describe('updateTask / deleteTask', () => {
   });
 });
 
+describe('etiquetas / proyectos', () => {
+  it('CRUD de etiquetas + scope por usuario + nombre único', async () => {
+    const a = await as(USER, () => sqliteStore.createTag({ name: '  Proyecto X  ', color: 'blue' }));
+    expect(a).toMatchObject({ name: 'Proyecto X', color: 'blue' });
+
+    await expect(as(USER, () => sqliteStore.createTag({ name: 'Proyecto X' }))).rejects.toThrow();
+
+    const renamed = await as(USER, () => sqliteStore.updateTag({ id: a.id, name: 'Proyecto Y', color: 'red' }));
+    expect(renamed).toMatchObject({ name: 'Proyecto Y', color: 'red' });
+
+    // color inválido → cae al default
+    const c = await as(USER, () => sqliteStore.createTag({ name: 'Casa', color: 'fucsia' }));
+    expect(c.color).toBe('slate');
+
+    const mine = await as(USER, () => sqliteStore.listTags());
+    expect(mine.map((t) => t.name)).toEqual(['Casa', 'Proyecto Y']);
+    expect(await as(OTHER, () => sqliteStore.listTags())).toHaveLength(0);
+  });
+
+  it('asigna etiquetas a una tarea y las devuelve en getWeekView', async () => {
+    const view = await as(USER, async () => {
+      const t1 = await sqliteStore.createTag({ name: 'urgente', color: 'red' });
+      const t2 = await sqliteStore.createTag({ name: 'admin' });
+      const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: task.id, tagIds: [t1.id, t2.id, t1.id] });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0].tagIds.sort()).toEqual(view.tags.map((t) => t.id).sort());
+    expect(view.tags.map((t) => t.name)).toEqual(['admin', 'urgente']);
+
+    // reemplazo total: pasar [] limpia
+    const cleared = await as(USER, async () => {
+      await sqliteStore.updateTask({ taskId: view.tasks[0].id, tagIds: [] });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0].tagIds).toEqual([]);
+  });
+
+  it('rechaza etiquetas de otro usuario o inexistentes', async () => {
+    const foreign = await as(OTHER, () => sqliteStore.createTag({ name: 'ajena' }));
+    await expect(
+      as(USER, async () => {
+        const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+        await sqliteStore.updateTask({ taskId: task.id, tagIds: [foreign.id] });
+      })
+    ).rejects.toThrow();
+  });
+
+  it('borrar una etiqueta la quita de las tareas', async () => {
+    const view = await as(USER, async () => {
+      const tag = await sqliteStore.createTag({ name: 'temporal' });
+      const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: task.id, tagIds: [tag.id] });
+      await sqliteStore.deleteTag(tag.id);
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tags).toHaveLength(0);
+    expect(view.tasks[0].tagIds).toEqual([]);
+  });
+
+  it('getSessionsInRange trae los tagIds de la tarea', async () => {
+    const rows = await as(USER, async () => {
+      const tag = await sqliteStore.createTag({ name: 'facturable', color: 'green' });
+      const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: task.id, tagIds: [tag.id] });
+      await sqliteStore.logSession({ taskId: task.id, durationSeconds: 600, start: '09:00', end: '09:10' });
+      return sqliteStore.getSessionsInRange({ from: '2026-08-01', to: '2026-08-31' });
+    });
+    expect(rows[0].tagIds).toHaveLength(1);
+  });
+});
+
 describe('inbox (tareas sin fecha)', () => {
   it('createTask sin fecha va al inbox, no a un día', async () => {
     const view = await as(USER, async () => {

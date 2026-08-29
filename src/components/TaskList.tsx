@@ -15,8 +15,9 @@ import {
   nowAsHHMM,
   parseDurationToSeconds,
 } from '../duration';
-import type { DayColumn, Session, Task } from '../types';
+import type { DayColumn, Session, Tag, Task } from '../types';
 import { daysBetween, dueChipLabel, dueLabel, isOverdue, taskTimeSummary } from '../taskMeta';
+import { resolveTags, tagColorOf } from '../tags';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
  *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
@@ -86,6 +87,9 @@ export default function TaskList({
   previousWeekLabel,
   nextWeekLabel,
   fileId,
+  allTags,
+  onManageTags,
+  canReorder = true,
   lockedTaskId,
   busyTaskIds,
   onTaskCreated,
@@ -111,6 +115,11 @@ export default function TaskList({
   previousWeekLabel: string;
   nextWeekLabel: string;
   fileId: string | null;
+  allTags: Tag[];
+  onManageTags: () => void;
+  /** Con un filtro por etiqueta activo se desactiva reordenar (los índices
+   *  no corresponden al orden real). Default true. */
+  canReorder?: boolean;
   lockedTaskId: string | null;
   busyTaskIds: Set<string>;
   onTaskCreated: (task: Task) => void;
@@ -369,6 +378,7 @@ export default function TaskList({
           {tasks.map((task, i) => {
             const total = sumSeconds(task);
             const timeSummary = taskTimeSummary(total, task.estimateMinutes);
+            const taskTags = resolveTags(task.tagIds, allTags);
             const manualOverlap =
               manualEntryTaskId === task.id
                 ? findOverlap(tasks, null, manualDraft.start, manualDraft.end)
@@ -382,7 +392,7 @@ export default function TaskList({
             return (
               <li
                 key={task.id}
-                draggable={!disableEdit && !isEditingText}
+                draggable={canReorder && !disableEdit && !isEditingText}
                 onDragStart={(e) => handleDragStart(e, task.id)}
                 onDragOver={(e) => handleDragOver(e, i)}
                 onDrop={(e) => handleDrop(e, i)}
@@ -448,6 +458,20 @@ export default function TaskList({
                     </button>
                   )}
 
+                  {!isEditingText && taskTags.length > 0 && (
+                    <span className="task-tags">
+                      {taskTags.map((t) => (
+                        <span
+                          key={t.id}
+                          className="task-tag"
+                          data-tag-color={tagColorOf(t.color)}
+                        >
+                          {t.name}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+
                   {!isEditingText && (
                     <div className="task-item-trailing">
                       {task.due && daysBetween(today, task.due) <= DUE_CHIP_WINDOW_DAYS && (
@@ -478,15 +502,21 @@ export default function TaskList({
                         onEdit={() => startEditTask(task)}
                         onMoveUp={() => onReorderTask(task, i - 1)}
                         onMoveDown={() => onReorderTask(task, i + 1)}
-                        canMoveUp={i > 0}
-                        canMoveDown={i < tasks.length - 1}
+                        canMoveUp={canReorder && i > 0}
+                        canMoveDown={canReorder && i < tasks.length - 1}
                         onDelete={() => setPendingTaskDelete(task)}
                         onSendToInbox={
                           task.sessions.length === 0 ? () => onSendToInbox(task) : undefined
                         }
                         disabled={disableEdit}
                         editDisabled={isBusy}
-                        isSet={Boolean(task.priority || task.notes || task.due)}
+                        isSet={Boolean(
+                          task.priority ||
+                            task.notes ||
+                            task.due ||
+                            task.estimateMinutes != null ||
+                            task.tagIds.length > 0
+                        )}
                         currentDay={selectedDay}
                         days={days}
                         previousWeekLabel={previousWeekLabel}
@@ -501,8 +531,10 @@ export default function TaskList({
                 {isEditingText && (
                   <TaskDetails
                     task={task}
+                    allTags={allTags}
                     disabled={isBusy}
                     onChange={(patch) => onTaskUpdated(task.id, patch)}
+                    onManageTags={onManageTags}
                   />
                 )}
 
