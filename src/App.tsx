@@ -5,6 +5,7 @@ import {
   getFiles,
   getTasks,
   logout,
+  syncCalendarFeeds,
   moveTask,
   moveTaskToInbox,
   PendingApprovalError,
@@ -22,6 +23,7 @@ import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
+import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import Report from './components/Report';
 import MonthView from './components/MonthView';
@@ -103,6 +105,7 @@ export default function App() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
@@ -113,6 +116,7 @@ export default function App() {
   const notifications = useNotificationSetting();
   const timerRef = useRef<TimerHandle>(null);
   const carryOverDoneRef = useRef(false);
+  const feedSyncDoneRef = useRef(false);
 
   // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
   // tareas con `file` → modo de un solo contexto, el selector no aparece.
@@ -510,6 +514,21 @@ export default function App() {
     })();
   }, [carryOverAuto, data, refresh]);
 
+  // Sync de calendarios suscriptos: una vez por sesión, en segundo plano.
+  // Los errores por feed se ven en el diálogo de Calendarios.
+  useEffect(() => {
+    if (authState !== 'authed' || feedSyncDoneRef.current || !data) return;
+    feedSyncDoneRef.current = true;
+    void (async () => {
+      try {
+        const res = await syncCalendarFeeds();
+        if (res.changed) void refresh(data.selectedDay, data.week);
+      } catch {
+        // silencioso
+      }
+    })();
+  }, [authState, data, refresh]);
+
   // --- Inbox (tareas sin fecha) ---
 
   function handleInboxCreated(task: Task) {
@@ -612,6 +631,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
           <MenuItem onClick={() => { setShowTemplates(true); close(); }}>Plantillas de día</MenuItem>
           <MenuItem onClick={() => { setShowTags(true); close(); }}>Etiquetas</MenuItem>
+          <MenuItem onClick={() => { setShowFeeds(true); close(); }}>Calendarios</MenuItem>
         </>
       )}
     </Menu>
@@ -888,6 +908,14 @@ export default function App() {
           tags={data.tags}
           fileId={selectedFileId}
           onClose={() => setShowGoals(false)}
+        />
+      )}
+
+      {showFeeds && (
+        <CalendarFeedsDialog
+          files={files}
+          onChanged={() => void refresh(data?.selectedDay, data?.week)}
+          onClose={() => setShowFeeds(false)}
         />
       )}
 

@@ -813,6 +813,155 @@ describe('recurrentes automáticas (al abrir la semana)', () => {
   });
 });
 
+describe('calendarios iCal', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function icsWith(...vevents: string[]): string {
+    return [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//t//EN',
+      'BEGIN:VTIMEZONE',
+      'TZID:America/El_Salvador',
+      'BEGIN:STANDARD',
+      'DTSTART:19700101T000000',
+      'TZOFFSETFROM:-0600',
+      'TZOFFSETTO:-0600',
+      'END:STANDARD',
+      'END:VTIMEZONE',
+      ...vevents,
+      'END:VCALENDAR',
+    ].join('\r\n');
+  }
+
+  function vevent(uid: string, summary: string, day: string, opts: { status?: string } = {}): string {
+    return [
+      'BEGIN:VEVENT',
+      `UID:${uid}`,
+      `SUMMARY:${summary}`,
+      `DTSTART;TZID=America/El_Salvador:${day}T090000`,
+      `DTEND;TZID=America/El_Salvador:${day}T100000`,
+      ...(opts.status ? [`STATUS:${opts.status}`] : []),
+      'END:VEVENT',
+    ].join('\r\n');
+  }
+
+  function stubFetch(text: string, ok = true, status = 200): void {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok,
+        status,
+        arrayBuffer: async () => new TextEncoder().encode(text).buffer,
+      }))
+    );
+  }
+
+  async function thursday(): Promise<{ name: string; source: string }[]> {
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    return view.tasks.map((t) => ({ name: t.name, source: t.source }));
+  }
+
+  it('materializa los eventos como tareas del día correcto', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ name: 'Trabajo', url: 'https://x.test/c.ics' })
+    );
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    expect(res.added).toBe(1);
+    expect(res.changed).toBe(true);
+    expect(await thursday()).toEqual([{ name: 'Reunión', source: 'calendar' }]);
+
+    const feeds = await as(USER, () => sqliteStore.listCalendarFeeds());
+    expect(feeds[0].lastError).toBeNull();
+    expect(feeds[0].lastSyncedAt).not.toBeNull();
+  });
+
+  it('re-sync: agrega nuevos, actualiza los sin tocar, borra los que se fueron', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Uno', '20260827'), vevent('b', 'Dos', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    expect((await thursday()).map((t) => t.name).sort()).toEqual(['Dos', 'Uno']);
+
+    // 'a' renombrado, 'b' se fue, 'c' nuevo.
+    stubFetch(icsWith(vevent('a', 'Uno (v2)', '20260827'), vevent('c', 'Tres', '20260827')));
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    expect(res).toMatchObject({ added: 1, updated: 1, removed: 1 });
+    expect((await thursday()).map((t) => t.name).sort()).toEqual(['Tres', 'Uno (v2)']);
+  });
+
+  it('no pisa una tarea que el usuario completó', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    await as(USER, () => sqliteStore.updateTask({ taskId: view.tasks[0].id, done: true }));
+
+    // el evento desaparece del feed → la tarea completada NO se borra, se huerfaniza.
+    stubFetch(icsWith());
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    expect(res.removed).toBe(1); // cuenta remove+orphan
+    const after = await thursday();
+    expect(after).toEqual([{ name: 'Reunión', source: 'calendar' }]);
+  });
+
+  it('guarda el error del feed sin tirar la operación', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch('not found', false, 404);
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    expect(res.added).toBe(0);
+    const feeds = await as(USER, () => sqliteStore.listCalendarFeeds());
+    expect(feeds[0].lastError).toContain('404');
+  });
+
+  it('deleteCalendarFeed borra el feed y sus tareas sin sesiones', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    await as(USER, () => sqliteStore.deleteCalendarFeed(feed.id));
+
+    expect(await as(USER, () => sqliteStore.listCalendarFeeds())).toEqual([]);
+    expect(await thursday()).toEqual([]);
+  });
+
+  it('scopea los feeds por usuario', async () => {
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    expect(await as(OTHER, () => sqliteStore.listCalendarFeeds())).toEqual([]);
+    await expect(
+      as(OTHER, () => sqliteStore.updateCalendarFeed({ id: feed.id, enabled: false }))
+    ).rejects.toThrow();
+  });
+});
+
 afterEach(() => {
   resetDb();
 });

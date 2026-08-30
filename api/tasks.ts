@@ -28,6 +28,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (typeof req.query.goals === 'string') {
         return res.status(200).json({ goals: await sqliteStore.listGoals() });
       }
+      // ?feeds=1 → calendarios iCal suscriptos.
+      if (typeof req.query.feeds === 'string') {
+        return res.status(200).json({ feeds: await sqliteStore.listCalendarFeeds() });
+      }
       // ?analytics=1 → agregados del panel de analítica.
       if (typeof req.query.analytics === 'string') {
         const weeks = Number(req.query.weeks);
@@ -58,6 +62,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         items?: DayTemplateItemInput[];
         tag_id?: string | null;
         target_minutes?: number;
+        url?: string;
+        enabled?: boolean;
+        feed_id?: string;
+        force?: boolean;
       };
       if (body.action === 'carry_over') {
         const result = await sqliteStore.carryOverToToday({ fileId: body.file });
@@ -123,6 +131,34 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (body.action === 'delete_goal') {
         await sqliteStore.deleteGoal(body.id);
         return res.status(200).json({ ok: true });
+      }
+      if (body.action === 'create_feed') {
+        const feed = await sqliteStore.createCalendarFeed({
+          name: body.name,
+          url: body.url,
+          fileId: body.file ?? null,
+        });
+        return res.status(200).json({ ok: true, feed });
+      }
+      if (body.action === 'update_feed') {
+        const feed = await sqliteStore.updateCalendarFeed({
+          id: body.id,
+          name: body.name,
+          enabled: body.enabled,
+          fileId: 'file' in body ? (body.file ?? null) : undefined,
+        });
+        return res.status(200).json({ ok: true, feed });
+      }
+      if (body.action === 'delete_feed') {
+        await sqliteStore.deleteCalendarFeed(body.id);
+        return res.status(200).json({ ok: true });
+      }
+      if (body.action === 'sync_feeds') {
+        const result = await sqliteStore.syncCalendarFeeds({
+          feedId: body.feed_id,
+          force: body.force === true || typeof body.feed_id === 'string',
+        });
+        return res.status(200).json({ ok: true, ...result });
       }
       return res.status(400).json({ error: 'invalid_action' });
     }

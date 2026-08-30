@@ -23,6 +23,9 @@ export type Session = {
 /** Prioridad de una tarea; null = sin prioridad. */
 export type TaskPriority = 'low' | 'med' | 'high';
 
+/** Procedencia de una tarea: creada a mano o materializada de un calendario. */
+export type TaskSource = 'manual' | 'calendar';
+
 export type Task = {
   id: string;
   name: string;
@@ -40,7 +43,24 @@ export type Task = {
   estimateMinutes: number | null;
   /** ids de las etiquetas asignadas (ver `Tag`). */
   tagIds: string[];
+  /** 'manual' salvo que la tarea venga de un calendario suscripto. */
+  source: TaskSource;
   sessions: Session[];
+};
+
+/** Calendario iCal suscripto: se baja cada tanto y sus eventos se vuelven tareas. */
+export type CalendarFeed = {
+  id: string;
+  name: string;
+  /** URL .ics; se devuelve completa solo al dueño. */
+  url: string;
+  /** Bucket destino de las tareas creadas ('Trabajo' / 'Casa' / null). */
+  file: string | null;
+  enabled: boolean;
+  /** ISO del último sync exitoso, o null. */
+  lastSyncedAt: string | null;
+  /** Último error de sync (sin la URL), o null. */
+  lastError: string | null;
 };
 
 /** Etiqueta / proyecto. `color` es una clave de paleta (ver src/tags.ts). */
@@ -243,6 +263,24 @@ export type ApplyDayTemplateInput = { id?: string; date?: string; fileId?: strin
 export type CreateGoalInput = { tagId?: string | null; targetMinutes?: number; fileId?: string };
 export type UpdateGoalInput = { id?: string; targetMinutes?: number; tagId?: string | null };
 
+export type CreateCalendarFeedInput = { name?: string; url?: string; fileId?: string | null };
+export type UpdateCalendarFeedInput = {
+  id?: string;
+  name?: string;
+  fileId?: string | null;
+  enabled?: boolean;
+};
+/** Resultado agregado de sincronizar uno o varios feeds. */
+export type SyncCalendarResult = {
+  /** Feeds efectivamente sincronizados (los frescos se saltean por debounce). */
+  syncedFeeds: number;
+  added: number;
+  updated: number;
+  removed: number;
+  /** true si algún feed cambió algo (para que el cliente refresque). */
+  changed: boolean;
+};
+
 export type UpdateTaskPositionInput = {
   taskId?: string;
   /**
@@ -335,4 +373,16 @@ export interface TaskStore {
   createGoal(input: CreateGoalInput): Promise<Goal>;
   updateGoal(input: UpdateGoalInput): Promise<Goal>;
   deleteGoal(id?: string): Promise<void>;
+
+  /** Calendarios iCal suscriptos del usuario. */
+  listCalendarFeeds(): Promise<CalendarFeed[]>;
+  createCalendarFeed(input: CreateCalendarFeedInput): Promise<CalendarFeed>;
+  updateCalendarFeed(input: UpdateCalendarFeedInput): Promise<CalendarFeed>;
+  /** Borra el feed y sus tareas sin tocar (las que tienen sesiones quedan huérfanas). */
+  deleteCalendarFeed(id?: string): Promise<void>;
+  /**
+   * Baja y materializa los feeds habilitados. `feedId` para forzar uno solo
+   * (ignora el debounce); sin él, sincroniza todos los que estén vencidos.
+   */
+  syncCalendarFeeds(input: { feedId?: string; force?: boolean }): Promise<SyncCalendarResult>;
 }

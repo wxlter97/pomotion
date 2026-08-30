@@ -392,6 +392,16 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
   Ventana 4/12/26 sem. `GET /api/tasks?analytics=1` (2 queries + `computeAnalytics`
   puro). Sin función serverless nueva.
 - **Time-blocking**: asignar la tarea a un bloque horario, ver el día como timeline.
+  (Descartado por ahora — el más invasivo, necesita UI de calendario nueva.)
+- ~~**Suscripción a calendarios (iCal)**~~ ✅ PR #35 — diálogo "Calendarios" (menú "Ver"):
+  se registra una URL `.ics` (Google/Outlook/…), el server la baja y materializa los
+  eventos con hora como tareas del día, manteniéndolas al día en cada sync. Recurrentes
+  (RRULE/EXDATE/overrides) expandidos vía `ical.js`. Ventana hoy−7…+28 días, debounce
+  10 min, trigger en segundo plano al abrir la app + botón "Sincronizar". Sync
+  unidireccional. Migración `005_calendar_feeds.sql` (`calendar_feeds` + `tasks.source`
+  / `feed_id` / `external_uid` / `external_date`). `GET /api/tasks?feeds=1` + acciones
+  `*_feed` / `sync_feeds` en `POST /api/tasks` (sin función serverless nueva).
+  Los eventos de día completo y los que rechazaste quedan afuera.
 - ~~**Templates de día**~~ ✅ PR #32 — diálogo "Plantillas de día" (menú "Ver"): guardar
   un set de tareas (a mano, o copiando el día visible con su prioridad/estimación) y
   "Aplicar" al día visible (dedup por nombre). Migración `003_day_templates.sql`
