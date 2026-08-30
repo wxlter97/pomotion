@@ -31,6 +31,8 @@ export type Task = {
   tagIds: string[];
   /** 'manual' salvo que la tarea venga de un calendario suscripto. */
   source: TaskSource;
+  /** ISO-8601 de cuándo se creó la tarea (para el chip de "edad"). */
+  createdAt: string;
   sessions: Session[];
 };
 

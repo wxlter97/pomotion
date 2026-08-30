@@ -70,6 +70,29 @@ export function dueChipLabel(due: string, today: string): string {
   return shortDate(due);
 }
 
+// --- Edad de la tarea ---
+
+/** A partir de cuántos días una tarea abierta muestra el chip de "edad". */
+export const TASK_AGE_MIN_DAYS = 7;
+
+/**
+ * Chip compacto de antigüedad para una tarea que lleva mucho abierta:
+ * "9d" hasta ~2 semanas, después "3sem". `null` si es más nueva que el
+ * umbral. `createdAt` es un ISO; solo cuenta la parte de fecha.
+ */
+export function taskAgeLabel(createdAt: string, today: string): string | null {
+  const days = daysBetween(createdAt.slice(0, 10), today);
+  if (days < TASK_AGE_MIN_DAYS) return null;
+  if (days < 14) return `${days}d`;
+  return `${Math.round(days / 7)}sem`;
+}
+
+/** Texto largo para el tooltip del chip: "Abierta hace 9 días". */
+export function taskAgeTitle(createdAt: string, today: string): string {
+  const days = daysBetween(createdAt.slice(0, 10), today);
+  return `Abierta hace ${days} ${days === 1 ? 'día' : 'días'}`;
+}
+
 // --- Estimación vs. real ---
 
 /**
