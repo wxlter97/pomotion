@@ -545,9 +545,14 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 - **Aviso al arrancar un bloque planeado**: mismo mecanismo que `dueReminders`
   (banner + notificación del navegador), pero disparando en `planned_start` en vez
   de en `due`. Bajo costo — reusa `notify()` y el patrón de `useDueNotifications`.
-- **Plantillas de día con horario**: que "Plantillas de día" conserve también la
-  hora planeada de cada ítem (no solo prioridad/estimación), así aplicar una
-  plantilla deja el día directamente agendado en el timeline.
+- ~~**Plantillas de día con horario**~~ ✅ — "Plantillas de día" conserva también la
+  hora planeada de cada ítem (no solo prioridad/estimación): al crear una plantilla
+  como snapshot del día visible ("Copiar…") se captura `planned_start`, y al
+  "Aplicar" la tarea nueva nace ya agendada en el timeline. Migración
+  `013_day_template_time.sql` (`day_template_items.planned_start`). Sin UI nueva —
+  la creación manual de ítems (textarea de nombres) sigue sin prioridad/estimación/
+  hora, igual que antes; el tooltip de la plantilla ahora muestra la hora si hay.
+  Sin función serverless nueva, en el backup.
 - **Deshacer la última acción**: snackbar "Deshacer" (5-10s) para borrar tarea /
   marcar hecho / mover, para el error más común sin la fricción de confirmar todo.
 - **Atajos de teclado en el timeline**: alternativa al arrastre — flechas para

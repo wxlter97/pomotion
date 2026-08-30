@@ -211,7 +211,10 @@ export default function DayTemplatesDialog({
                         setEditingId(tpl.id);
                         setEditingName(tpl.name);
                       }}
-                      title={tpl.items.map((i) => i.name).join('\n') || t('templates.noItems')}
+                      title={
+                        tpl.items.map((i) => (i.plannedStart ? `${i.plannedStart} ${i.name}` : i.name)).join('\n') ||
+                        t('templates.noItems')
+                      }
                     >
                       {tpl.name}
                     </button>

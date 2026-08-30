@@ -264,7 +264,12 @@ export function deleteTag(id: string) {
 
 // --- Plantillas de día ---
 
-type TemplateItemInput = { name: string; priority?: DayTemplateItem['priority']; estimateMinutes?: number | null };
+type TemplateItemInput = {
+  name: string;
+  priority?: DayTemplateItem['priority'];
+  estimateMinutes?: number | null;
+  plannedStart?: string | null;
+};
 
 /** Crea una plantilla con ítems explícitos o como snapshot de un día. */
 export function createDayTemplate(

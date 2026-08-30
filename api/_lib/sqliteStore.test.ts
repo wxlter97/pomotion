@@ -442,16 +442,40 @@ describe('plantillas de día', () => {
     expect(view.dayTemplates[0].items[1].estimateMinutes).toBe(90);
   });
 
-  it('crea como snapshot de un día (captura prioridad/estimación)', async () => {
+  it('crea como snapshot de un día (captura prioridad/estimación/hora)', async () => {
     const tpl = await as(USER, async () => {
       const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
       const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'B' });
-      await sqliteStore.updateTask({ taskId: a.id, priority: 'high', estimateMinutes: 60 });
+      await sqliteStore.updateTask({ taskId: a.id, priority: 'high', estimateMinutes: 60, plannedStart: '9:00' });
       void b;
       return sqliteStore.createDayTemplate({ name: 'Día tipo', fromDate: '2026-08-24' });
     });
     expect(tpl.items.map((i) => i.name)).toEqual(['A', 'B']);
-    expect(tpl.items[0]).toMatchObject({ priority: 'high', estimateMinutes: 60 });
+    expect(tpl.items[0]).toMatchObject({ priority: 'high', estimateMinutes: 60, plannedStart: '09:00' });
+    expect(tpl.items[1].plannedStart).toBeNull();
+  });
+
+  it('aplicar una plantilla con hora deja la tarea nueva ya agendada', async () => {
+    const view = await as(USER, async () => {
+      const tpl = await sqliteStore.createDayTemplate({
+        name: 't',
+        items: [{ name: 'Standup', plannedStart: '9:05' }, { name: 'Deep work' }],
+      });
+      await sqliteStore.applyDayTemplate({ id: tpl.id, date: '2026-08-25' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Martes' });
+    });
+    const standup = view.tasks.find((t) => t.name === 'Standup');
+    const deepWork = view.tasks.find((t) => t.name === 'Deep work');
+    expect(standup?.plannedStart).toBe('09:05');
+    expect(deepWork?.plannedStart).toBeNull();
+  });
+
+  it('rechaza una hora inválida en un ítem de plantilla', async () => {
+    await expect(
+      as(USER, () =>
+        sqliteStore.createDayTemplate({ name: 't', items: [{ name: 'x', plannedStart: '9am' }] })
+      )
+    ).rejects.toThrow();
   });
 
   it('aplicar estampa las tareas en el día, con dedup por nombre', async () => {
