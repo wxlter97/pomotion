@@ -175,6 +175,38 @@ export type EstimateAccuracy = {
   suggestedFactor: number;
 };
 
+/** Una tarea sin terminar de la semana revisada (ver WeeklyReview). */
+export type ReviewTask = {
+  id: string;
+  name: string;
+  date: string;
+  day: string;
+  file: string | null;
+  loggedSeconds: number;
+  hasSessions: boolean;
+};
+
+/** Datos de la Revisión semanal (panel guiado de fin de semana). */
+export type WeeklyReview = {
+  week: string;
+  weekStart: string;
+  previousWeekLabel: string;
+  nextWeekLabel: string;
+  isCurrentWeek: boolean;
+  nextWeekStart: string;
+  completedCount: number;
+  totalCount: number;
+  loggedSeconds: number;
+  previousLoggedSeconds: number;
+  byContext: { label: string; file: string | null; seconds: number }[];
+  byTag: { tagId: string; name: string; color: string; seconds: number }[];
+  unfinished: ReviewTask[];
+  /** Foco fijado para la semana revisada (referencia). */
+  thisFocus: string;
+  /** Foco fijado para la semana siguiente (editable en el panel). */
+  nextFocus: string;
+};
+
 export type RecurringFreq = 'weekly' | 'monthly';
 
 export type RecurringRule = {

@@ -17,6 +17,7 @@ const SCHEMA_TABLES = [
   'goals',
   'calendar_feeds',
   'day_notes',
+  'week_focus',
   'schema_migrations',
 ];
 
@@ -38,6 +39,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('006_task_checklist.sql');
     expect(applied).toContain('007_day_notes.sql');
     expect(applied).toContain('008_monthly_recurrence.sql');
+    expect(applied).toContain('009_week_focus.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });

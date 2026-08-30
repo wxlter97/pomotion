@@ -155,6 +155,43 @@ export type FocusHeatmap = {
   days: FocusHeatmapDay[];
 };
 
+// --- Revisión semanal (ROADMAP §11) ---
+
+/** Una tarea sin terminar de la semana revisada, con su tiempo registrado. */
+export type ReviewTask = {
+  id: string;
+  name: string;
+  date: string;
+  /** Nombre del día ("Lunes"…"Domingo"). */
+  day: string;
+  file: string | null;
+  loggedSeconds: number;
+  hasSessions: boolean;
+};
+
+export type WeeklyReview = {
+  /** Etiqueta "2026.08.24 - 2026.08.28". */
+  week: string;
+  /** Lunes de la semana revisada, 'YYYY-MM-DD'. */
+  weekStart: string;
+  previousWeekLabel: string;
+  nextWeekLabel: string;
+  isCurrentWeek: boolean;
+  /** Lunes de la semana siguiente — dónde se guarda el "foco". */
+  nextWeekStart: string;
+  completedCount: number;
+  totalCount: number;
+  loggedSeconds: number;
+  previousLoggedSeconds: number;
+  byContext: { label: string; file: string | null; seconds: number }[];
+  byTag: { tagId: string; name: string; color: string; seconds: number }[];
+  unfinished: ReviewTask[];
+  /** Foco que se fijó para ESTA semana (referencia, solo lectura acá). */
+  thisFocus: string;
+  /** Foco fijado para la semana siguiente (editable). */
+  nextFocus: string;
+};
+
 /** Fila del reporte de tiempo. */
 export type SessionRow = {
   date: string;
@@ -271,6 +308,8 @@ export type GetMonthSummaryInput = { month?: string; fileId?: string };
 export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
 export type GetAnalyticsInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
+export type GetWeeklyReviewInput = { week?: string };
+export type SaveWeekFocusInput = { weekStart?: string; body?: string };
 
 export type CreateTaskInput = {
   /** 'YYYY-MM-DD'; ausente/null = va al inbox (sin fecha). */
@@ -424,6 +463,11 @@ export interface TaskStore {
   /** Agregados para el panel de analítica (por día de semana, hora, semana…). */
   getAnalytics(input: GetAnalyticsInput): Promise<Analytics>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
+  /** Datos de la Revisión semanal: qué se hizo, tiempo por contexto/tag,
+   *  tareas sin terminar y el "foco" de la semana. */
+  getWeeklyReview(input: GetWeeklyReviewInput): Promise<WeeklyReview>;
+  /** Guarda (o borra, si `body` queda vacío) el "foco" de una semana. */
+  saveWeekFocus(input: SaveWeekFocusInput): Promise<{ body: string }>;
   /** Tareas cuyo nombre contiene `query` (todas las semanas + inbox del contexto). */
   searchTasks(input: SearchTasksInput): Promise<TaskSearchResult[]>;
   /** Volcado completo del dataset del usuario, para descargar como backup. */
