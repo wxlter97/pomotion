@@ -436,16 +436,25 @@ export function getRecurringRules() {
   return request<{ rules: RecurringRule[] }>('/api/recurring');
 }
 
-export function createRecurringRule(name: string, weekdays?: string) {
+export function createRecurringRule(
+  name: string,
+  opts?: { freq?: 'weekly' | 'monthly'; weekdays?: string; monthdays?: string }
+) {
   return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ action: 'create', name, weekdays }),
+    body: JSON.stringify({ action: 'create', name, ...opts }),
   });
 }
 
 export function updateRecurringRule(
   id: string,
-  fields: { name?: string; weekdays?: string; active?: boolean }
+  fields: {
+    name?: string;
+    active?: boolean;
+    freq?: 'weekly' | 'monthly';
+    weekdays?: string;
+    monthdays?: string;
+  }
 ) {
   return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',

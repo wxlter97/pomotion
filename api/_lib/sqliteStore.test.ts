@@ -956,6 +956,40 @@ describe('recurrentes', () => {
     expect(dom.tasks.map((t) => t.name)).toEqual(['Meal prep']);
   });
 
+  it('materializa reglas mensuales (día del mes y último día)', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createRecurringRule({ name: 'Pagar alquiler', freq: 'monthly', monthdays: '1' });
+      await sqliteStore.createRecurringRule({ name: 'Cierre de mes', freq: 'monthly', monthdays: '-1' });
+    });
+
+    // Semana Lun 31 ago – Vie 4 sep (materializa 31 ago … 6 sep).
+    const res = await as(USER, () =>
+      sqliteStore.applyRecurringToWeek({ week: '2026.08.31 - 2026.09.04' })
+    );
+    expect(res.added).toBe(2);
+
+    const lun = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.31 - 2026.09.04', day: 'Lunes' })
+    );
+    expect(lun.tasks.map((t) => t.name)).toEqual(['Cierre de mes']); // 31 ago = último día
+
+    const mar = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.31 - 2026.09.04', day: 'Martes' })
+    );
+    expect(mar.tasks.map((t) => t.name)).toEqual(['Pagar alquiler']); // 1 sep
+  });
+
+  it('createRecurringRule rechaza monthdays inválido y guarda freq/monthdays', async () => {
+    await expect(
+      as(USER, () => sqliteStore.createRecurringRule({ name: 'X', freq: 'monthly', monthdays: '40' }))
+    ).rejects.toThrow();
+
+    const rule = await as(USER, () =>
+      sqliteStore.createRecurringRule({ name: 'Y', freq: 'monthly', monthdays: '15,1,15' })
+    );
+    expect(rule).toMatchObject({ freq: 'monthly', monthdays: '1,15' });
+  });
+
   it('CRUD de reglas', async () => {
     const rules = await as(USER, async () => {
       const r = await sqliteStore.createRecurringRule({ name: 'X' });
@@ -963,10 +997,22 @@ describe('recurrentes', () => {
       return sqliteStore.listRecurringRules();
     });
     expect(rules).toHaveLength(1);
-    expect(rules[0]).toMatchObject({ name: 'X2', active: false });
+    expect(rules[0]).toMatchObject({ name: 'X2', active: false, freq: 'weekly' });
 
     await as(USER, () => sqliteStore.deleteRecurringRule(rules[0].id));
     expect(await as(USER, () => sqliteStore.listRecurringRules())).toHaveLength(0);
+  });
+
+  it('cambiar una regla a mensual y de vuelta a semanal', async () => {
+    const r = await as(USER, () => sqliteStore.createRecurringRule({ name: 'Flexible' }));
+    const monthly = await as(USER, () =>
+      sqliteStore.updateRecurringRule({ id: r.id, freq: 'monthly', monthdays: '10' })
+    );
+    expect(monthly).toMatchObject({ freq: 'monthly', monthdays: '10' });
+    const weekly = await as(USER, () =>
+      sqliteStore.updateRecurringRule({ id: r.id, freq: 'weekly', weekdays: '2,4' })
+    );
+    expect(weekly).toMatchObject({ freq: 'weekly', weekdays: '2,4' });
   });
 });
 

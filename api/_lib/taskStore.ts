@@ -13,6 +13,8 @@ import type { Analytics } from './analytics.js';
 export type { Analytics } from './analytics.js';
 import type { ChecklistItem } from './checklist.js';
 export type { ChecklistItem } from './checklist.js';
+import type { RecurringFreq } from './recurrence.js';
+export type { RecurringFreq } from './recurrence.js';
 
 export type Session = {
   id: string;
@@ -191,9 +193,13 @@ export type RecurringRule = {
   id: string;
   name: string;
   file: string | null;
-  /** CSV de días 1(Lun)..7(Dom), ej. "1,2,3,4,5". */
-  weekdays: string;
   active: boolean;
+  /** 'weekly' usa `weekdays`; 'monthly' usa `monthdays`. */
+  freq: RecurringFreq;
+  /** CSV de días 1(Lun)..7(Dom), ej. "1,2,3,4,5". Relevante con freq 'weekly'. */
+  weekdays: string;
+  /** CSV de días del mes 1..31, más `-1` = último día. Relevante con freq 'monthly'; '' si no aplica. */
+  monthdays: string;
 };
 
 /** Un ítem de una plantilla de día. */
@@ -380,12 +386,20 @@ export type UpdateSessionInput = {
   end?: string;
 };
 
-export type CreateRecurringRuleInput = { name?: string; weekdays?: string; fileId?: string };
+export type CreateRecurringRuleInput = {
+  name?: string;
+  fileId?: string;
+  freq?: string;
+  weekdays?: string;
+  monthdays?: string;
+};
 export type UpdateRecurringRuleInput = {
   id?: string;
   name?: string;
-  weekdays?: string;
   active?: boolean;
+  freq?: string;
+  weekdays?: string;
+  monthdays?: string;
 };
 export type ApplyRecurringInput = { week?: string; fileId?: string };
 
