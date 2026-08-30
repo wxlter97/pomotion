@@ -152,6 +152,20 @@ export type Analytics = {
   byWeek: { weekStart: string; label: string; totalSeconds: number }[];
   completion: { total: number; done: number };
   streak: { current: number; longest: number };
+  estimateAccuracy: EstimateAccuracy | null;
+};
+
+/** Precisión de las estimaciones sobre las tareas completadas de la ventana. */
+export type EstimateAccuracy = {
+  count: number;
+  totalEstimatedSeconds: number;
+  totalLoggedSeconds: number;
+  /** registrado / estimado. >1 = subestimás. */
+  ratio: number;
+  /** (ratio − 1) × 100. + = subestimás, − = sobreestimás. */
+  biasPct: number;
+  /** Factor sugerido para multiplicar futuras estimaciones. */
+  suggestedFactor: number;
 };
 
 export type RecurringRule = {

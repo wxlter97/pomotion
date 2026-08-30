@@ -580,7 +580,7 @@ async function getAnalytics(input: GetAnalyticsInput): Promise<Analytics> {
 
   const sessRows = (
     await db.execute({
-      sql: `SELECT date, start_hhmm, duration_sec FROM work_sessions
+      sql: `SELECT task_id, date, start_hhmm, duration_sec FROM work_sessions
             WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?`,
       args: [userId, ...f.args, startMonday, today],
     })
@@ -588,11 +588,24 @@ async function getAnalytics(input: GetAnalyticsInput): Promise<Analytics> {
 
   const taskRows = (
     await db.execute({
-      sql: `SELECT date, done FROM tasks
+      sql: `SELECT id, date, done, estimate_min FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date IS NOT NULL AND date >= ? AND date <= ?`,
       args: [userId, ...f.args, startMonday, today],
     })
   ).rows;
+
+  // Tiempo registrado por tarea, para cruzar contra la estimación.
+  const loggedByTask = new Map<string, number>();
+  for (const r of sessRows) {
+    const id = String(r.task_id);
+    loggedByTask.set(id, (loggedByTask.get(id) ?? 0) + Number(r.duration_sec));
+  }
+  const estimates = taskRows
+    .filter((r) => r.estimate_min != null && Number(r.done) === 1)
+    .map((r) => ({
+      estimateMinutes: Number(r.estimate_min),
+      loggedSeconds: loggedByTask.get(String(r.id)) ?? 0,
+    }));
 
   return computeAnalytics(
     sessRows.map((r) => ({
@@ -601,7 +614,8 @@ async function getAnalytics(input: GetAnalyticsInput): Promise<Analytics> {
       durationSec: Number(r.duration_sec),
     })),
     taskRows.map((r) => ({ date: String(r.date), done: Number(r.done) === 1 })),
-    { weeks, startMonday, endDate: today }
+    { weeks, startMonday, endDate: today },
+    estimates
   );
 }
 

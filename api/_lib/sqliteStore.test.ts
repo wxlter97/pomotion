@@ -732,6 +732,33 @@ describe('getAnalytics', () => {
     vi.useRealTimers();
     expect(other.totalSeconds).toBe(0);
   });
+
+  it('estimateAccuracy cruza estimación vs registrado de tareas completadas', async () => {
+    vi.setSystemTime(new Date('2026-08-27T12:00:00Z'));
+    const a = await as(USER, async () => {
+      for (let i = 0; i < 3; i++) {
+        const t = await sqliteStore.createTask({ date: '2026-08-24', text: `t${i}` });
+        await sqliteStore.updateTask({ taskId: t.id, estimateMinutes: 60, done: true });
+        await sqliteStore.logSession({
+          taskId: t.id,
+          durationSeconds: 5400, // 90m real vs 60m estimado
+          start: '09:00',
+          end: '10:30',
+        });
+      }
+      // Una estimada pero sin terminar → no cuenta.
+      const open = await sqliteStore.createTask({ date: '2026-08-25', text: 'abierta' });
+      await sqliteStore.updateTask({ taskId: open.id, estimateMinutes: 30 });
+      await sqliteStore.logSession({ taskId: open.id, durationSeconds: 9999, start: '11:00', end: '13:00' });
+      return sqliteStore.getAnalytics({ weeks: 4 });
+    });
+    vi.useRealTimers();
+
+    expect(a.estimateAccuracy).not.toBeNull();
+    expect(a.estimateAccuracy!.count).toBe(3);
+    expect(a.estimateAccuracy!.biasPct).toBe(50);
+    expect(a.estimateAccuracy!.suggestedFactor).toBe(1.5);
+  });
 });
 
 describe('getSessionsInRange (reporte)', () => {

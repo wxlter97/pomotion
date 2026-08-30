@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeAnalytics, computeStreak, weekdayMon0 } from './analytics.js';
+import {
+  computeAnalytics,
+  computeEstimateAccuracy,
+  computeStreak,
+  weekdayMon0,
+} from './analytics.js';
 
 describe('weekdayMon0', () => {
   it('0=Lunes .. 6=Domingo', () => {
@@ -77,5 +82,56 @@ describe('computeAnalytics', () => {
     );
     expect(a.totalSeconds).toBe(0);
     expect(a.completion.total).toBe(0);
+  });
+
+  it('estimateAccuracy es null sin el 4º argumento', () => {
+    const a = computeAnalytics([], [], opts);
+    expect(a.estimateAccuracy).toBeNull();
+  });
+});
+
+describe('computeEstimateAccuracy', () => {
+  it('null si hay menos de 3 tareas con estimación + tiempo', () => {
+    expect(computeEstimateAccuracy([])).toBeNull();
+    expect(
+      computeEstimateAccuracy([
+        { estimateMinutes: 60, loggedSeconds: 3600 },
+        { estimateMinutes: 30, loggedSeconds: 1800 },
+      ])
+    ).toBeNull();
+  });
+
+  it('ignora tareas sin estimación o sin tiempo registrado', () => {
+    const a = computeEstimateAccuracy([
+      { estimateMinutes: 60, loggedSeconds: 3600 },
+      { estimateMinutes: 60, loggedSeconds: 3600 },
+      { estimateMinutes: 60, loggedSeconds: 3600 },
+      { estimateMinutes: 0, loggedSeconds: 9999 }, // sin estimación
+      { estimateMinutes: 120, loggedSeconds: 0 }, // sin tiempo
+    ]);
+    expect(a?.count).toBe(3);
+    expect(a?.ratio).toBe(1);
+    expect(a?.biasPct).toBe(0);
+  });
+
+  it('detecta subestimación: registrado > estimado', () => {
+    const a = computeEstimateAccuracy([
+      { estimateMinutes: 60, loggedSeconds: 5400 }, // 90m real vs 60m est
+      { estimateMinutes: 60, loggedSeconds: 5400 },
+      { estimateMinutes: 60, loggedSeconds: 5400 },
+    ]);
+    expect(a?.ratio).toBeCloseTo(1.5);
+    expect(a?.biasPct).toBe(50);
+    expect(a?.suggestedFactor).toBe(1.5);
+  });
+
+  it('detecta sobreestimación', () => {
+    const a = computeEstimateAccuracy([
+      { estimateMinutes: 100, loggedSeconds: 3000 }, // 50m real vs 100m est
+      { estimateMinutes: 100, loggedSeconds: 3000 },
+      { estimateMinutes: 100, loggedSeconds: 3000 },
+    ]);
+    expect(a?.biasPct).toBe(-50);
+    expect(a?.suggestedFactor).toBe(0.5);
   });
 });

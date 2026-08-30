@@ -3183,6 +3183,27 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+.an-weekday-fill.is-over {
+  background: var(--color-destructive);
+}
+
+/* Precisión de estimación */
+.an-estimate .an-weekday-row {
+  grid-template-columns: 5rem 1fr 4.5rem;
+}
+
+.an-estimate-msg {
+  margin: 0 0 0.7rem;
+  font-size: 0.88rem;
+  color: var(--color-label);
+}
+
+.an-estimate-hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.76rem;
+  color: var(--color-label-secondary);
+}
+
 /* Tira de barras verticales — horas / semanas */
 .an-strip {
   display: flex;
