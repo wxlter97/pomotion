@@ -16,7 +16,15 @@ import {
   parseDurationToSeconds,
 } from '../duration';
 import type { DayColumn, Session, Tag, Task } from '../types';
-import { daysBetween, dueChipLabel, dueLabel, isOverdue, taskTimeSummary } from '../taskMeta';
+import {
+  daysBetween,
+  dueChipLabel,
+  dueLabel,
+  isOverdue,
+  taskAgeLabel,
+  taskAgeTitle,
+  taskTimeSummary,
+} from '../taskMeta';
 import { resolveTags, tagColorOf } from '../tags';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
@@ -379,6 +387,12 @@ export default function TaskList({
             const total = sumSeconds(task);
             const timeSummary = taskTimeSummary(total, task.estimateMinutes);
             const taskTags = resolveTags(task.tagIds, allTags);
+            // Chip de "lleva mucho abierta": solo en tareas sin hacer y que no
+            // sean de un día futuro (planificar a futuro no es estar estancado).
+            const ageLabel =
+              !task.done && selectedDate <= today
+                ? taskAgeLabel(task.createdAt, today)
+                : null;
             const manualOverlap =
               manualEntryTaskId === task.id
                 ? findOverlap(tasks, null, manualDraft.start, manualDraft.end)
@@ -479,6 +493,11 @@ export default function TaskList({
 
                   {!isEditingText && (
                     <div className="task-item-trailing">
+                      {ageLabel && (
+                        <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today)}>
+                          {ageLabel}
+                        </span>
+                      )}
                       {task.due && daysBetween(today, task.due) <= DUE_CHIP_WINDOW_DAYS && (
                         <span
                           className={

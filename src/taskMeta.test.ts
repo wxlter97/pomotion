@@ -8,6 +8,8 @@ import {
   parseEstimateMinutes,
   priorityLabel,
   shortDate,
+  taskAgeLabel,
+  taskAgeTitle,
   taskTimeSummary,
 } from './taskMeta';
 
@@ -105,5 +107,29 @@ describe('taskTimeSummary', () => {
 
   it('marca over cuando lo registrado pasa la estimación', () => {
     expect(taskTimeSummary(9000, 120)).toEqual({ text: '2h 30m / 2h', over: true });
+  });
+});
+
+describe('taskAgeLabel', () => {
+  const today = '2026-08-29';
+
+  it('null antes del umbral', () => {
+    expect(taskAgeLabel('2026-08-29T10:00:00Z', today)).toBeNull();
+    expect(taskAgeLabel('2026-08-24T10:00:00Z', today)).toBeNull(); // 5 días
+  });
+
+  it('días hasta las 2 semanas', () => {
+    expect(taskAgeLabel('2026-08-22T08:00:00Z', today)).toBe('7d');
+    expect(taskAgeLabel('2026-08-17T23:00:00Z', today)).toBe('12d');
+  });
+
+  it('semanas a partir de 14 días', () => {
+    expect(taskAgeLabel('2026-08-15T00:00:00Z', today)).toBe('2sem'); // 14 días
+    expect(taskAgeLabel('2026-07-25T00:00:00Z', today)).toBe('5sem'); // 35 días
+  });
+
+  it('taskAgeTitle da el texto largo', () => {
+    expect(taskAgeTitle('2026-08-22T00:00:00Z', today)).toBe('Abierta hace 7 días');
+    expect(taskAgeTitle('2026-08-28T00:00:00Z', today)).toBe('Abierta hace 1 día');
   });
 });

@@ -142,6 +142,7 @@ function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
     tagIds,
     source: String(r.source ?? 'manual') === 'calendar' ? 'calendar' : 'manual',
+    createdAt: String(r.created_at),
     sessions,
   };
 }
@@ -894,6 +895,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     estimateMinutes: null,
     tagIds: [],
     source: 'manual',
+    createdAt: now,
     sessions: [],
   };
 }

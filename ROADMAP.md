@@ -477,7 +477,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 | ~~**Objetivo de pomodoros del día**~~ ❌ descartado | — | Al usuario no le gustó la idea (2026-08-29). |
 | **Notificaciones de vencimiento** | Aviso del navegador cuando una tarea vence hoy / está vencida; empujón opcional a la mañana. | Ya existe `notify.ts` + `useNotificationSetting` + el permiso. Chequeo al cargar la semana + `setInterval`. Casi todo cliente. |
 | ~~**Modo foco**~~ ✅ | Vista minimal: solo el timer + el nombre de la tarea, el resto oculto. Se entra por menú "⋮" → "Modo foco" o la tecla `F`; se sale con `F` / `Esc` / botón "Salir de foco". | Puro frontend, estado efímero (`useState`, no persiste). Clase `.app--focus` que oculta header/día/inbox/lista/footers por CSS + reposiciona el timer al centro. |
-| **Edad de la tarea** | Chip "3d" / "2sem" en tareas que llevan mucho abiertas sin cerrarse. | `created_at` ya está en `tasks`; falta exponerlo en `Task` (API + `src/types.ts`) y un helper puro para el label. |
+| ~~**Edad de la tarea**~~ ✅ | Chip tenue "9d" / "3sem" en tareas sin hacer que llevan ≥7 días abiertas (no en días futuros). | `Task.createdAt` nuevo (API + `src/types.ts` + `toTask`). `taskAgeLabel`/`taskAgeTitle` puros en `taskMeta.ts`. Chip en la fila de `TaskList`. Sin migración (`created_at` ya estaba). |
 
 ### Tier 2 — UI nueva o migración chica
 
