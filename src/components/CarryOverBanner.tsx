@@ -1,3 +1,5 @@
+import { useT } from '../i18n';
+
 export default function CarryOverBanner({
   count,
   auto,
@@ -11,13 +13,10 @@ export default function CarryOverBanner({
   onCarryOver: () => void;
   busy: boolean;
 }) {
+  const t = useT();
   return (
     <div className="info banner carry-over-banner">
-      <span>
-        {count === 1
-          ? 'Tenés 1 tarea pendiente de un día pasado.'
-          : `Tenés ${count} tareas pendientes de días pasados.`}
-      </span>
+      <span>{count === 1 ? t('carryOver.one') : t('carryOver.many', { count })}</span>
       <div className="carry-over-actions">
         <button
           type="button"
@@ -25,11 +24,11 @@ export default function CarryOverBanner({
           onClick={onCarryOver}
           disabled={busy}
         >
-          {busy ? 'Moviendo…' : 'Traer a hoy'}
+          {busy ? t('carryOver.moving') : t('carryOver.bring')}
         </button>
         <label className="carry-over-auto">
           <input type="checkbox" checked={auto} onChange={onToggleAuto} />
-          automático
+          {t('carryOver.auto')}
         </label>
       </div>
     </div>

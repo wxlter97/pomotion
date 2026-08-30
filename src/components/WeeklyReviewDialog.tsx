@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { localizeDay, plural, useLang, useT } from '../i18n';
 import {
   getWeeklyReview,
   moveTask,
@@ -11,7 +12,7 @@ import { formatDurationLabel } from '../duration';
 import { tagColorOf } from '../tags';
 import type { ReviewTask, WeeklyReview } from '../types';
 
-const STEPS = ['Resumen', 'Pendientes', 'Foco'] as const;
+const STEP_KEYS = ['review.stepSummary', 'review.stepPending', 'review.stepFocus'] as const;
 
 /** 'YYYY-MM-DD' + N días, sin corrimiento de zona. */
 function addDays(dateStr: string, n: number): string {
@@ -62,6 +63,8 @@ export default function WeeklyReviewDialog({
   /** Se llama tras mover/completar una tarea pendiente (para refrescar la agenda). */
   onChanged: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const [week, setWeek] = useState(initialWeek);
   const [data, setData] = useState<WeeklyReview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,10 +95,10 @@ export default function WeeklyReviewDialog({
     } catch (err) {
       setError(
         err instanceof UnauthorizedError
-          ? 'La sesión expiró. Recargá la página para volver a entrar.'
+          ? t('common.sessionExpired')
           : err instanceof Error
             ? err.message
-            : 'No se pudo cargar la revisión'
+            : t('review.loadError')
       );
     } finally {
       setLoading(false);
@@ -117,7 +120,7 @@ export default function WeeklyReviewDialog({
       setHandled((prev) => ({ ...prev, [task.id]: how }));
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea');
+      setError(err instanceof Error ? err.message : t('review.taskError'));
     } finally {
       setBusyId(null);
     }
@@ -131,7 +134,7 @@ export default function WeeklyReviewDialog({
       await saveWeekFocus(data.nextWeekStart, focusText);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar el foco');
+      setError(err instanceof Error ? err.message : t('review.focusError'));
       setSavingFocus(false);
     }
   }
@@ -156,7 +159,7 @@ export default function WeeklyReviewDialog({
         aria-labelledby="wr-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="wr-title">Revisión semanal</h2>
+        <h2 id="wr-title">{t('review.title')}</h2>
 
         <div className="wr-weeknav">
           <button
@@ -164,7 +167,7 @@ export default function WeeklyReviewDialog({
             className="btn btn-icon"
             onClick={() => data && setWeek(data.previousWeekLabel)}
             disabled={loading || !data}
-            aria-label="Semana anterior"
+            aria-label={t('day.prevWeek')}
           >
             ‹
           </button>
@@ -174,28 +177,28 @@ export default function WeeklyReviewDialog({
             className="btn btn-icon"
             onClick={() => data && setWeek(data.nextWeekLabel)}
             disabled={loading || !data}
-            aria-label="Semana siguiente"
+            aria-label={t('day.nextWeek')}
           >
             ›
           </button>
         </div>
 
         <div className="segmented wr-steps">
-          {STEPS.map((label, i) => (
+          {STEP_KEYS.map((key, i) => (
             <button
-              key={label}
+              key={key}
               type="button"
               className={i === step ? 'is-active' : undefined}
               onClick={() => setStep(i)}
               disabled={loading || !data}
             >
-              {i + 1}. {label}
+              {i + 1}. {t(key)}
             </button>
           ))}
         </div>
 
         {error && <p className="error">{error}</p>}
-        {loading && <p className="muted">Cargando…</p>}
+        {loading && <p className="muted">{t('common.loading')}</p>}
 
         {data && !loading && (
           <div className="wr-body">
@@ -207,12 +210,12 @@ export default function WeeklyReviewDialog({
                       {data.completedCount}
                       <span className="wr-stat-of">/{data.totalCount}</span>
                     </span>
-                    <span className="wr-stat-label">tareas hechas</span>
+                    <span className="wr-stat-label">{t('review.tasksDone')}</span>
                   </div>
                   <div className="wr-stat">
                     <span className="wr-stat-value">{formatDurationLabel(data.loggedSeconds)}</span>
                     <span className="wr-stat-label">
-                      registrado
+                      {t('review.logged')}
                       {deltaPct !== null && deltaPct !== 0 && (
                         <span className={deltaPct > 0 ? 'wr-delta is-up' : 'wr-delta is-down'}>
                           {deltaPct > 0 ? '▲' : '▼'} {Math.abs(deltaPct)}%
@@ -223,12 +226,12 @@ export default function WeeklyReviewDialog({
                 </div>
 
                 {data.loggedSeconds === 0 ? (
-                  <p className="muted">Sin tiempo registrado esta semana.</p>
+                  <p className="muted">{t('review.noTime')}</p>
                 ) : (
                   <>
                     {data.byContext.length > 0 && (
                       <section className="wr-section">
-                        <h3>Por contexto</h3>
+                        <h3>{t('review.byContext')}</h3>
                         <Bars
                           rows={data.byContext.map((c) => ({
                             key: c.label,
@@ -240,13 +243,13 @@ export default function WeeklyReviewDialog({
                     )}
                     {data.byTag.length > 0 && (
                       <section className="wr-section">
-                        <h3>Por etiqueta</h3>
+                        <h3>{t('review.byTag')}</h3>
                         <Bars
-                          rows={data.byTag.map((t) => ({
-                            key: t.tagId,
-                            label: t.name,
-                            seconds: t.seconds,
-                            color: t.color,
+                          rows={data.byTag.map((tag) => ({
+                            key: tag.tagId,
+                            label: tag.name,
+                            seconds: tag.seconds,
+                            color: tag.color,
                           }))}
                         />
                       </section>
@@ -259,56 +262,55 @@ export default function WeeklyReviewDialog({
             {step === 1 && (
               <section className="wr-section">
                 <p className="wr-hint">
-                  Lo que quedó sin terminar. Traelo a la próxima semana, mandalo al backlog o marcá
-                  lo que en realidad ya está.
-                  {resolvedCount > 0 && ` · ${resolvedCount} resuelta${resolvedCount === 1 ? '' : 's'}`}
+                  {t('review.pendingHint')}
+                  {resolvedCount > 0 && t('review.resolvedCount', { count: resolvedCount, word: plural(resolvedCount, t('review.resolvedOne'), t('review.resolvedMany')) })}
                 </p>
                 {pending.length === 0 ? (
                   <p className="muted">
                     {data.unfinished.length === 0
-                      ? 'No quedó nada pendiente esta semana. 🎉'
-                      : 'Listo, no queda nada por resolver.'}
+                      ? t('review.nothingPendingEver')
+                      : t('review.nothingLeft')}
                   </p>
                 ) : (
                   <ul className="wr-pending">
-                    {pending.map((t) => (
-                      <li key={t.id} className="wr-pending-item">
+                    {pending.map((task) => (
+                      <li key={task.id} className="wr-pending-item">
                         <div className="wr-pending-main">
-                          <span className="wr-pending-name">{t.name || '(sin texto)'}</span>
+                          <span className="wr-pending-name">{task.name || t('taskList.noText')}</span>
                           <span className="wr-pending-meta">
-                            {t.day}
-                            {t.file && ` · ${t.file}`}
-                            {t.hasSessions && ` · ${formatDurationLabel(t.loggedSeconds)}`}
+                            {localizeDay(task.day, lang)}
+                            {task.file && ` · ${task.file}`}
+                            {task.hasSessions && ` · ${formatDurationLabel(task.loggedSeconds)}`}
                           </span>
                         </div>
                         <div className="wr-pending-actions">
                           <button
                             type="button"
                             className="btn btn-plain btn-small"
-                            onClick={() => void act(t, 'done')}
+                            onClick={() => void act(task, 'done')}
                             disabled={busyId !== null}
-                            title="Marcar como hecha"
+                            title={t('review.markDoneTitle')}
                           >
-                            ✓ Hecha
+                            {t('review.rowDone')}
                           </button>
                           <button
                             type="button"
                             className="btn btn-tinted btn-small"
-                            onClick={() => void act(t, 'bumped')}
+                            onClick={() => void act(task, 'bumped')}
                             disabled={busyId !== null}
-                            title="Mover a la próxima semana (mismo día)"
+                            title={t('review.bumpTitle')}
                           >
-                            → Próxima
+                            {t('review.rowBump')}
                           </button>
-                          {!t.hasSessions && (
+                          {!task.hasSessions && (
                             <button
                               type="button"
                               className="btn btn-plain btn-small"
-                              onClick={() => void act(t, 'backlog')}
+                              onClick={() => void act(task, 'backlog')}
                               disabled={busyId !== null}
-                              title="Sacar de la agenda (al backlog)"
+                              title={t('review.backlogTitle')}
                             >
-                              Backlog
+                              {t('review.rowBacklog')}
                             </button>
                           )}
                         </div>
@@ -323,19 +325,18 @@ export default function WeeklyReviewDialog({
               <section className="wr-section">
                 {data.thisFocus && (
                   <p className="wr-prevfocus">
-                    <span className="wr-prevfocus-label">Tu foco para esta semana:</span>{' '}
-                    {data.thisFocus}
-                  </p>
+                    <span className="wr-prevfocus-label">{t('review.thisFocus')}</span>{' '}
+                    XXKEEP                  </p>
                 )}
                 <label className="wr-focus-label" htmlFor="wr-focus">
-                  Foco de la semana siguiente ({data.nextWeekLabel})
+                  {t('review.focusLabel', { week: data.nextWeekLabel })}
                 </label>
                 <textarea
                   id="wr-focus"
                   className="task-notes-input wr-focus-input"
                   value={focusText}
                   onChange={(e) => setFocusText(e.target.value)}
-                  placeholder="¿Qué querés que pase esta semana? Una o dos líneas."
+                  placeholder={t('review.focusPlaceholder')}
                   rows={3}
                   maxLength={2000}
                 />
@@ -346,7 +347,7 @@ export default function WeeklyReviewDialog({
 
         <div className="sheet-actions wr-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
           {step > 0 && (
             <button
@@ -355,17 +356,17 @@ export default function WeeklyReviewDialog({
               onClick={() => setStep((s) => s - 1)}
               disabled={loading}
             >
-              Atrás
+              {t('review.back')}
             </button>
           )}
-          {step < STEPS.length - 1 ? (
+          {step < STEP_KEYS.length - 1 ? (
             <button
               type="button"
               className="btn btn-filled"
               onClick={() => setStep((s) => s + 1)}
               disabled={loading || !data}
             >
-              Siguiente
+              {t('review.next')}
             </button>
           ) : (
             <button
@@ -374,7 +375,7 @@ export default function WeeklyReviewDialog({
               onClick={() => void finish()}
               disabled={loading || !data || savingFocus}
             >
-              {savingFocus ? 'Guardando…' : 'Guardar y cerrar'}
+              {savingFocus ? t('common.saving') : t('review.saveClose')}
             </button>
           )}
         </div>

@@ -44,6 +44,6 @@ export function goalStatus(g: GoalProgress): GoalStatus {
   };
 }
 
-export function goalLabel(g: GoalProgress): string {
-  return g.tagName ?? 'Todas las tareas';
+export function goalLabel(g: GoalProgress, allTasksLabel = 'Todas las tareas'): string {
+  return g.tagName ?? allTasksLabel;
 }

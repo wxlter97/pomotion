@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { makeT } from './i18n';
 import {
   daysBetween,
   dueChipLabel,
@@ -13,19 +14,22 @@ import {
   taskTimeSummary,
 } from './taskMeta';
 
+const t = makeT('es');
+
 describe('priorityLabel', () => {
   it('traduce los niveles y el null', () => {
-    expect(priorityLabel('high')).toBe('Alta');
-    expect(priorityLabel('med')).toBe('Media');
-    expect(priorityLabel('low')).toBe('Baja');
-    expect(priorityLabel(null)).toBe('Sin prioridad');
+    expect(priorityLabel('high', t)).toBe('Alta');
+    expect(priorityLabel('med', t)).toBe('Media');
+    expect(priorityLabel('low', t)).toBe('Baja');
+    expect(priorityLabel(null, t)).toBe('Sin prioridad');
   });
 });
 
 describe('shortDate', () => {
-  it('formatea "D mmm"', () => {
-    expect(shortDate('2026-09-03')).toBe('3 sep');
-    expect(shortDate('2026-01-01')).toBe('1 ene');
+  it('formatea "D mmm" (es) y "mmm D" (en)', () => {
+    expect(shortDate('2026-09-03', 'es')).toBe('3 sep');
+    expect(shortDate('2026-01-01', 'es')).toBe('1 ene');
+    expect(shortDate('2026-09-03', 'en')).toBe('Sep 3');
   });
 });
 
@@ -34,7 +38,6 @@ describe('daysBetween', () => {
     expect(daysBetween('2026-08-29', '2026-08-29')).toBe(0);
     expect(daysBetween('2026-08-29', '2026-09-01')).toBe(3);
     expect(daysBetween('2026-09-01', '2026-08-29')).toBe(-3);
-    // cruce de año
     expect(daysBetween('2026-12-31', '2027-01-01')).toBe(1);
   });
 });
@@ -42,28 +45,28 @@ describe('daysBetween', () => {
 describe('isOverdue', () => {
   it('solo si hay due, no está hecha y ya pasó', () => {
     expect(isOverdue('2026-08-28', false, '2026-08-29')).toBe(true);
-    expect(isOverdue('2026-08-29', false, '2026-08-29')).toBe(false); // hoy no está vencida
-    expect(isOverdue('2026-08-28', true, '2026-08-29')).toBe(false); // hecha
+    expect(isOverdue('2026-08-29', false, '2026-08-29')).toBe(false);
+    expect(isOverdue('2026-08-28', true, '2026-08-29')).toBe(false);
     expect(isOverdue(null, false, '2026-08-29')).toBe(false);
   });
 });
 
 describe('dueLabel', () => {
   it('usa relativos para hoy/ayer/mañana y fecha corta para el resto', () => {
-    expect(dueLabel('2026-08-29', '2026-08-29')).toBe('vence hoy');
-    expect(dueLabel('2026-08-30', '2026-08-29')).toBe('vence mañana');
-    expect(dueLabel('2026-08-28', '2026-08-29')).toBe('venció ayer');
-    expect(dueLabel('2026-09-05', '2026-08-29')).toBe('vence 5 sep');
-    expect(dueLabel('2026-08-20', '2026-08-29')).toBe('venció 20 ago');
+    expect(dueLabel('2026-08-29', '2026-08-29', t, 'es')).toBe('vence hoy');
+    expect(dueLabel('2026-08-30', '2026-08-29', t, 'es')).toBe('vence mañana');
+    expect(dueLabel('2026-08-28', '2026-08-29', t, 'es')).toBe('venció ayer');
+    expect(dueLabel('2026-09-05', '2026-08-29', t, 'es')).toBe('vence 5 sep');
+    expect(dueLabel('2026-08-20', '2026-08-29', t, 'es')).toBe('venció 20 ago');
   });
 });
 
 describe('dueChipLabel', () => {
   it('es compacta, sin prefijo', () => {
-    expect(dueChipLabel('2026-08-29', '2026-08-29')).toBe('hoy');
-    expect(dueChipLabel('2026-08-30', '2026-08-29')).toBe('mañana');
-    expect(dueChipLabel('2026-08-28', '2026-08-29')).toBe('ayer');
-    expect(dueChipLabel('2026-09-05', '2026-08-29')).toBe('5 sep');
+    expect(dueChipLabel('2026-08-29', '2026-08-29', t, 'es')).toBe('hoy');
+    expect(dueChipLabel('2026-08-30', '2026-08-29', t, 'es')).toBe('mañana');
+    expect(dueChipLabel('2026-08-28', '2026-08-29', t, 'es')).toBe('ayer');
+    expect(dueChipLabel('2026-09-05', '2026-08-29', t, 'es')).toBe('5 sep');
   });
 });
 
@@ -93,20 +96,20 @@ describe('estimateLabel', () => {
 
 describe('taskTimeSummary', () => {
   it('sin estimación: solo lo registrado, o null si no hay nada', () => {
-    expect(taskTimeSummary(0, null)).toBeNull();
-    expect(taskTimeSummary(1500, null)).toEqual({ text: '25m', over: false });
+    expect(taskTimeSummary(0, null, t)).toBeNull();
+    expect(taskTimeSummary(1500, null, t)).toEqual({ text: '25m', over: false });
   });
 
   it('con estimación y algo registrado: "registrado / estimado"', () => {
-    expect(taskTimeSummary(3600, 120)).toEqual({ text: '1h / 2h', over: false });
+    expect(taskTimeSummary(3600, 120, t)).toEqual({ text: '1h / 2h', over: false });
   });
 
   it('con estimación y nada registrado: "est. X"', () => {
-    expect(taskTimeSummary(0, 120)).toEqual({ text: 'est. 2h', over: false });
+    expect(taskTimeSummary(0, 120, t)).toEqual({ text: 'est. 2h', over: false });
   });
 
   it('marca over cuando lo registrado pasa la estimación', () => {
-    expect(taskTimeSummary(9000, 120)).toEqual({ text: '2h 30m / 2h', over: true });
+    expect(taskTimeSummary(9000, 120, t)).toEqual({ text: '2h 30m / 2h', over: true });
   });
 });
 
@@ -114,22 +117,22 @@ describe('taskAgeLabel', () => {
   const today = '2026-08-29';
 
   it('null antes del umbral', () => {
-    expect(taskAgeLabel('2026-08-29T10:00:00Z', today)).toBeNull();
-    expect(taskAgeLabel('2026-08-24T10:00:00Z', today)).toBeNull(); // 5 días
+    expect(taskAgeLabel('2026-08-29T10:00:00Z', today, t)).toBeNull();
+    expect(taskAgeLabel('2026-08-24T10:00:00Z', today, t)).toBeNull();
   });
 
   it('días hasta las 2 semanas', () => {
-    expect(taskAgeLabel('2026-08-22T08:00:00Z', today)).toBe('7d');
-    expect(taskAgeLabel('2026-08-17T23:00:00Z', today)).toBe('12d');
+    expect(taskAgeLabel('2026-08-22T08:00:00Z', today, t)).toBe('7d');
+    expect(taskAgeLabel('2026-08-17T23:00:00Z', today, t)).toBe('12d');
   });
 
   it('semanas a partir de 14 días', () => {
-    expect(taskAgeLabel('2026-08-15T00:00:00Z', today)).toBe('2sem'); // 14 días
-    expect(taskAgeLabel('2026-07-25T00:00:00Z', today)).toBe('5sem'); // 35 días
+    expect(taskAgeLabel('2026-08-15T00:00:00Z', today, t)).toBe('2sem');
+    expect(taskAgeLabel('2026-07-25T00:00:00Z', today, t)).toBe('5sem');
   });
 
   it('taskAgeTitle da el texto largo', () => {
-    expect(taskAgeTitle('2026-08-22T00:00:00Z', today)).toBe('Abierta hace 7 días');
-    expect(taskAgeTitle('2026-08-28T00:00:00Z', today)).toBe('Abierta hace 1 día');
+    expect(taskAgeTitle('2026-08-22T00:00:00Z', today, t)).toBe('Abierta hace 7 días');
+    expect(taskAgeTitle('2026-08-28T00:00:00Z', today, t)).toBe('Abierta hace 1 día');
   });
 });

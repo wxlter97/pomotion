@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_TIMER_SETTINGS, TIMER_LIMITS, type TimerSettings } from '../timerSettings';
+import { useT, type MsgKey } from '../i18n';
 
 type NumField = 'workMinutes' | 'shortBreakMinutes' | 'longBreakMinutes' | 'longBreakEvery';
 
-const FIELDS: { key: NumField; label: string; hint?: string }[] = [
-  { key: 'workMinutes', label: 'Foco', hint: 'min' },
-  { key: 'shortBreakMinutes', label: 'Descanso corto', hint: 'min' },
-  { key: 'longBreakMinutes', label: 'Descanso largo', hint: 'min' },
-  { key: 'longBreakEvery', label: 'Descanso largo cada', hint: 'pomos' },
+const FIELDS: { key: NumField; labelKey: MsgKey; hintKey: MsgKey }[] = [
+  { key: 'workMinutes', labelKey: 'pomo.focus', hintKey: 'pomo.minutes' },
+  { key: 'shortBreakMinutes', labelKey: 'pomo.shortBreak', hintKey: 'pomo.minutes' },
+  { key: 'longBreakMinutes', labelKey: 'pomo.longBreak', hintKey: 'pomo.minutes' },
+  { key: 'longBreakEvery', labelKey: 'pomo.longBreakEvery', hintKey: 'pomo.pomosHint' },
 ];
 
 export default function TimerSettingsDialog({
@@ -24,6 +25,7 @@ export default function TimerSettingsDialog({
   disabled: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   const [draft, setDraft] = useState<Record<NumField, string>>({
     workMinutes: String(settings.workMinutes),
     shortBreakMinutes: String(settings.shortBreakMinutes),
@@ -71,18 +73,18 @@ export default function TimerSettingsDialog({
         aria-labelledby="timer-settings-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="timer-settings-title">Pomodoro</h2>
+        <h2 id="timer-settings-title">{t('pomo.title')}</h2>
 
         {disabled && (
-          <p className="muted">Detené el timer para cambiar las duraciones.</p>
+          <p className="muted">{t('pomo.lockedHint')}</p>
         )}
 
         <div className="timer-fields">
           {FIELDS.map((f) => (
             <label key={f.key} className="timer-field">
               <span className="timer-field-label">
-                {f.label}
-                {f.hint && <span className="timer-field-hint"> ({f.hint})</span>}
+                {t(f.labelKey)}
+                <span className="timer-field-hint"> ({t(f.hintKey)})</span>
               </span>
               <input
                 type="number"
@@ -101,7 +103,7 @@ export default function TimerSettingsDialog({
           ))}
         </div>
 
-        <p className="muted timer-note">Poné 0 en «cada» para no tener descanso largo.</p>
+        <p className="muted timer-note">{t('pomo.everyHint')}</p>
 
         <label className="timer-toggle">
           <input
@@ -109,15 +111,15 @@ export default function TimerSettingsDialog({
             checked={settings.autoStartNext}
             onChange={(e) => onUpdate({ autoStartNext: e.target.checked })}
           />
-          <span>Arrancar el siguiente pomodoro solo, al terminar el descanso</span>
+          <span>{t('pomo.autoStart')}</span>
         </label>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onReset} disabled={isDefault}>
-            Restaurar
+            {t('pomo.reset')}
           </button>
           <button type="button" className="btn btn-filled" onClick={onClose}>
-            Listo
+            {t('common.done')}
           </button>
         </div>
       </div>

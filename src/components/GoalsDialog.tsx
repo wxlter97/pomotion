@@ -4,20 +4,21 @@ import { formatDurationLabel } from '../duration';
 import { goalLabel, goalStatus } from '../goals';
 import type { GoalProgress, Tag } from '../types';
 import ConfirmDialog from './ConfirmDialog';
+import { useT, type TFn } from '../i18n';
 
 const NO_TAG = '__all__';
 
-function errText(err: unknown): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
-  return err instanceof Error ? err.message : 'Algo salió mal';
+function errText(err: unknown, t: TFn): string {
+  if (err instanceof UnauthorizedError) return t('goals.sessionExpired');
+  return err instanceof Error ? err.message : t('common.somethingWrong');
 }
 
-function paceText(g: GoalProgress): string {
+function paceText(g: GoalProgress, t: TFn): string {
   const s = goalStatus(g);
-  if (s.state === 'done') return '✓ cumplida';
+  if (s.state === 'done') return t('goals.paceDone');
   const delta = formatDurationLabel(Math.abs(s.paceDeltaSeconds));
-  if (s.state === 'on-track') return 'en ritmo';
-  return s.state === 'ahead' ? `${delta} adelantada` : `${delta} atrás del ritmo`;
+  if (s.state === 'on-track') return t('goals.paceOnTrack');
+  return s.state === 'ahead' ? t('goals.paceAhead', { delta }) : t('goals.paceBehind', { delta });
 }
 
 export default function GoalsDialog({
@@ -29,6 +30,8 @@ export default function GoalsDialog({
   fileId: string | null;
   onClose: () => void;
 }) {
+  const t = useT();
+  const allTasks = t('goals.allTasks');
   const [goals, setGoals] = useState<GoalProgress[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -42,7 +45,7 @@ export default function GoalsDialog({
     try {
       setGoals((await getGoals()).goals);
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setLoading(false);
     }
@@ -67,7 +70,7 @@ export default function GoalsDialog({
       await fn();
       await reload();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setBusy(false);
     }
@@ -100,7 +103,7 @@ export default function GoalsDialog({
         aria-labelledby="goals-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="goals-title">Metas del mes</h2>
+        <h2 id="goals-title">{t('goals.title')}</h2>
 
         <form className="goal-new" onSubmit={submitNew}>
           <input
@@ -110,35 +113,35 @@ export default function GoalsDialog({
             step="0.5"
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            placeholder="horas"
+            placeholder={t('goals.hoursPlaceholder')}
             disabled={busy}
             className="goal-hours-input"
-            aria-label="Horas objetivo"
+            aria-label={t('goals.hoursLabel')}
           />
-          <span className="goal-new-in">h en</span>
+          <span className="goal-new-in">{t('goals.hoursIn')}</span>
           <select
             value={tagId}
             onChange={(e) => setTagId(e.target.value)}
             disabled={busy}
             className="goal-tag-select"
-            aria-label="Etiqueta"
+            aria-label={t('goals.tagLabel')}
           >
-            <option value={NO_TAG}>Todas las tareas</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name}
+            <option value={NO_TAG}>{allTasks}</option>
+            {tags.map((tag) => (
+              <option key={tag.id} value={tag.id}>
+                {tag.name}
               </option>
             ))}
           </select>
           <button type="submit" className="btn btn-tinted btn-small" disabled={busy || !hours}>
-            Agregar
+            {t('common.add')}
           </button>
         </form>
 
         {loading ? (
-          <p className="muted">Cargando…</p>
+          <p className="muted">{t('common.loading')}</p>
         ) : goals.length === 0 ? (
-          <p className="muted">Todavía no pusiste metas para este mes.</p>
+          <p className="muted">{t('goals.none')}</p>
         ) : (
           <ul className="goal-list">
             {goals.map((g) => {
@@ -146,19 +149,19 @@ export default function GoalsDialog({
               return (
                 <li key={g.id} className="goal-item" data-state={s.state}>
                   <div className="goal-item-head">
-                    <span className="goal-item-name">{goalLabel(g)}</span>
+                    <span className="goal-item-name">{goalLabel(g, allTasks)}</span>
                     <button
                       type="button"
                       className="goal-item-delete"
                       onClick={() => setPendingDelete(g)}
                       disabled={busy}
-                      aria-label={`Eliminar meta ${goalLabel(g)}`}
-                      title="Eliminar meta"
+                      aria-label={t('goals.deleteAria', { name: goalLabel(g, allTasks) })}
+                      title={t('goals.deleteTitle')}
                     >
                       ×
                     </button>
                   </div>
-                  <div className="goal-bar" title={`Ritmo esperado: ${formatDurationLabel(s.expectedSeconds)}`}>
+                  <div className="goal-bar" title={t('goals.expectedPace', { value: formatDurationLabel(s.expectedSeconds) })}>
                     <div className="goal-bar-fill" style={{ width: `${s.progressPct}%` }} />
                     <div
                       className="goal-bar-pace"
@@ -167,9 +170,9 @@ export default function GoalsDialog({
                   </div>
                   <p className="goal-item-meta">
                     <strong>{formatDurationLabel(g.loggedSeconds)}</strong> / {formatDurationLabel(s.targetSeconds)}
-                    {s.state !== 'done' && <> · faltan {formatDurationLabel(s.remainingSeconds)}</>}
+                    {s.state !== 'done' && <>{t('goals.remaining', { value: formatDurationLabel(s.remainingSeconds) })}</>}
                     {' · '}
-                    <span className="goal-item-pace">{paceText(g)}</span>
+                    <span className="goal-item-pace">{paceText(g, t)}</span>
                   </p>
                 </li>
               );
@@ -181,7 +184,7 @@ export default function GoalsDialog({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>
@@ -189,8 +192,8 @@ export default function GoalsDialog({
       {pendingDelete && (
         <ConfirmDialog
           title={`Eliminar la meta "${goalLabel(pendingDelete)}"`}
-          message="Borra la meta. No toca tus tareas ni sesiones."
-          confirmLabel="Eliminar"
+          message={t('goals.deleteBody')}
+          confirmLabel={t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}

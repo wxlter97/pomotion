@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { dueNotificationBody } from './dueReminders';
+import { useT } from './i18n';
 import { notificationPermission, notify } from './notify';
 import type { DueReminder } from './types';
 
@@ -37,6 +38,7 @@ export function useDueNotifications(
   today: string,
   enabled: boolean
 ): void {
+  const t = useT();
   const key = reminders.map((r) => r.id).join(',');
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export function useDueNotifications(
       const seen = loadSeen(today);
       const unseen = reminders.filter((r) => !seen.has(r.id));
       if (unseen.length === 0) return;
-      notify(dueNotificationBody(unseen), 'pomotion-due');
+      notify(dueNotificationBody(unseen, t), 'pomotion-due');
       for (const r of unseen) seen.add(r.id);
       saveSeen(today, seen);
     }

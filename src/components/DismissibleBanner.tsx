@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useT } from '../i18n';
 
 const DEFAULT_DURATION_MS = 8000;
 const FADE_MS = 300;
@@ -19,6 +20,7 @@ export default function DismissibleBanner({
   tone?: 'warning' | 'error' | 'success';
   durationMs?: number;
 }) {
+  const t = useT();
   const [state, setState] = useState<'visible' | 'fading' | 'hidden'>('visible');
 
   useEffect(() => {
@@ -41,8 +43,8 @@ export default function DismissibleBanner({
         type="button"
         className="banner-dismiss"
         onClick={() => setState('fading')}
-        aria-label="Cerrar aviso"
-        title="Cerrar"
+        aria-label={t('common.dismissNotice')}
+        title={t('common.close')}
       >
         ×
       </button>

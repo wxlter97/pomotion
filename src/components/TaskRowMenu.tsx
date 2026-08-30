@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { localizeDay, useLang, useT } from '../i18n';
 import { getTasks } from '../api';
 import type { DayColumn } from '../types';
 
@@ -52,6 +53,8 @@ export default function TaskRowMenu({
   fileId: string | null;
   onMove: (target: MoveTarget) => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>('root');
   const [otherWeek, setOtherWeek] = useState<OtherWeek | null>(null);
@@ -95,14 +98,14 @@ export default function TaskRowMenu({
       const res = await getTasks(undefined, label, fileId ?? undefined);
       setOtherWeek({ label, days: res.days });
     } catch (err) {
-      setWeekError(err instanceof Error ? err.message : 'No se pudo cargar esa semana');
+      setWeekError(err instanceof Error ? err.message : t('rowMenu.loadWeekError'));
     } finally {
       setLoadingWeek(null);
     }
   }
 
   function pick(d: DayColumn, weekLabel?: string) {
-    onMove({ date: d.date, destLabel: weekLabel ? `${d.day} · ${weekLabel}` : d.day });
+    onMove({ date: d.date, destLabel: weekLabel ? `${localizeDay(d.day, lang)} · ${weekLabel}` : localizeDay(d.day, lang) });
     close();
   }
 
@@ -118,8 +121,8 @@ export default function TaskRowMenu({
         onClick={() => (open ? close() : setOpen(true))}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Acciones de la tarea"
-        title="Editar, mover o eliminar"
+        aria-label={t('rowMenu.actions')}
+        title={t('rowMenu.trigger')}
       >
         ⋮
       </button>
@@ -134,7 +137,7 @@ export default function TaskRowMenu({
                   className="move-menu-item move-menu-back"
                   onClick={() => setOtherWeek(null)}
                 >
-                  ‹ Esta semana
+                  ‹ {t('rowMenu.thisWeek')}
                 </button>
                 <div className="move-menu-heading">{otherWeek.label}</div>
                 {otherWeek.days.map((d) => (
@@ -145,7 +148,7 @@ export default function TaskRowMenu({
                     role="menuitem"
                     onClick={() => pick(d, otherWeek.label)}
                   >
-                    {d.day}
+                    {localizeDay(d.day, lang)}
                   </button>
                 ))}
               </>
@@ -156,9 +159,9 @@ export default function TaskRowMenu({
                   className="move-menu-item move-menu-back"
                   onClick={() => setView('root')}
                 >
-                  ‹ Volver
+                  ‹ {t('rowMenu.back')}
                 </button>
-                <div className="move-menu-heading">Mover a otra semana…</div>
+                <div className="move-menu-heading">{t('rowMenu.moveOtherWeek')}</div>
                 {previousWeekLabel && (
                   <button
                     type="button"
@@ -166,7 +169,7 @@ export default function TaskRowMenu({
                     onClick={() => void loadWeek(previousWeekLabel)}
                     disabled={loadingWeek !== null}
                   >
-                    ‹ {loadingWeek === previousWeekLabel ? 'Cargando…' : previousWeekLabel}
+                    ‹ {loadingWeek === previousWeekLabel ? t('common.loading') : previousWeekLabel}
                   </button>
                 )}
                 {nextWeekLabel && (
@@ -176,7 +179,7 @@ export default function TaskRowMenu({
                     onClick={() => void loadWeek(nextWeekLabel)}
                     disabled={loadingWeek !== null}
                   >
-                    {loadingWeek === nextWeekLabel ? 'Cargando…' : nextWeekLabel} ›
+                    {loadingWeek === nextWeekLabel ? t('common.loading') : nextWeekLabel} ›
                   </button>
                 )}
                 {weekError && <div className="move-menu-error">{weekError}</div>}
@@ -191,7 +194,7 @@ export default function TaskRowMenu({
                 onClick={() => run(onEdit)}
                 disabled={editDisabled}
               >
-                Editar
+                {t('common.edit')}
               </button>
               <div className="move-menu-sep" />
               <button
@@ -200,7 +203,7 @@ export default function TaskRowMenu({
                 role="menuitem"
                 onClick={() => run(onStartSelect)}
               >
-                Seleccionar varias
+                {t('rowMenu.selectMany')}
               </button>
               {(canMove || onSendToInbox) && <div className="move-menu-sep" />}
               {canMove && (
@@ -211,7 +214,7 @@ export default function TaskRowMenu({
                   onClick={() => setView('move')}
                   disabled={disabled}
                 >
-                  Mover a otra semana…
+                  {t('rowMenu.moveOtherWeek')}
                 </button>
               )}
               {onSendToInbox && (
@@ -222,7 +225,7 @@ export default function TaskRowMenu({
                   onClick={() => run(onSendToInbox)}
                   disabled={disabled}
                 >
-                  Sacar de la agenda
+                  {t('rowMenu.sendToInbox')}
                 </button>
               )}
               <div className="move-menu-sep" />
@@ -233,7 +236,7 @@ export default function TaskRowMenu({
                 onClick={() => run(onDelete)}
                 disabled={disabled}
               >
-                Eliminar
+                {t('common.delete')}
               </button>
             </>
           )}

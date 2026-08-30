@@ -1,29 +1,31 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getAdminUsers, setUserApproval, UnauthorizedError, type AdminUser } from '../api';
 import ConfirmDialog from './ConfirmDialog';
+import { useT, type TFn } from '../i18n';
 
-function errText(err: unknown): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
-  return err instanceof Error ? err.message : 'Algo salió mal';
+function errText(err: unknown, t: TFn): string {
+  if (err instanceof UnauthorizedError) return t('goals.sessionExpired');
+  return err instanceof Error ? err.message : t('common.somethingWrong');
 }
 
 function initial(u: AdminUser): string {
   return (u.name?.trim()?.[0] ?? u.email[0] ?? '?').toUpperCase();
 }
 
-function lastSeenLabel(iso: string | null): string {
-  if (!iso) return 'nunca entró';
+function lastSeenLabel(iso: string | null, t: TFn): string {
+  if (!iso) return t('admin.neverSignedIn');
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   const days = Math.floor((Date.now() - d.getTime()) / 86_400_000);
-  if (days <= 0) return 'activo hoy';
-  if (days === 1) return 'ayer';
-  if (days < 30) return `hace ${days} días`;
-  return `hace ${Math.floor(days / 30)} meses`;
+  if (days <= 0) return t('admin.activeToday');
+  if (days === 1) return t('meta.chipYesterday');
+  if (days < 30) return t('admin.agoDays', { n: days });
+  return t('admin.agoMonths', { n: Math.floor(days / 30) });
 }
 
 /** Panel de admin: aprobar / revocar el login de los usuarios. */
 export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
     try {
       setUsers((await getAdminUsers()).users);
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
       await setUserApproval(user.id, approved);
       await reload();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setBusyId(null);
     }
@@ -78,13 +80,13 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
         <div className="admin-user-main">
           <span className="admin-user-name">
             {u.name || u.email}
-            {u.isAdmin && <span className="admin-user-badge">admin</span>}
+            {u.isAdmin && <span className="admin-user-badge">{t('admin.adminBadge')}</span>}
           </span>
           <span className="admin-user-sub">
             {u.approved
               ? u.name
-                ? `${u.email} · ${lastSeenLabel(u.lastSeenAt)}`
-                : lastSeenLabel(u.lastSeenAt)
+                ? `${u.email} · ${lastSeenLabel(u.lastSeenAt, t)}`
+                : lastSeenLabel(u.lastSeenAt, t)
               : u.name
                 ? u.email
                 : 'sin actividad'}
@@ -97,7 +99,7 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
             onClick={() => void apply(u, true)}
             disabled={busy}
           >
-            {busy ? '…' : 'Aprobar'}
+            {busy ? t('feeds.syncBusy') : t('admin.approve')}
           </button>
         ) : (
           !u.isAdmin && (
@@ -107,7 +109,7 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
               onClick={() => setPendingRevoke(u)}
               disabled={busy}
             >
-              Revocar
+              {t('admin.revoke')}
             </button>
           )
         )}
@@ -124,22 +126,22 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
         aria-labelledby="admin-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="admin-title">Usuarios</h2>
+        <h2 id="admin-title">{t('admin.title')}</h2>
 
         {loading ? (
-          <p className="muted">Cargando…</p>
+          <p className="muted">{t('common.loading')}</p>
         ) : (
           <>
             {pending.length > 0 && (
               <>
-                <h3 className="admin-section-title">Pendientes ({pending.length})</h3>
+                <h3 className="admin-section-title">{t('admin.pendingN', { n: pending.length })}</h3>
                 <ul className="admin-user-list">{pending.map(row)}</ul>
               </>
             )}
 
-            <h3 className="admin-section-title">Con acceso ({approved.length})</h3>
+            <h3 className="admin-section-title">{t('admin.withAccessN', { n: approved.length })}</h3>
             {approved.length === 0 ? (
-              <p className="muted">Nadie todavía.</p>
+              <p className="muted">{t('admin.none')}</p>
             ) : (
               <ul className="admin-user-list">{approved.map(row)}</ul>
             )}
@@ -150,16 +152,16 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>
 
       {pendingRevoke && (
         <ConfirmDialog
-          title={`Revocar a ${pendingRevoke.name || pendingRevoke.email}`}
-          message="No va a poder entrar hasta que lo apruebes de nuevo. Sus tareas no se tocan."
-          confirmLabel="Revocar"
+          title={t('admin.revokeAria', { name: pendingRevoke.name || pendingRevoke.email })}
+          message={t('admin.revokeBody')}
+          confirmLabel={t('admin.revoke')}
           destructive
           onConfirm={() => {
             const u = pendingRevoke;

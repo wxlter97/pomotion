@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { moveItem, orderFiles } from '../fileOrder';
+import { useT } from '../i18n';
 import type { FileEntry } from '../types';
 
 /**
@@ -18,6 +19,7 @@ export default function ContextOrderDialog({
   onSave: (order: string[]) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [items, setItems] = useState<FileEntry[]>(() => orderFiles(files, order));
 
   useEffect(() => {
@@ -43,8 +45,8 @@ export default function ContextOrderDialog({
         aria-labelledby="context-order-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="context-order-title">Orden de los contextos</h2>
-        <p>El orden en que aparecen las pestañas de arriba. Solo cambia lo que ves — no toca las tareas.</p>
+        <h2 id="context-order-title">{t('contextOrder.title')}</h2>
+        <p>{t('contextOrder.body')}</p>
 
         <ul className="context-order-list">
           {items.map((file, i) => (
@@ -56,8 +58,8 @@ export default function ContextOrderDialog({
                   className="btn btn-icon"
                   onClick={() => move(i, i - 1)}
                   disabled={i === 0}
-                  aria-label={`Subir ${file.label}`}
-                  title="Subir"
+                  aria-label={t('contextOrder.up', { name: file.label })}
+                  title={t('contextOrder.up', { name: file.label })}
                 >
                   ↑
                 </button>
@@ -66,8 +68,8 @@ export default function ContextOrderDialog({
                   className="btn btn-icon"
                   onClick={() => move(i, i + 1)}
                   disabled={i === items.length - 1}
-                  aria-label={`Bajar ${file.label}`}
-                  title="Bajar"
+                  aria-label={t('contextOrder.down', { name: file.label })}
+                  title={t('contextOrder.down', { name: file.label })}
                 >
                   ↓
                 </button>
@@ -78,7 +80,7 @@ export default function ContextOrderDialog({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-filled" onClick={onClose}>
-            Listo
+            {t('common.done')}
           </button>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import { monthName, type Lang } from './i18n';
+
 /**
  * Helpers puros para la vista mensual: armado de la grilla del calendario
  * (semanas de lunes a domingo) y traducción de una fecha al par
@@ -5,6 +7,8 @@
  *
  * Aritmética en UTC para no arrastrar corrimientos de zona horaria — una
  * grilla de calendario es puro calendario, "hoy" llega resuelto del server.
+ * Los nombres de día que devuelve `weekTargetForDate` van al server, así que
+ * quedan en español canónico; lo que se muestra lo traduce el componente.
  */
 
 const WEEKDAY_LABELS = [
@@ -15,24 +19,6 @@ const WEEKDAY_LABELS = [
   'Viernes',
   'Sábado',
   'Domingo',
-] as const;
-
-/** Encabezados cortos de la grilla, lunes primero. */
-export const WEEKDAY_HEADERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
-
-const MONTH_NAMES = [
-  'Enero',
-  'Febrero',
-  'Marzo',
-  'Abril',
-  'Mayo',
-  'Junio',
-  'Julio',
-  'Agosto',
-  'Septiembre',
-  'Octubre',
-  'Noviembre',
-  'Diciembre',
 ] as const;
 
 function ymd(d: Date): string {
@@ -84,9 +70,9 @@ export function monthGrid(month: string): (string | null)[][] {
 }
 
 /** "Agosto 2026" a partir de "YYYY-MM". */
-export function monthTitle(month: string): string {
+export function monthTitle(month: string, lang: Lang = 'es'): string {
   const [y, m] = month.split('-').map(Number);
-  return `${MONTH_NAMES[m - 1]} ${y}`;
+  return `${monthName(m - 1, lang, true)} ${y}`;
 }
 
 /**

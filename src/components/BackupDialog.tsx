@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { backupDownloadUrl, importBackup, UnauthorizedError } from '../api';
+import { plural, useT } from '../i18n';
 
 type Stage =
   | { kind: 'idle' }
@@ -15,6 +16,7 @@ function countRows(backup: unknown): number {
 }
 
 export default function BackupDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [stage, setStage] = useState<Stage>({ kind: 'idle' });
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -37,13 +39,13 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
       const backup = JSON.parse(text) as unknown;
       const fmt = (backup as { format?: unknown } | null)?.format;
       if (fmt !== 'pomotion-backup') {
-        setError('Ese archivo no parece un backup de pomotion.');
+        setError(t('backup.notBackup'));
         setStage({ kind: 'idle' });
         return;
       }
       setStage({ kind: 'ready', fileName: file.name, backup, rows: countRows(backup) });
     } catch {
-      setError('No se pudo leer el archivo (¿es un .json válido?).');
+      setError(t('backup.badJson'));
       setStage({ kind: 'idle' });
     }
   }
@@ -60,10 +62,10 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
       setStage({ kind: 'ready', fileName: '', backup, rows: countRows(backup) });
       setError(
         err instanceof UnauthorizedError
-          ? 'La sesión expiró. Recargá la página para volver a entrar.'
+          ? t('common.sessionExpired')
           : err instanceof Error
             ? err.message
-            : 'No se pudo restaurar el backup'
+            : t('backup.restoreError')
       );
     }
   }
@@ -79,19 +81,20 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
         aria-labelledby="backup-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="backup-title">Copia de seguridad</h2>
+        <h2 id="backup-title">{t('backup.title')}</h2>
 
         {error && <p className="error">{error}</p>}
 
         {stage.kind === 'done' ? (
           <>
             <p className="muted">
-              Backup restaurado:{' '}
-              {Object.entries(stage.imported)
-                .filter(([, n]) => n > 0)
-                .map(([t, n]) => `${n} ${t}`)
-                .join(' · ') || 'sin datos'}
-              .
+              {t('backup.restored', {
+                summary:
+                  Object.entries(stage.imported)
+                    .filter(([, n]) => n > 0)
+                    .map(([table, n]) => `${n} ${table}`)
+                    .join(' · ') || t('backup.noData'),
+              })}
             </p>
             <div className="sheet-actions">
               <button
@@ -99,29 +102,23 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
                 className="btn btn-filled"
                 onClick={() => window.location.reload()}
               >
-                Recargar
+                {t('backup.reload')}
               </button>
             </div>
           </>
         ) : (
           <>
             <section className="backup-section">
-              <h3>Exportar</h3>
-              <p className="muted">
-                Descargá todo tu dataset (tareas, sesiones, etiquetas, plantillas, metas,
-                calendarios) en un archivo <code>.json</code>. Guardalo en un lugar seguro.
-              </p>
+              <h3>{t('backup.export')}</h3>
+              <p className="muted">{t('backup.exportDesc')}</p>
               <a className="btn btn-plain" href={backupDownloadUrl} download>
-                Descargar copia (.json)
+                {t('backup.downloadBtn')}
               </a>
             </section>
 
             <section className="backup-section">
-              <h3>Restaurar</h3>
-              <p className="muted">
-                Solo funciona en una <strong>cuenta vacía</strong> — sirve para pasar tus
-                datos a otro dispositivo o cuenta, no para fusionar.
-              </p>
+              <h3>{t('backup.restore')}</h3>
+              <p className="muted">{t('backup.restoreDesc')}</p>
 
               <input
                 ref={fileRef}
@@ -135,13 +132,13 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
               {stage.kind === 'ready' && (
                 <p className="backup-ready">
                   {stage.fileName ? `${stage.fileName} — ` : ''}
-                  {stage.rows} {stage.rows === 1 ? 'fila' : 'filas'} a restaurar.
+                  {t('backup.toRestore', { n: stage.rows, word: plural(stage.rows, t('backup.rowOne'), t('backup.rowMany')) })}
                 </p>
               )}
 
               <div className="sheet-actions">
                 <button type="button" className="btn btn-plain" onClick={onClose} disabled={busy}>
-                  Cerrar
+                  {t('common.close')}
                 </button>
                 <button
                   type="button"
@@ -149,7 +146,7 @@ export default function BackupDialog({ onClose }: { onClose: () => void }) {
                   onClick={() => void runImport()}
                   disabled={stage.kind !== 'ready' || busy}
                 >
-                  {busy ? 'Restaurando…' : 'Restaurar'}
+                  {busy ? t('backup.restoring') : t('backup.restore')}
                 </button>
               </div>
             </section>

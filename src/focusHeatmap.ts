@@ -1,3 +1,5 @@
+import { monthAbbr, type Lang } from './i18n';
+
 /**
  * Helpers puros para el heatmap de foco: grilla estilo GitHub (una columna
  * por semana, una fila por día de la semana, lunes arriba), niveles de
@@ -5,21 +7,6 @@
  *
  * Aritmética en UTC — es puro calendario; "hoy" llega resuelto del server.
  */
-
-const MONTH_ABBR = [
-  'ene',
-  'feb',
-  'mar',
-  'abr',
-  'may',
-  'jun',
-  'jul',
-  'ago',
-  'sep',
-  'oct',
-  'nov',
-  'dic',
-] as const;
 
 /** Etiquetas de fila; solo lun/mié/vie llevan texto (como GitHub). */
 export const HEATMAP_ROW_LABELS = ['L', '', 'X', '', 'V', '', ''] as const;
@@ -77,7 +64,7 @@ export function intensityLevel(seconds: number): 0 | 1 | 2 | 3 | 4 {
  * mes distinto al de la etiqueta anterior, su índice (0-based) y la
  * abreviatura del mes.
  */
-export function monthLabels(columns: (string | null)[][]): { index: number; label: string }[] {
+export function monthLabels(columns: (string | null)[][], lang: Lang = 'es'): { index: number; label: string }[] {
   const labels: { index: number; label: string }[] = [];
   let lastMonth = -1;
   columns.forEach((col, i) => {
@@ -85,7 +72,7 @@ export function monthLabels(columns: (string | null)[][]): { index: number; labe
     if (!first) return;
     const month = Number(first.slice(5, 7)) - 1;
     if (month !== lastMonth) {
-      labels.push({ index: i, label: MONTH_ABBR[month] });
+      labels.push({ index: i, label: monthAbbr(month, lang) });
       lastMonth = month;
     }
   });
@@ -93,7 +80,8 @@ export function monthLabels(columns: (string | null)[][]): { index: number; labe
 }
 
 /** "5 mar" a partir de "YYYY-MM-DD" (para el tooltip de la celda). */
-export function focusDateLabel(dateStr: string): string {
+export function focusDateLabel(dateStr: string, lang: Lang = 'es'): string {
   const [, m, d] = dateStr.split('-');
-  return `${Number(d)} ${MONTH_ABBR[Number(m) - 1]}`;
+  const abbr = monthAbbr(Number(m) - 1, lang);
+  return lang === 'en' ? `${abbr} ${Number(d)}` : `${Number(d)} ${abbr}`;
 }
