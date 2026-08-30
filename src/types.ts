@@ -184,6 +184,14 @@ export type GoalProgress = Goal & {
   daysInMonth: number;
 };
 
+/** Volcado completo del dataset del usuario (backup manual). */
+export type Backup = {
+  format: 'pomotion-backup';
+  version: 1;
+  exportedAt: string;
+  data: Record<string, Array<Record<string, string | number | null>>>;
+};
+
 export type TimerMode = 'pomodoro' | 'free';
 export type TimerPhase = 'idle' | 'work' | 'break';
 

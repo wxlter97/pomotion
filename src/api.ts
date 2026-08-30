@@ -100,6 +100,19 @@ export function getTasks(day?: string, week?: string, fileId?: string) {
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
 
+// --- Backup / restore ---
+
+/** URL de descarga directa del backup completo (.json), navegación normal. */
+export const backupDownloadUrl = '/api/tasks?export=1&download=1';
+
+/** Restaura un backup. Solo funciona si la cuenta está vacía (409 si no). */
+export function importBackup(backup: unknown) {
+  return request<{ ok: true; imported: Record<string, number> }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'import', backup }),
+  });
+}
+
 /** Busca tareas por texto en el nombre (todas las semanas + inbox del contexto). */
 export function searchTasks(query: string, fileId?: string) {
   const params = new URLSearchParams({ search: query });

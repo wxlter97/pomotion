@@ -17,6 +17,7 @@ import {
   todayDateStringInTz,
 } from './parse.js';
 import { computeAnalytics } from './analytics.js';
+import { ACCOUNT_NONEMPTY_TABLES, BACKUP_TABLES, buildInserts, parseBackup, remapIds } from './backup.js';
 import {
   desiredTasksFromEvents,
   fetchIcalText,
@@ -43,6 +44,9 @@ import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js
 import type {
   Analytics,
   ApplyDayTemplateInput,
+  Backup,
+  BackupValue,
+  ImportResult,
   ApplyRecurringInput,
   CalendarFeed,
   CreateCalendarFeedInput,
@@ -668,6 +672,86 @@ async function searchTasks(input: SearchTasksInput): Promise<TaskSearchResult[]>
       hasSessions: Number(r.has_sessions) === 1,
     };
   });
+}
+
+// --- Backup / restore ---
+
+function toBackupValue(v: unknown): BackupValue {
+  if (v == null) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'bigint') return Number(v);
+  return String(v);
+}
+
+async function exportBackup(): Promise<Backup> {
+  const userId = currentUserId();
+  const db = getDb();
+  const data: Backup['data'] = {};
+
+  for (const t of BACKUP_TABLES) {
+    const quoted = t.columns.map((c) => `"${c}"`).join(', ');
+    const rows = (
+      await db.execute({
+        sql: `SELECT ${quoted} FROM "${t.table}" WHERE ${t.scopeWhere} ORDER BY rowid`,
+        args: [userId],
+      })
+    ).rows;
+    data[t.table] = rows.map((r) => {
+      const o: Record<string, BackupValue> = {};
+      for (const c of t.columns) o[c] = toBackupValue(r[c]);
+      return o;
+    });
+  }
+
+  return {
+    format: 'pomotion-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    data,
+  };
+}
+
+async function importBackup(input: { backup: unknown }): Promise<ImportResult> {
+  const userId = currentUserId();
+  const db = getDb();
+  const backup = parseBackup(input.backup);
+
+  const countSql = ACCOUNT_NONEMPTY_TABLES.map(
+    (t) => `(SELECT COUNT(*) FROM "${t}" WHERE user_id = ?)`
+  ).join(' + ');
+  const existing = Number(
+    (
+      await db.execute({
+        sql: `SELECT ${countSql} AS n`,
+        args: ACCOUNT_NONEMPTY_TABLES.map(() => userId),
+      })
+    ).rows[0].n
+  );
+  if (existing > 0) {
+    throw new ConflictError(
+      'account_not_empty',
+      'La cuenta ya tiene datos. El restore solo funciona en una cuenta vacía.'
+    );
+  }
+
+  const data = remapIds(backup.data, () => crypto.randomUUID());
+  const stmts: { sql: string; args: BackupValue[] }[] = [];
+  const imported: Record<string, number> = {};
+  for (const t of BACKUP_TABLES) {
+    const rows = data[t.table] ?? [];
+    imported[t.table] = rows.length;
+    stmts.push(
+      ...buildInserts(
+        t.table,
+        t.columns,
+        rows,
+        t.hasUserId ? { column: 'user_id', value: userId } : undefined
+      )
+    );
+  }
+  if (stmts.length > 0) await db.batch(stmts, 'write');
+
+  return { imported };
 }
 
 async function listFiles(): Promise<FileEntry[]> {
@@ -2000,6 +2084,8 @@ export const sqliteStore: TaskStore = {
   getAnalytics,
   getSessionsInRange,
   searchTasks,
+  exportBackup,
+  importBackup,
   listFiles,
   listTags,
   createTag,

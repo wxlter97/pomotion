@@ -28,6 +28,18 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (typeof req.query.goals === 'string') {
         return res.status(200).json({ goals: await sqliteStore.listGoals() });
       }
+      // ?export=1 → volcado completo del dataset del usuario (backup).
+      //   &download=1 fuerza la descarga como archivo .json (navegación normal).
+      if (typeof req.query.export === 'string') {
+        const backup = await sqliteStore.exportBackup();
+        if (typeof req.query.download === 'string') {
+          const stamp = backup.exportedAt.slice(0, 10);
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Content-Disposition', `attachment; filename="pomotion-backup-${stamp}.json"`);
+          return res.status(200).send(JSON.stringify(backup, null, 2));
+        }
+        return res.status(200).json(backup);
+      }
       // ?search=<q> → tareas cuyo nombre contiene el texto (todas las semanas + inbox).
       if (typeof req.query.search === 'string') {
         const results = await sqliteStore.searchTasks({
@@ -74,7 +86,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         enabled?: boolean;
         feed_id?: string;
         force?: boolean;
+        backup?: unknown;
       };
+      if (body.action === 'import') {
+        const result = await sqliteStore.importBackup({ backup: body.backup });
+        return res.status(200).json({ ok: true, ...result });
+      }
       if (body.action === 'carry_over') {
         const result = await sqliteStore.carryOverToToday({ fileId: body.file });
         return res.status(200).json({ ok: true, ...result });
