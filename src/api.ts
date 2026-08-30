@@ -15,6 +15,7 @@ import type {
   TaskPriority,
   TaskSearchResult,
   TasksResponse,
+  WeeklyReview,
 } from './types';
 
 export class UnauthorizedError extends Error {}
@@ -148,6 +149,22 @@ export function getAnalytics(weeks?: number, fileId?: string) {
   if (weeks) params.set('weeks', String(weeks));
   if (fileId) params.set('file', fileId);
   return request<Analytics>(`/api/tasks?${params.toString()}`);
+}
+
+/** Datos de la Revisión semanal. `week` vacío/ausente = semana actual. */
+export function getWeeklyReview(week?: string) {
+  const params = new URLSearchParams();
+  params.set('review', week ?? '');
+  return request<WeeklyReview>(`/api/tasks?${params.toString()}`);
+}
+
+/** Guarda el "foco" de una semana ('YYYY-MM-DD', se normaliza a lunes).
+ *  Texto vacío lo borra. Devuelve el texto final (ya trimmeado). */
+export function saveWeekFocus(weekStart: string, body: string) {
+  return request<{ ok: true; body: string }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'save_week_focus', week_start: weekStart, body_text: body }),
+  });
 }
 
 // --- Tareas ---

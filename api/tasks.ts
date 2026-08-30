@@ -52,6 +52,13 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (typeof req.query.feeds === 'string') {
         return res.status(200).json({ feeds: await sqliteStore.listCalendarFeeds() });
       }
+      // ?review=<semana> → datos de la Revisión semanal.
+      if (typeof req.query.review === 'string') {
+        const review = await sqliteStore.getWeeklyReview({
+          week: req.query.review || undefined,
+        });
+        return res.status(200).json(review);
+      }
       // ?analytics=1 → agregados del panel de analítica.
       if (typeof req.query.analytics === 'string') {
         const weeks = Number(req.query.weeks);
@@ -92,6 +99,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         ids?: unknown;
         weekend?: boolean;
         body_text?: string;
+        week_start?: string;
       };
       if (body.action === 'bulk') {
         const result = await sqliteStore.bulkTasks({
@@ -108,6 +116,13 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (body.action === 'save_day_note') {
         const result = await sqliteStore.saveDayNote({ date: body.date, body: body.body_text });
+        return res.status(200).json({ ok: true, ...result });
+      }
+      if (body.action === 'save_week_focus') {
+        const result = await sqliteStore.saveWeekFocus({
+          weekStart: body.week_start,
+          body: body.body_text,
+        });
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'carry_over') {

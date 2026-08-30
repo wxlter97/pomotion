@@ -17,6 +17,7 @@ import {
   todayDateStringInTz,
 } from './parse.js';
 import { computeAnalytics } from './analytics.js';
+import { buildReviewSummary } from './weeklyReview.js';
 import { normalizeChecklistInput, parseChecklist, serializeChecklist } from './checklist.js';
 import {
   isValidMonthdays,
@@ -77,14 +78,17 @@ import type {
   GoalProgress,
   GetMonthSummaryInput,
   GetWeekViewInput,
+  GetWeeklyReviewInput,
   LogSessionInput,
   MonthDaySummary,
   MonthSummary,
   RecurringRule,
   ReportInput,
   SaveDayNoteInput,
+  SaveWeekFocusInput,
   Session,
   SessionRow,
+  WeeklyReview,
   SyncCalendarResult,
   SearchTasksInput,
   Tag,
@@ -725,6 +729,131 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
       end: String(r.end_hhmm),
     };
   });
+}
+
+// --- Revisión semanal (ROADMAP §11) ---
+
+const WEEK_FOCUS_MAX = 2000;
+
+async function weekFocusBody(userId: string, weekStart: string): Promise<string> {
+  const rows = (
+    await getDb().execute({
+      sql: 'SELECT body FROM week_focus WHERE user_id = ? AND week_start = ?',
+      args: [userId, weekStart],
+    })
+  ).rows;
+  return String(rows[0]?.body ?? '');
+}
+
+async function getWeeklyReview(input: GetWeeklyReviewInput): Promise<WeeklyReview> {
+  const userId = currentUserId();
+  const db = getDb();
+  const weekStart = resolveWeekStart(input.week, TIMEZONE);
+  const dates = weekDates(weekStart, true); // Lun–Dom: revisamos la semana entera
+  const firstDate = dates[0];
+  const lastDate = dates[dates.length - 1];
+  const prevStart = addDaysToDate(weekStart, -7);
+  const prevEnd = addDaysToDate(weekStart, -1);
+  const nextWeekStart = addDaysToDate(weekStart, 7);
+  const today = todayDateStringInTz(TIMEZONE);
+
+  // Todas las tareas con fecha esa semana (todos los contextos).
+  const taskRows = (
+    await db.execute({
+      sql: `SELECT id, name, date, done, file FROM tasks
+            WHERE user_id = ? AND date IS NOT NULL AND date >= ? AND date <= ?`,
+      args: [userId, firstDate, lastDate],
+    })
+  ).rows;
+
+  const sessRows = (
+    await db.execute({
+      sql: `SELECT task_id, duration_sec FROM work_sessions
+            WHERE user_id = ? AND date >= ? AND date <= ?`,
+      args: [userId, firstDate, lastDate],
+    })
+  ).rows;
+
+  const prevLogged = Number(
+    (
+      await db.execute({
+        sql: `SELECT COALESCE(SUM(duration_sec), 0) AS total FROM work_sessions
+              WHERE user_id = ? AND date >= ? AND date <= ?`,
+        args: [userId, prevStart, prevEnd],
+      })
+    ).rows[0]?.total ?? 0
+  );
+
+  const tags = (
+    await db.execute({
+      sql: 'SELECT id, name, color FROM tags WHERE user_id = ?',
+      args: [userId],
+    })
+  ).rows.map((r) => ({ id: String(r.id), name: String(r.name), color: String(r.color) }));
+
+  const tagIdsByTaskMap = await tagIdsByTask(taskRows.map((r) => String(r.id)));
+
+  const summary = buildReviewSummary({
+    tasks: taskRows.map((r) => ({
+      id: String(r.id),
+      name: String(r.name),
+      date: String(r.date),
+      done: Number(r.done) === 1,
+      file: r.file == null ? null : String(r.file),
+    })),
+    sessions: sessRows.map((r) => ({
+      taskId: String(r.task_id),
+      durationSeconds: Number(r.duration_sec),
+    })),
+    tagIdsByTask: tagIdsByTaskMap,
+    tags,
+    previousLoggedSeconds: prevLogged,
+  });
+
+  return {
+    week: weekLabelOf(weekStart),
+    weekStart,
+    previousWeekLabel: weekLabelOf(prevStart),
+    nextWeekLabel: weekLabelOf(nextWeekStart),
+    isCurrentWeek: weekStart === mondayOf(today),
+    nextWeekStart,
+    completedCount: summary.completedCount,
+    totalCount: summary.totalCount,
+    loggedSeconds: summary.loggedSeconds,
+    previousLoggedSeconds: summary.previousLoggedSeconds,
+    byContext: summary.byContext,
+    byTag: summary.byTag,
+    unfinished: summary.unfinished,
+    thisFocus: await weekFocusBody(userId, weekStart),
+    nextFocus: await weekFocusBody(userId, nextWeekStart),
+  };
+}
+
+async function saveWeekFocus(input: SaveWeekFocusInput): Promise<{ body: string }> {
+  const userId = currentUserId();
+  if (!input.weekStart || !DATE_RE.test(input.weekStart)) {
+    throw new BadRequestError('invalid_week_start', 'weekStart debe ser "YYYY-MM-DD"');
+  }
+  const weekStart = mondayOf(input.weekStart); // normaliza a lunes
+  const raw = typeof input.body === 'string' ? input.body : '';
+  if (raw.length > WEEK_FOCUS_MAX) {
+    throw new BadRequestError('invalid_body', `El foco no puede pasar de ${WEEK_FOCUS_MAX} caracteres`);
+  }
+  const body = raw.trim();
+  const db = getDb();
+  if (body === '') {
+    await db.execute({
+      sql: 'DELETE FROM week_focus WHERE user_id = ? AND week_start = ?',
+      args: [userId, weekStart],
+    });
+    return { body: '' };
+  }
+  await db.execute({
+    sql: `INSERT INTO week_focus (user_id, week_start, body, updated_at) VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, week_start) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
+    args: [userId, weekStart, body, new Date().toISOString()],
+  });
+  return { body };
 }
 
 // --- Búsqueda de tareas ---
@@ -2305,6 +2434,8 @@ export const sqliteStore: TaskStore = {
   getFocusHeatmap,
   getAnalytics,
   getSessionsInRange,
+  getWeeklyReview,
+  saveWeekFocus,
   searchTasks,
   exportBackup,
   importBackup,

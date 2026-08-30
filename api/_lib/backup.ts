@@ -98,6 +98,12 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     scopeWhere: 'user_id = ?',
     columns: ['date', 'body', 'updated_at'],
   },
+  {
+    table: 'week_focus',
+    hasUserId: true,
+    scopeWhere: 'user_id = ?',
+    columns: ['week_start', 'body', 'updated_at'],
+  },
 ] as const;
 
 /** Tablas con `id` propio (uuid) que hay que regenerar al restaurar, para no

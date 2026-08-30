@@ -674,6 +674,87 @@ describe('notas del día / bitácora', () => {
   });
 });
 
+describe('revisión semanal (getWeeklyReview / saveWeekFocus)', () => {
+  const WEEK = '2026.08.24 - 2026.08.28'; // lunes 2026-08-24
+
+  it('resume hechas/totales, tiempo por contexto y por etiqueta, y las pendientes', async () => {
+    const review = await as(USER, async () => {
+      const tag = await sqliteStore.createTag({ name: 'Proyecto', color: 'blue' });
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Hecha', fileId: 'Trabajo' });
+      await sqliteStore.createTask({ date: '2026-08-25', text: 'Pendiente', fileId: 'Casa' });
+      const c = await sqliteStore.createTask({ date: '2026-08-26', text: 'Pendiente 2', fileId: 'Trabajo' });
+      await sqliteStore.updateTask({ taskId: a.id, done: true, tagIds: [tag.id] });
+      await sqliteStore.logSession({ taskId: a.id, durationSeconds: 3600, start: '09:00', end: '10:00' });
+      await sqliteStore.logSession({ taskId: c.id, durationSeconds: 1800, start: '11:00', end: '11:30' });
+      return sqliteStore.getWeeklyReview({ week: WEEK });
+    });
+
+    expect(review.week).toBe(WEEK);
+    expect(review.completedCount).toBe(1);
+    expect(review.totalCount).toBe(3);
+    expect(review.loggedSeconds).toBe(5400);
+    expect(review.byContext).toEqual([
+      { label: 'Trabajo', file: 'Trabajo', seconds: 5400 },
+    ]);
+    expect(review.byTag).toEqual([
+      { tagId: expect.any(String), name: 'Proyecto', color: 'blue', seconds: 3600 },
+    ]);
+    expect(review.unfinished.map((t) => t.name)).toEqual(['Pendiente', 'Pendiente 2']);
+    expect(review.unfinished[1]).toMatchObject({ day: 'Miércoles', hasSessions: true, loggedSeconds: 1800 });
+  });
+
+  it('compara el tiempo con el de la semana anterior', async () => {
+    const review = await as(USER, async () => {
+      const prev = await sqliteStore.createTask({ date: '2026-08-17', text: 'prev' });
+      const now = await sqliteStore.createTask({ date: '2026-08-24', text: 'now' });
+      await sqliteStore.logSession({ taskId: prev.id, durationSeconds: 1200, start: '09:00', end: '09:20' });
+      await sqliteStore.logSession({ taskId: now.id, durationSeconds: 600, start: '09:00', end: '09:10' });
+      return sqliteStore.getWeeklyReview({ week: WEEK });
+    });
+    expect(review.loggedSeconds).toBe(600);
+    expect(review.previousLoggedSeconds).toBe(1200);
+  });
+
+  it('incluye tareas del fin de semana en la revisión', async () => {
+    const review = await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-30', text: 'Domingo pendiente' }); // domingo
+      return sqliteStore.getWeeklyReview({ week: WEEK });
+    });
+    expect(review.unfinished.map((t) => [t.name, t.day])).toEqual([['Domingo pendiente', 'Domingo']]);
+  });
+
+  it('guarda el foco de la semana siguiente y lo devuelve; vacío lo borra', async () => {
+    const first = await as(USER, () =>
+      sqliteStore.saveWeekFocus({ weekStart: '2026-08-31', body: '  cerrar el informe  ' })
+    );
+    expect(first.body).toBe('cerrar el informe');
+
+    const review = await as(USER, () => sqliteStore.getWeeklyReview({ week: WEEK }));
+    expect(review.nextWeekStart).toBe('2026-08-31');
+    expect(review.nextFocus).toBe('cerrar el informe');
+    expect(review.thisFocus).toBe('');
+
+    await as(USER, () => sqliteStore.saveWeekFocus({ weekStart: '2026-08-31', body: '   ' }));
+    const after = await as(USER, () => sqliteStore.getWeeklyReview({ week: WEEK }));
+    expect(after.nextFocus).toBe('');
+  });
+
+  it('normaliza weekStart a lunes y scopea por usuario', async () => {
+    await as(USER, () => sqliteStore.saveWeekFocus({ weekStart: '2026-09-03', body: 'jueves→lunes' }));
+    const mine = await as(USER, () => sqliteStore.getWeeklyReview({ week: '2026.08.31 - 2026.09.04' }));
+    expect(mine.thisFocus).toBe('jueves→lunes');
+
+    const other = await as(OTHER, () => sqliteStore.getWeeklyReview({ week: '2026.08.31 - 2026.09.04' }));
+    expect(other.thisFocus).toBe('');
+  });
+
+  it('rechaza weekStart inválido', async () => {
+    await expect(
+      as(USER, () => sqliteStore.saveWeekFocus({ weekStart: 'nope', body: 'x' }))
+    ).rejects.toThrow();
+  });
+});
+
 describe('getMonthSummary (vista mensual)', () => {
   it('resume tareas y horas por día del mes, solo días con actividad', async () => {
     const summary = await as(USER, async () => {

@@ -34,6 +34,7 @@ import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
 import Analytics from './components/Analytics';
+import WeeklyReviewDialog from './components/WeeklyReviewDialog';
 import Inbox from './components/Inbox';
 import DayNote from './components/DayNote';
 import Menu, { MenuItem } from './components/Menu';
@@ -118,6 +119,7 @@ export default function App() {
   const [showMonth, setShowMonth] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showReview, setShowReview] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
@@ -801,6 +803,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
           <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
+          <MenuItem onClick={() => { setShowReview(true); close(); }}>Revisión semanal</MenuItem>
           <MenuItem onClick={() => { setShowGoals(true); close(); }}>Metas del mes</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
@@ -1152,6 +1155,14 @@ export default function App() {
 
       {showAnalytics && (
         <Analytics fileId={selectedFileId} onClose={() => setShowAnalytics(false)} />
+      )}
+
+      {showReview && data && (
+        <WeeklyReviewDialog
+          initialWeek={data.week}
+          onChanged={() => void refresh(data.selectedDay, data.week)}
+          onClose={() => setShowReview(false)}
+        />
       )}
 
       {showGoals && data && (
