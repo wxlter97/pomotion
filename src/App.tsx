@@ -37,6 +37,7 @@ import TagsDialog from './components/TagsDialog';
 import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
+import TimerSettingsDialog from './components/TimerSettingsDialog';
 import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
@@ -45,6 +46,7 @@ import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
 import { useAccent } from './useAccent';
 import { useCarryOverSetting } from './useCarryOverSetting';
+import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
@@ -113,11 +115,13 @@ export default function App() {
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
   const [theme, toggleTheme] = useTheme();
   const [accent, chooseAccent] = useAccent();
+  const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const notifications = useNotificationSetting();
@@ -681,6 +685,9 @@ export default function App() {
           <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? 'Sí' : 'No'}>
             Traer pendientes al abrir
           </MenuItem>
+          <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
+            Pomodoro
+          </MenuItem>
           <div className="menu-heading">Color de acento</div>
           <div className="accent-row" role="group" aria-label="Color de acento">
             {ACCENTS.map((a) => (
@@ -907,6 +914,7 @@ export default function App() {
               <Timer
                 ref={timerRef}
                 task={selectedTask}
+                settings={timerSettings}
                 onSessionLogged={handleSessionLogged}
                 onPhaseChange={setTimerPhase}
                 soundsEnabled={soundsEnabled}
@@ -971,6 +979,16 @@ export default function App() {
       {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
 
       {showBackup && <BackupDialog onClose={() => setShowBackup(false)} />}
+
+      {showTimerSettings && (
+        <TimerSettingsDialog
+          settings={timerSettings}
+          onUpdate={updateTimerSettings}
+          onReset={resetTimerSettings}
+          disabled={timerPhase !== 'idle'}
+          onClose={() => setShowTimerSettings(false)}
+        />
+      )}
 
       {showTags && data && (
         <TagsDialog
