@@ -633,6 +633,47 @@ describe('carry-over', () => {
   });
 });
 
+describe('notas del día / bitácora', () => {
+  it('upsert: guarda, sobrescribe y aparece en la vista del día correcto', async () => {
+    await as(USER, () => sqliteStore.saveDayNote({ date: '2026-08-25', body: '  primer intento  ' }));
+    await as(USER, () => sqliteStore.saveDayNote({ date: '2026-08-25', body: 'versión final' }));
+
+    const martes = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Martes' })
+    );
+    expect(martes.dayNote).toBe('versión final');
+
+    const lunes = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(lunes.dayNote).toBe('');
+  });
+
+  it('texto vacío borra la nota', async () => {
+    await as(USER, () => sqliteStore.saveDayNote({ date: '2026-08-24', body: 'algo' }));
+    const res = await as(USER, () => sqliteStore.saveDayNote({ date: '2026-08-24', body: '   ' }));
+    expect(res.body).toBe('');
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(view.dayNote).toBe('');
+  });
+
+  it('está scopeada por usuario', async () => {
+    await as(USER, () => sqliteStore.saveDayNote({ date: '2026-08-24', body: 'mía' }));
+    const otherView = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(otherView.dayNote).toBe('');
+  });
+
+  it('rechaza fechas inválidas', async () => {
+    await expect(
+      as(USER, () => sqliteStore.saveDayNote({ date: '24-08-2026', body: 'x' }))
+    ).rejects.toThrow();
+  });
+});
+
 describe('getMonthSummary (vista mensual)', () => {
   it('resume tareas y horas por día del mes, solo días con actividad', async () => {
     const summary = await as(USER, async () => {

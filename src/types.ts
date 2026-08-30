@@ -93,6 +93,8 @@ export type TasksResponse = {
   carryOverCount: number;
   /** Tareas sin hacer del contexto que vencen hoy o ya vencieron. */
   dueReminders: DueReminder[];
+  /** Bitácora del día seleccionado (texto libre); '' si no hay nada escrito. */
+  dayNote: string;
 };
 
 /** Una tarea encontrada por la búsqueda de texto. */

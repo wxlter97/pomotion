@@ -765,6 +765,7 @@ h3 {
 .app--focus > .file-tabs,
 .app--focus > .day-row,
 .app--focus > .inbox,
+.app--focus > .day-note,
 .app--focus > .shortcuts-hint,
 .app--focus > .app-footer,
 .app--focus > .banner,
@@ -1449,6 +1450,37 @@ h3 {
   background: var(--color-bg-elevated);
   border-radius: 14px;
   box-shadow: var(--shadow-card);
+}
+
+/* Bitácora del día: reusa la cabecera plegable del inbox. */
+.day-note {
+  margin: 0 1.5rem 1rem;
+}
+.day-note.is-open .inbox-chevron {
+  transform: rotate(90deg);
+}
+.day-note-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--color-accent);
+  flex-shrink: 0;
+}
+.day-note-status {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--color-label-secondary);
+}
+.day-note-body {
+  margin-top: 0.5rem;
+  padding: 0.85rem;
+  background: var(--color-bg-elevated);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+.day-note-body .task-notes-input {
+  margin: 0;
 }
 
 .inbox-body .task-add-form {

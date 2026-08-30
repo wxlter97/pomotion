@@ -152,6 +152,15 @@ export function getAnalytics(weeks?: number, fileId?: string) {
 
 // --- Tareas ---
 
+/** Guarda la bitácora de un día ('YYYY-MM-DD'). Texto vacío borra la nota.
+ *  Devuelve el texto final (ya trimmeado). */
+export function saveDayNote(date: string, body: string) {
+  return request<{ ok: true; body: string }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'save_day_note', date, body_text: body }),
+  });
+}
+
 /** Mueve a hoy las tareas pendientes (sin sesiones) de días pasados. */
 export function carryOverToToday(fileId?: string, weekend?: boolean) {
   return request<{ ok: true; moved: number }>('/api/tasks', {

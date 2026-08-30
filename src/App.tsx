@@ -35,6 +35,7 @@ import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
 import Analytics from './components/Analytics';
 import Inbox from './components/Inbox';
+import DayNote from './components/DayNote';
 import Menu, { MenuItem } from './components/Menu';
 import TagsDialog from './components/TagsDialog';
 import type { MoveTarget } from './components/TaskRowMenu';
@@ -614,6 +615,11 @@ export default function App() {
     );
   }
 
+  function handleDayNoteSaved(date: string, body: string) {
+    // Solo refleja el cambio si seguimos en el mismo día que se editó.
+    setData((prev) => (prev && prev.selectedDate === date ? { ...prev, dayNote: body } : prev));
+  }
+
   async function handleScheduleTask(task: Task, date: string) {
     if (!data) return;
     const { selectedDay, week } = data;
@@ -959,6 +965,13 @@ export default function App() {
             onDeleted={handleInboxDeleted}
             onTextUpdated={handleInboxTextUpdated}
             onSchedule={(task, date) => void handleScheduleTask(task, date)}
+          />
+
+          <DayNote
+            key={data.selectedDate}
+            date={data.selectedDate}
+            note={data.dayNote}
+            onSaved={handleDayNoteSaved}
           />
 
           <div className="main-grid">

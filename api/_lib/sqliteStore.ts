@@ -75,6 +75,7 @@ import type {
   MonthSummary,
   RecurringRule,
   ReportInput,
+  SaveDayNoteInput,
   Session,
   SessionRow,
   SyncCalendarResult,
@@ -373,6 +374,15 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     })
   ).rows.map((r) => ({ id: String(r.id), name: String(r.name), due: String(r.due) }));
 
+  const dayNote = String(
+    (
+      await db.execute({
+        sql: 'SELECT body FROM day_notes WHERE user_id = ? AND date = ?',
+        args: [userId, selectedDate],
+      })
+    ).rows[0]?.body ?? ''
+  );
+
   const dayTotalSeconds = sessRows
     .filter((r) => String(r.date) === selectedDate)
     .reduce((sum, r) => sum + Number(r.duration_sec), 0);
@@ -396,6 +406,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     weekTotalSeconds,
     carryOverCount: await countCarryOver(userId, input.fileId, weekend),
     dueReminders,
+    dayNote,
   };
 }
 
@@ -467,6 +478,37 @@ async function carryOverToToday(input: {
     'write'
   );
   return { moved: rows.length };
+}
+
+// Tope defensivo para la bitácora del día: ~20 páginas de texto.
+const DAY_NOTE_MAX = 20000;
+
+/** Guarda la bitácora de un día (upsert). Texto vacío tras el trim → borra la
+ *  fila para no dejar basura. Devuelve el texto final guardado. */
+async function saveDayNote(input: SaveDayNoteInput): Promise<{ body: string }> {
+  const userId = currentUserId();
+  if (!input.date || !DATE_RE.test(input.date)) {
+    throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD"');
+  }
+  const raw = typeof input.body === 'string' ? input.body : '';
+  if (raw.length > DAY_NOTE_MAX) {
+    throw new BadRequestError('invalid_body', `La nota no puede pasar de ${DAY_NOTE_MAX} caracteres`);
+  }
+  const body = raw.trim();
+  const db = getDb();
+  if (body === '') {
+    await db.execute({
+      sql: 'DELETE FROM day_notes WHERE user_id = ? AND date = ?',
+      args: [userId, input.date],
+    });
+    return { body: '' };
+  }
+  await db.execute({
+    sql: `INSERT INTO day_notes (user_id, date, body, updated_at) VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, date) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
+    args: [userId, input.date, body, new Date().toISOString()],
+  });
+  return { body };
 }
 
 // --- Vista mensual ---
@@ -2242,6 +2284,7 @@ export const sqliteStore: TaskStore = {
   updateTaskPosition,
   bulkTasks,
   carryOverToToday,
+  saveDayNote,
   logSession,
   updateSession,
   deleteSession,
