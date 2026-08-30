@@ -34,6 +34,7 @@ import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
 import Analytics from './components/Analytics';
+import DayTimeline from './components/DayTimeline';
 import WeeklyReviewDialog from './components/WeeklyReviewDialog';
 import Inbox from './components/Inbox';
 import DayNote from './components/DayNote';
@@ -126,6 +127,7 @@ export default function App() {
   const [showMonth, setShowMonth] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showTimeline, setShowTimeline] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -824,6 +826,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowMonth(true); close(); }}>{t('menu.monthView')}</MenuItem>
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>{t('menu.heatmap')}</MenuItem>
           <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>{t('menu.analytics')}</MenuItem>
+          <MenuItem onClick={() => { setShowTimeline(true); close(); }}>{t('menu.timeline')}</MenuItem>
           <MenuItem onClick={() => { setShowReview(true); close(); }}>{t('menu.weeklyReview')}</MenuItem>
           <MenuItem onClick={() => { setShowGoals(true); close(); }}>{t('menu.goals')}</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>{t('menu.report')}</MenuItem>
@@ -1204,6 +1207,18 @@ export default function App() {
 
       {showAnalytics && (
         <Analytics fileId={selectedFileId} onClose={() => setShowAnalytics(false)} />
+      )}
+
+      {showTimeline && data && (
+        <DayTimeline
+          tasks={data.tasks}
+          selectedDate={data.selectedDate}
+          today={data.today}
+          allTags={data.tags}
+          onManageTags={() => setShowTags(true)}
+          onTaskUpdated={handleTaskUpdated}
+          onClose={() => setShowTimeline(false)}
+        />
       )}
 
       {showReview && data && (

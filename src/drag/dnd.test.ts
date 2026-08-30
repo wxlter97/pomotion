@@ -15,6 +15,7 @@ function task(overrides: Partial<Task> = {}): Task {
     due: null,
     estimateMinutes: null,
     plannedStart: null,
+    plannedMinutes: null,
     tagIds: [],
     source: 'manual',
     createdAt: '2026-08-24T10:00:00.000Z',

@@ -32,6 +32,9 @@ export type Task = {
   estimateMinutes: number | null;
   /** Hora planeada 'HH:MM' (time-blocking v1); null = sin horario. */
   plannedStart: string | null;
+  /** Duración del bloque en minutos (redimensionado a mano en el timeline);
+   *  null = usa `estimateMinutes` o el default del timeline. */
+  plannedMinutes: number | null;
   /** ids de las etiquetas asignadas. */
   tagIds: string[];
   /** 'manual' salvo que la tarea venga de un calendario suscripto. */

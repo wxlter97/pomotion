@@ -49,6 +49,7 @@ export const en: Record<MsgKey, string> = {
   'menu.monthView': 'Month view',
   'menu.heatmap': 'Focus heatmap',
   'menu.analytics': 'Analytics',
+  'menu.timeline': 'Day agenda',
   'menu.weeklyReview': 'Weekly review',
   'menu.goals': 'Monthly goals',
   'menu.report': 'Time report',
@@ -573,4 +574,12 @@ export const en: Record<MsgKey, string> = {
 
   'time.hoursShort': '{n}h',
   'time.minutesShort': '{n}m',
+
+  // --- Day agenda / timeline ---
+  'timeline.title': 'Day agenda',
+  'timeline.planned': 'Planned',
+  'timeline.actual': 'Actual',
+  'timeline.unscheduled': 'Unscheduled — drag a task onto the timeline to schedule it',
+  'timeline.resizeHandle': 'Drag to change the duration',
+  'timeline.saveError': 'Could not save the schedule',
 };

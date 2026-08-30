@@ -19,6 +19,7 @@ type Fields = {
   due?: string | null;
   estimateMinutes?: number | null;
   plannedStart?: string | null;
+  plannedMinutes?: number | null;
   tagIds?: string[];
   checklist?: ChecklistItem[];
 };
@@ -220,7 +221,7 @@ export default function TaskDetails({
           <button
             type="button"
             className="btn btn-plain btn-small"
-            onClick={() => void save({ plannedStart: null })}
+            onClick={() => void save({ plannedStart: null, plannedMinutes: null })}
             disabled={busy}
           >
             {t("details.remove")}

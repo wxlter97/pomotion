@@ -52,6 +52,7 @@ export const es = {
   'menu.monthView': 'Vista mensual',
   'menu.heatmap': 'Heatmap de foco',
   'menu.analytics': 'Analítica',
+  'menu.timeline': 'Agenda del día',
   'menu.weeklyReview': 'Revisión semanal',
   'menu.goals': 'Metas del mes',
   'menu.report': 'Reporte de tiempo',
@@ -576,6 +577,14 @@ export const es = {
 
   'time.hoursShort': '{n}h',
   'time.minutesShort': '{n}m',
+
+  // --- Agenda / timeline del día ---
+  'timeline.title': 'Agenda del día',
+  'timeline.planned': 'Planeado',
+  'timeline.actual': 'Real',
+  'timeline.unscheduled': 'Sin horario — arrastrá una tarea al timeline para agendarla',
+  'timeline.resizeHandle': 'Arrastrar para cambiar la duración',
+  'timeline.saveError': 'No se pudo guardar el horario',
 } as const;
 
 export type MsgKey = keyof typeof es;

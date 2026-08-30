@@ -155,6 +155,7 @@ function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
     due: r.due == null ? null : String(r.due),
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
     plannedStart: r.planned_start == null ? null : String(r.planned_start),
+    plannedMinutes: r.planned_minutes == null ? null : Number(r.planned_minutes),
     tagIds,
     source: String(r.source ?? 'manual') === 'calendar' ? 'calendar' : 'manual',
     createdAt: String(r.created_at),
@@ -1118,6 +1119,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     due: null,
     estimateMinutes: null,
     plannedStart: null,
+    plannedMinutes: null,
     tagIds: [],
     source: 'manual',
     createdAt: now,
@@ -1129,6 +1131,8 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
 const NOTES_MAX = 4000;
 // Tope defensivo para la estimación: 100 horas. Más que eso es un error de tipeo.
 const ESTIMATE_MAX_MIN = 6000;
+// El bloque del timeline no puede durar más que un día.
+const PLANNED_MINUTES_MAX = 1440;
 
 async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
   const userId = currentUserId();
@@ -1207,6 +1211,22 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     sets.push('planned_start = ?');
     args.push(value);
     result.plannedStart = value;
+  }
+  if (input.plannedMinutes !== undefined) {
+    const pm = input.plannedMinutes;
+    let value: number | null = null;
+    if (pm !== null) {
+      if (typeof pm !== 'number' || !Number.isFinite(pm) || pm <= 0 || pm > PLANNED_MINUTES_MAX) {
+        throw new BadRequestError(
+          'invalid_planned_minutes',
+          `planned_minutes debe ser un número entre 1 y ${PLANNED_MINUTES_MAX} o null`
+        );
+      }
+      value = Math.round(pm);
+    }
+    sets.push('planned_minutes = ?');
+    args.push(value);
+    result.plannedMinutes = value;
   }
   if (input.checklist !== undefined) {
     const items = normalizeChecklistInput(input.checklist, () => crypto.randomUUID());

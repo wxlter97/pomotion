@@ -217,6 +217,31 @@ describe('updateTask / deleteTask', () => {
     ).rejects.toThrow();
   });
 
+  it('setea la duración del bloque y la limpia con null', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: t.id, plannedMinutes: 45 });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0].plannedMinutes).toBe(45);
+
+    const cleared = await as(USER, async () => {
+      await sqliteStore.updateTask({ taskId: view.tasks[0].id, plannedMinutes: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0].plannedMinutes).toBeNull();
+  });
+
+  it('rechaza duraciones de bloque no positivas o mayores a un día', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, plannedMinutes: 0 }))
+    ).rejects.toThrow();
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, plannedMinutes: 1441 }))
+    ).rejects.toThrow();
+  });
+
   it('ordena el día por hora planeada, dejando las tareas sin horario después', async () => {
     const view = await as(USER, async () => {
       const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Sin horario' });
