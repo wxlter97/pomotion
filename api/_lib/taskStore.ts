@@ -252,6 +252,8 @@ export type DayTemplateItem = {
   name: string;
   priority: TaskPriority | null;
   estimateMinutes: number | null;
+  /** Hora 'HH:MM' con la que nace la tarea al aplicar la plantilla; null = sin horario. */
+  plannedStart: string | null;
 };
 
 /** Plantilla de día: un set de tareas con nombre para "estampar" en un día. */
@@ -356,6 +358,7 @@ export type DayTemplateItemInput = {
   name?: string;
   priority?: TaskPriority | null;
   estimateMinutes?: number | null;
+  plannedStart?: string | null;
 };
 export type CreateDayTemplateInput = {
   name?: string;

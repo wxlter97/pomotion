@@ -73,7 +73,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     table: 'day_template_items',
     hasUserId: false,
     scopeWhere: 'template_id IN (SELECT id FROM day_templates WHERE user_id = ?)',
-    columns: ['id', 'template_id', 'name', 'order', 'priority', 'estimate_min'],
+    columns: ['id', 'template_id', 'name', 'order', 'priority', 'estimate_min', 'planned_start'],
   },
   {
     table: 'goals',

@@ -233,6 +233,7 @@ export type DayTemplateItem = {
   name: string;
   priority: TaskPriority | null;
   estimateMinutes: number | null;
+  plannedStart: string | null;
 };
 
 export type DayTemplate = {

@@ -924,6 +924,86 @@ body.is-dragging * {
   opacity: 0.95;
 }
 
+/* --- Snackbar "Deshacer" (ver useUndo.ts) --- */
+.undo-snackbar {
+  position: fixed;
+  left: 50%;
+  bottom: 1.25rem;
+  transform: translateX(-50%);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  max-width: min(92vw, 420px);
+  padding: 0.6rem 0.5rem 0.6rem 0.9rem;
+  border-radius: 980px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-separator);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+  animation: snackbar-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.undo-snackbar-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.84rem;
+  color: var(--color-label);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.undo-snackbar-action {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 0.84rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+}
+.undo-snackbar-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+}
+.undo-snackbar-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--color-accent);
+  transform-origin: left;
+  animation-name: undo-countdown;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes undo-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+@keyframes snackbar-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .task-select {
   flex: 1 1 8rem;
   min-width: 7rem;

@@ -586,6 +586,14 @@ export const es = {
   'timeline.unscheduled': 'Sin horario — arrastrá una tarea al timeline para agendarla',
   'timeline.resizeHandle': 'Arrastrar para cambiar la duración',
   'timeline.saveError': 'No se pudo guardar el horario',
+
+  // --- Deshacer ---
+  'undo.action': 'Deshacer',
+  'undo.taskDone': 'Tarea "{name}" marcada como hecha.',
+  'undo.taskMoved': 'Se movió "{name}".',
+  'undo.taskDeleted': 'Se borró "{name}".',
+  'undo.restoreError': 'No se pudo deshacer el borrado',
+  'undo.moveBackError': 'No se pudo deshacer el movimiento',
 } as const;
 
 export type MsgKey = keyof typeof es;

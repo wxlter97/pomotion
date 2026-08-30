@@ -1803,6 +1803,7 @@ function toTemplateItem(r: Row): DayTemplateItem {
     name: String(r.name),
     priority: p && PRIORITIES.has(p) ? (p as TaskPriority) : null,
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
+    plannedStart: r.planned_start == null ? null : String(r.planned_start),
   };
 }
 
@@ -1851,7 +1852,14 @@ function cleanItems(items: DayTemplateItemInput[] | undefined): DayTemplateItem[
       }
       est = Math.round(e);
     }
-    out.push({ name, priority: p as TaskPriority | null, estimateMinutes: est });
+    let plannedStart: string | null = null;
+    if (raw.plannedStart != null) {
+      plannedStart = normalizeTimeLabel(raw.plannedStart);
+      if (plannedStart === null) {
+        throw new BadRequestError('invalid_planned_start', 'planned_start de un ítem inválido');
+      }
+    }
+    out.push({ name, priority: p as TaskPriority | null, estimateMinutes: est, plannedStart });
     if (out.length >= TEMPLATE_MAX_ITEMS) break;
   }
   return out;
@@ -1874,7 +1882,7 @@ async function itemsFromDay(
   const f = fileFilter(file ?? undefined);
   const rows = (
     await getDb().execute({
-      sql: `SELECT name, priority, estimate_min FROM tasks
+      sql: `SELECT name, priority, estimate_min, planned_start FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date = ?
             ORDER BY "order", created_at`,
       args: [userId, ...f.args, date],
@@ -1887,9 +1895,9 @@ async function writeItems(templateId: string, items: DayTemplateItem[]): Promise
   if (items.length === 0) return;
   await getDb().batch(
     items.map((it, i) => ({
-      sql: `INSERT INTO day_template_items (id, template_id, name, "order", priority, estimate_min)
-            VALUES (?, ?, ?, ?, ?, ?)`,
-      args: [crypto.randomUUID(), templateId, it.name, i, it.priority, it.estimateMinutes],
+      sql: `INSERT INTO day_template_items (id, template_id, name, "order", priority, estimate_min, planned_start)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [crypto.randomUUID(), templateId, it.name, i, it.priority, it.estimateMinutes, it.plannedStart],
     })),
     'write'
   );
@@ -2014,8 +2022,8 @@ async function applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: 
     existing.add(key);
     order += 1;
     inserts.push({
-      sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, priority, estimate_min, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, priority, estimate_min, planned_start, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         crypto.randomUUID(),
         userId,
@@ -2025,6 +2033,7 @@ async function applyDayTemplate(input: ApplyDayTemplateInput): Promise<{ added: 
         file,
         it.priority,
         it.estimateMinutes,
+        it.plannedStart,
         now,
         now,
       ],

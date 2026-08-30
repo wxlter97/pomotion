@@ -583,4 +583,12 @@ export const en: Record<MsgKey, string> = {
   'timeline.unscheduled': 'Unscheduled — drag a task onto the timeline to schedule it',
   'timeline.resizeHandle': 'Drag to change the duration',
   'timeline.saveError': 'Could not save the schedule',
+
+  // --- Undo ---
+  'undo.action': 'Undo',
+  'undo.taskDone': 'Task "{name}" marked as done.',
+  'undo.taskMoved': '"{name}" moved.',
+  'undo.taskDeleted': '"{name}" deleted.',
+  'undo.restoreError': 'Could not undo the delete',
+  'undo.moveBackError': 'Could not undo the move',
 };
