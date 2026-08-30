@@ -17,6 +17,16 @@ import {
   todayDateStringInTz,
 } from './parse.js';
 import { computeAnalytics } from './analytics.js';
+import {
+  desiredTasksFromEvents,
+  fetchIcalText,
+  isoDateUtc,
+  parseIcalEvents,
+  planSync,
+  syncWindow,
+  SYNC_DEBOUNCE_MS,
+  type FeedTaskRow,
+} from './calendarSync.js';
 import { currentUserId } from './requestContext.js';
 import {
   WEEKDAY_NAMES,
@@ -34,6 +44,8 @@ import type {
   Analytics,
   ApplyDayTemplateInput,
   ApplyRecurringInput,
+  CalendarFeed,
+  CreateCalendarFeedInput,
   CreateDayTemplateInput,
   CreateGoalInput,
   CreateRecurringRuleInput,
@@ -58,10 +70,12 @@ import type {
   ReportInput,
   Session,
   SessionRow,
+  SyncCalendarResult,
   Tag,
   Task,
   TaskPriority,
   TaskStore,
+  UpdateCalendarFeedInput,
   UpdateDayTemplateInput,
   UpdateGoalInput,
   UpdateRecurringRuleInput,
@@ -121,6 +135,7 @@ function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
     due: r.due == null ? null : String(r.due),
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
     tagIds,
+    source: String(r.source ?? 'manual') === 'calendar' ? 'calendar' : 'manual',
     sessions,
   };
 }
@@ -750,6 +765,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     due: null,
     estimateMinutes: null,
     tagIds: [],
+    source: 'manual',
     sessions: [],
   };
 }
@@ -1611,6 +1627,328 @@ async function deleteGoal(id?: string): Promise<void> {
   await getDb().execute({ sql: 'DELETE FROM goals WHERE id = ? AND user_id = ?', args: [id, userId] });
 }
 
+// --- Calendarios iCal ---
+
+const FEED_NAME_MAX = 80;
+const FEED_URL_MAX = 2000;
+
+function toCalendarFeed(r: Row): CalendarFeed {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    url: String(r.url),
+    file: r.file == null ? null : String(r.file),
+    enabled: Number(r.enabled) === 1,
+    lastSyncedAt: r.last_synced_at == null ? null : String(r.last_synced_at),
+    lastError: r.last_error == null ? null : String(r.last_error),
+  };
+}
+
+function cleanFeedUrl(raw: string | undefined): string {
+  const value = (raw ?? '').trim();
+  if (!value || value.length > FEED_URL_MAX) {
+    throw new BadRequestError('invalid_url', 'La URL del calendario no es válida');
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(value.replace(/^webcal:\/\//i, 'https://'));
+  } catch {
+    throw new BadRequestError('invalid_url', 'La URL del calendario no es válida');
+  }
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    throw new BadRequestError('invalid_url', 'La URL debe ser http(s) o webcal');
+  }
+  return parsed.toString();
+}
+
+function cleanFeedName(raw: string | undefined, fallback: string): string {
+  const value = (raw ?? '').trim().slice(0, FEED_NAME_MAX);
+  return value || fallback;
+}
+
+async function currentUserEmail(userId: string): Promise<string | null> {
+  const row = (
+    await getDb().execute({ sql: 'SELECT email FROM users WHERE id = ?', args: [userId] })
+  ).rows[0];
+  return row?.email == null ? null : String(row.email);
+}
+
+async function listCalendarFeeds(): Promise<CalendarFeed[]> {
+  const userId = currentUserId();
+  const rows = (
+    await getDb().execute({
+      sql: 'SELECT * FROM calendar_feeds WHERE user_id = ? ORDER BY created_at',
+      args: [userId],
+    })
+  ).rows;
+  return rows.map(toCalendarFeed);
+}
+
+async function createCalendarFeed(input: CreateCalendarFeedInput): Promise<CalendarFeed> {
+  const userId = currentUserId();
+  const url = cleanFeedUrl(input.url);
+  const file = input.fileId ?? null;
+  const name = cleanFeedName(input.name, 'Calendario');
+  const id = crypto.randomUUID();
+  await getDb().execute({
+    sql: `INSERT INTO calendar_feeds (id, user_id, name, url, file, enabled, created_at)
+          VALUES (?, ?, ?, ?, ?, 1, ?)`,
+    args: [id, userId, name, url, file, new Date().toISOString()],
+  });
+  return { id, name, url, file, enabled: true, lastSyncedAt: null, lastError: null };
+}
+
+async function updateCalendarFeed(input: UpdateCalendarFeedInput): Promise<CalendarFeed> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_id', 'Falta id');
+
+  const sets: string[] = [];
+  const args: InValue[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    args.push(cleanFeedName(input.name, 'Calendario'));
+  }
+  if (input.fileId !== undefined) {
+    sets.push('file = ?');
+    args.push(input.fileId ?? null);
+  }
+  if (input.enabled !== undefined) {
+    sets.push('enabled = ?');
+    args.push(input.enabled ? 1 : 0);
+  }
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+
+  const res = await getDb().execute({
+    sql: `UPDATE calendar_feeds SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`,
+    args: [...args, input.id, userId],
+  });
+  if (res.rowsAffected === 0) throw new NotFoundError('feed_not_found', 'Calendario no encontrado');
+
+  const row = (
+    await getDb().execute({ sql: 'SELECT * FROM calendar_feeds WHERE id = ?', args: [input.id] })
+  ).rows[0];
+  return toCalendarFeed(row);
+}
+
+async function deleteCalendarFeed(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_id', 'Falta id');
+  const db = getDb();
+
+  // Tareas del feed sin historial (sin sesiones) → se borran; el resto queda
+  // huérfano (source sigue 'calendar', pero feed_id a NULL).
+  const rows = (
+    await db.execute({
+      sql: `SELECT t.id,
+                   EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id) AS has_sessions
+            FROM tasks t WHERE t.user_id = ? AND t.feed_id = ?`,
+      args: [userId, id],
+    })
+  ).rows;
+  const removable = rows.filter((r) => Number(r.has_sessions) === 0).map((r) => String(r.id));
+  const keep = rows.filter((r) => Number(r.has_sessions) === 1).map((r) => String(r.id));
+
+  const batch: { sql: string; args: InValue[] }[] = [];
+  for (const chunk of chunkIds(removable)) {
+    const ph = chunk.map(() => '?').join(',');
+    batch.push({ sql: `DELETE FROM task_tags WHERE task_id IN (${ph})`, args: [...chunk] });
+    batch.push({
+      sql: `DELETE FROM tasks WHERE user_id = ? AND id IN (${ph})`,
+      args: [userId, ...chunk],
+    });
+  }
+  for (const chunk of chunkIds(keep)) {
+    const ph = chunk.map(() => '?').join(',');
+    batch.push({
+      sql: `UPDATE tasks SET feed_id = NULL, updated_at = ? WHERE user_id = ? AND id IN (${ph})`,
+      args: [new Date().toISOString(), userId, ...chunk],
+    });
+  }
+  batch.push({ sql: 'DELETE FROM calendar_feeds WHERE id = ? AND user_id = ?', args: [id, userId] });
+  await db.batch(batch, 'write');
+}
+
+function chunkIds(ids: string[], size = 50): string[][] {
+  const out: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) out.push(ids.slice(i, i + size));
+  return out;
+}
+
+async function syncCalendarFeeds(input: {
+  feedId?: string;
+  force?: boolean;
+}): Promise<SyncCalendarResult> {
+  const userId = currentUserId();
+  const db = getDb();
+  const result: SyncCalendarResult = {
+    syncedFeeds: 0,
+    added: 0,
+    updated: 0,
+    removed: 0,
+    changed: false,
+  };
+
+  const feeds = (
+    await db.execute({
+      sql: input.feedId
+        ? 'SELECT * FROM calendar_feeds WHERE user_id = ? AND id = ?'
+        : 'SELECT * FROM calendar_feeds WHERE user_id = ? AND enabled = 1',
+      args: input.feedId ? [userId, input.feedId] : [userId],
+    })
+  ).rows.map(toCalendarFeed);
+  if (feeds.length === 0) return result;
+
+  // Pedir un feed puntual (feedId) siempre ignora el debounce.
+  const force = input.force === true || typeof input.feedId === 'string';
+  const viewerEmail = await currentUserEmail(userId);
+  const now = new Date();
+  const { start: winStart, end: winEnd } = syncWindow(now);
+  const winStartIso = isoDateUtc(winStart);
+  const winEndIso = isoDateUtc(winEnd);
+
+  for (const feed of feeds) {
+    if (feed.enabled === false && !input.feedId) continue;
+    const fresh =
+      !force &&
+      feed.lastSyncedAt != null &&
+      now.getTime() - new Date(feed.lastSyncedAt).getTime() < SYNC_DEBOUNCE_MS;
+    if (fresh) continue;
+
+    result.syncedFeeds++;
+    try {
+      const fetched = await fetchIcalText(feed.url);
+      if (!fetched.ok) throw new Error(fetched.error);
+
+      const events = parseIcalEvents(fetched.text, {
+        windowStart: winStart,
+        windowEnd: winEnd,
+        viewerEmail,
+      });
+      const desired = desiredTasksFromEvents(events, TIMEZONE);
+
+      const existing: FeedTaskRow[] = (
+        await db.execute({
+          sql: `SELECT t.id, t.external_uid, t.name, t.date, t.external_date, t.notes, t.estimate_min,
+                       t.done,
+                       EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id) AS has_sessions
+                FROM tasks t
+                WHERE t.user_id = ? AND t.feed_id = ?
+                  AND t.external_date >= ? AND t.external_date <= ?`,
+          args: [userId, feed.id, winStartIso, winEndIso],
+        })
+      ).rows.map((r) => ({
+        id: String(r.id),
+        externalUid: String(r.external_uid),
+        name: String(r.name),
+        date: r.date == null ? null : String(r.date),
+        externalDate: r.external_date == null ? null : String(r.external_date),
+        notes: r.notes == null ? null : String(r.notes),
+        estimateMin: r.estimate_min == null ? null : Number(r.estimate_min),
+        done: Number(r.done) === 1,
+        hasSessions: Number(r.has_sessions) === 1,
+      }));
+
+      const plan = planSync(desired, existing);
+
+      // Orden: al final de cada día, en el bucket del feed.
+      const f = fileFilter(feed.file ?? undefined);
+      const maxOrderByDate = new Map<string, number>();
+      for (const r of (
+        await db.execute({
+          sql: `SELECT date, max("order") AS o FROM tasks
+                WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ? GROUP BY date`,
+          args: [userId, ...f.args, winStartIso, winEndIso],
+        })
+      ).rows) {
+        maxOrderByDate.set(String(r.date), Number(r.o));
+      }
+
+      const iso = now.toISOString();
+      const writes: { sql: string; args: InValue[] }[] = [];
+
+      for (const d of plan.create) {
+        const order = (maxOrderByDate.get(d.date) ?? 0) + 1;
+        maxOrderByDate.set(d.date, order);
+        writes.push({
+          sql: `INSERT INTO tasks
+                  (id, user_id, name, date, done, "order", file, source, feed_id, external_uid,
+                   external_date, estimate_min, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 'calendar', ?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            crypto.randomUUID(),
+            userId,
+            d.name,
+            d.date,
+            order,
+            feed.file,
+            feed.id,
+            d.externalUid,
+            d.date,
+            d.estimateMin > 0 ? d.estimateMin : null,
+            d.notes,
+            iso,
+            iso,
+          ],
+        });
+      }
+      for (const u of plan.update) {
+        writes.push({
+          sql: `UPDATE tasks SET name = ?, date = ?, external_date = ?, estimate_min = ?, notes = ?,
+                     updated_at = ?
+                WHERE id = ? AND user_id = ?`,
+          args: [
+            u.name,
+            u.date,
+            u.date,
+            u.estimateMin > 0 ? u.estimateMin : null,
+            u.notes,
+            iso,
+            u.id,
+            userId,
+          ],
+        });
+      }
+      for (const chunk of chunkIds(plan.remove)) {
+        const ph = chunk.map(() => '?').join(',');
+        writes.push({ sql: `DELETE FROM task_tags WHERE task_id IN (${ph})`, args: [...chunk] });
+        writes.push({
+          sql: `DELETE FROM tasks WHERE user_id = ? AND id IN (${ph})`,
+          args: [userId, ...chunk],
+        });
+      }
+      for (const chunk of chunkIds(plan.orphan)) {
+        const ph = chunk.map(() => '?').join(',');
+        writes.push({
+          sql: `UPDATE tasks SET feed_id = NULL, updated_at = ? WHERE user_id = ? AND id IN (${ph})`,
+          args: [iso, userId, ...chunk],
+        });
+      }
+
+      if (writes.length > 0) await db.batch(writes, 'write');
+
+      result.added += plan.create.length;
+      result.updated += plan.update.length;
+      result.removed += plan.remove.length + plan.orphan.length;
+      if (plan.create.length || plan.update.length || plan.remove.length || plan.orphan.length) {
+        result.changed = true;
+      }
+
+      await db.execute({
+        sql: 'UPDATE calendar_feeds SET last_synced_at = ?, last_error = NULL WHERE id = ? AND user_id = ?',
+        args: [iso, feed.id, userId],
+      });
+    } catch (err) {
+      const message = (err instanceof Error ? err.message : 'Error al sincronizar').slice(0, 300);
+      await db.execute({
+        sql: 'UPDATE calendar_feeds SET last_synced_at = ?, last_error = ? WHERE id = ? AND user_id = ?',
+        args: [new Date().toISOString(), message, feed.id, userId],
+      });
+    }
+  }
+
+  return result;
+}
+
 export const sqliteStore: TaskStore = {
   getWeekView,
   getMonthSummary,
@@ -1643,4 +1981,9 @@ export const sqliteStore: TaskStore = {
   createGoal,
   updateGoal,
   deleteGoal,
+  listCalendarFeeds,
+  createCalendarFeed,
+  updateCalendarFeed,
+  deleteCalendarFeed,
+  syncCalendarFeeds,
 };

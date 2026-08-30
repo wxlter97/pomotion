@@ -454,6 +454,11 @@ export default function TaskList({
                     </div>
                   ) : (
                     <button type="button" className="task-select" onClick={() => onSelect(task)}>
+                      {task.source === 'calendar' && (
+                        <span className="task-src" title="Del calendario" aria-label="Del calendario">
+                          📅
+                        </span>
+                      )}
                       <span className="task-text">{task.name || '(sin texto)'}</span>
                     </button>
                   )}

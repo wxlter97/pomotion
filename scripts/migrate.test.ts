@@ -15,6 +15,7 @@ const SCHEMA_TABLES = [
   'day_templates',
   'day_template_items',
   'goals',
+  'calendar_feeds',
   'schema_migrations',
 ];
 
@@ -32,6 +33,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('002_recurring_runs.sql');
     expect(applied).toContain('003_day_templates.sql');
     expect(applied).toContain('004_goals.sql');
+    expect(applied).toContain('005_calendar_feeds.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });
@@ -56,7 +58,7 @@ describe('runMigrations', () => {
     const cols = new Set(
       (await db.execute("SELECT name FROM pragma_table_info('tasks')")).rows.map((r) => String(r.name))
     );
-    for (const c of ['user_id', 'date', 'done', 'order', 'file', 'priority', 'estimate_min', 'notes', 'due', 'recurring_rule_id']) {
+    for (const c of ['user_id', 'date', 'done', 'order', 'file', 'priority', 'estimate_min', 'notes', 'due', 'recurring_rule_id', 'source', 'feed_id', 'external_uid', 'external_date']) {
       expect(cols.has(c), `falta tasks.${c}`).toBe(true);
     }
   });

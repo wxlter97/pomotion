@@ -9,6 +9,9 @@ export type Session = {
 /** Prioridad de una tarea; null = sin prioridad. */
 export type TaskPriority = 'low' | 'med' | 'high';
 
+/** Procedencia de una tarea: creada a mano o traída de un calendario suscripto. */
+export type TaskSource = 'manual' | 'calendar';
+
 export type Task = {
   id: string;
   name: string;
@@ -26,7 +29,20 @@ export type Task = {
   estimateMinutes: number | null;
   /** ids de las etiquetas asignadas. */
   tagIds: string[];
+  /** 'manual' salvo que la tarea venga de un calendario suscripto. */
+  source: TaskSource;
   sessions: Session[];
+};
+
+/** Calendario iCal suscripto. */
+export type CalendarFeed = {
+  id: string;
+  name: string;
+  url: string;
+  file: string | null;
+  enabled: boolean;
+  lastSyncedAt: string | null;
+  lastError: string | null;
 };
 
 /** Etiqueta / proyecto. `color` es una clave de paleta (ver tags.ts). */

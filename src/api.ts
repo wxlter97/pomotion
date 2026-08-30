@@ -1,5 +1,6 @@
 import type {
   Analytics,
+  CalendarFeed,
   DayTemplate,
   DayTemplateItem,
   FileEntry,
@@ -277,6 +278,57 @@ export function deleteGoal(id: string) {
   return request<{ ok: true }>('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({ action: 'delete_goal', id }),
+  });
+}
+
+// --- Calendarios iCal ---
+
+export function getCalendarFeeds() {
+  return request<{ feeds: CalendarFeed[] }>('/api/tasks?feeds=1');
+}
+
+export function createCalendarFeed(name: string, url: string, fileId: string | null) {
+  return request<{ ok: true; feed: CalendarFeed }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_feed', name, url, file: fileId }),
+  });
+}
+
+export function updateCalendarFeed(
+  id: string,
+  fields: { name?: string; enabled?: boolean; fileId?: string | null }
+) {
+  const body: Record<string, unknown> = { action: 'update_feed', id };
+  if (fields.name !== undefined) body.name = fields.name;
+  if (fields.enabled !== undefined) body.enabled = fields.enabled;
+  if ('fileId' in fields) body.file = fields.fileId;
+  return request<{ ok: true; feed: CalendarFeed }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deleteCalendarFeed(id: string) {
+  return request<{ ok: true }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_feed', id }),
+  });
+}
+
+export type SyncCalendarResult = {
+  ok: true;
+  syncedFeeds: number;
+  added: number;
+  updated: number;
+  removed: number;
+  changed: boolean;
+};
+
+/** Sincroniza los feeds vencidos (o uno puntual con `feedId`, ignorando el debounce). */
+export function syncCalendarFeeds(feedId?: string) {
+  return request<SyncCalendarResult>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'sync_feeds', feed_id: feedId }),
   });
 }
 

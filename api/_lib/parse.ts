@@ -31,6 +31,24 @@ export function todayDateStringInTz(timeZone: string): string {
   }).format(new Date());
 }
 
+/** Fecha "YYYY-MM-DD" y hora "HH:MM" de un instante en una zona horaria dada. */
+export function dateTimeInTz(instant: Date, timeZone: string): { date: string; time: string } {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(instant);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+  return {
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    time: `${get('hour')}:${get('minute')}`,
+  };
+}
+
 /** Nombre del día de la semana ("lunes", ...) normalizado, sin acentos. */
 export function todayWeekdayNameInTz(timeZone: string): string {
   const name = new Intl.DateTimeFormat('es-ES', { timeZone, weekday: 'long' }).format(new Date());
