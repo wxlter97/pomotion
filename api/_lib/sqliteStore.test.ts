@@ -962,6 +962,89 @@ describe('calendarios iCal', () => {
   });
 });
 
+describe('searchTasks (búsqueda de tareas)', () => {
+  it('encuentra por subcadena, sin distinguir mayúsculas, en cualquier semana', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'Revisar informe anual' });
+      await sqliteStore.createTask({ date: '2026-09-14', text: 'Llamar al banco' });
+      await sqliteStore.createTask({ date: '2026-07-06', text: 'Preparar INFORME de gastos' });
+    });
+
+    const results = await as(USER, () => sqliteStore.searchTasks({ query: 'informe' }));
+    expect(results.map((r) => r.name)).toEqual([
+      'Revisar informe anual',
+      'Preparar INFORME de gastos',
+    ]);
+    expect(results[0]).toMatchObject({
+      date: '2026-08-24',
+      weekLabel: '2026.08.24 - 2026.08.28',
+      day: 'Lunes',
+      done: false,
+      hasSessions: false,
+    });
+  });
+
+  it('ordena las fechadas por fecha descendente y deja el inbox al final', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-10', text: 'plan viejo' });
+      await sqliteStore.createTask({ date: '2026-08-26', text: 'plan nuevo' });
+      await sqliteStore.createTask({ text: 'plan sin fecha' });
+    });
+
+    const results = await as(USER, () => sqliteStore.searchTasks({ query: 'plan' }));
+    expect(results.map((r) => r.name)).toEqual(['plan nuevo', 'plan viejo', 'plan sin fecha']);
+    const inbox = results[2];
+    expect(inbox.date).toBeNull();
+    expect(inbox.weekLabel).toBeNull();
+    expect(inbox.day).toBeNull();
+  });
+
+  it('devuelve [] con query vacío o solo espacios', async () => {
+    await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'algo' }));
+    expect(await as(USER, () => sqliteStore.searchTasks({ query: '' }))).toEqual([]);
+    expect(await as(USER, () => sqliteStore.searchTasks({ query: '   ' }))).toEqual([]);
+  });
+
+  it('trata los comodines de LIKE como texto literal', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'progreso 50% del hito' });
+      await sqliteStore.createTask({ date: '2026-08-25', text: 'sin porcentaje' });
+    });
+    const hit = await as(USER, () => sqliteStore.searchTasks({ query: '50%' }));
+    expect(hit.map((r) => r.name)).toEqual(['progreso 50% del hito']);
+    // '%' es literal: encuentra la tarea con el signo, no todas.
+    const literal = await as(USER, () => sqliteStore.searchTasks({ query: '%' }));
+    expect(literal.map((r) => r.name)).toEqual(['progreso 50% del hito']);
+  });
+
+  it('scopea por usuario y por contexto (file)', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'reunión Trabajo', fileId: 'Trabajo' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'reunión Casa', fileId: 'Casa' });
+    });
+    await as(OTHER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'reunión ajena' }));
+
+    const mine = await as(USER, () =>
+      sqliteStore.searchTasks({ query: 'reunión', fileId: 'Trabajo' })
+    );
+    expect(mine.map((r) => r.name)).toEqual(['reunión Trabajo']);
+    expect(await as(OTHER, () => sqliteStore.searchTasks({ query: 'reunión' }))).toEqual([
+      expect.objectContaining({ name: 'reunión ajena' }),
+    ]);
+  });
+
+  it('marca hasSessions cuando la tarea tiene tiempo registrado', async () => {
+    const task = await as(USER, () =>
+      sqliteStore.createTask({ date: '2026-08-24', text: 'con tiempo' })
+    );
+    await as(USER, () =>
+      sqliteStore.logSession({ taskId: task.id, durationSeconds: 1500, start: '09:00', end: '09:25' })
+    );
+    const results = await as(USER, () => sqliteStore.searchTasks({ query: 'con tiempo' }));
+    expect(results[0].hasSessions).toBe(true);
+  });
+});
+
 afterEach(() => {
   resetDb();
 });

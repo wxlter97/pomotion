@@ -2394,6 +2394,79 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- Search dialog --- */
+.sheet--search {
+  max-width: 440px;
+  max-height: min(80vh, 620px);
+  display: flex;
+  flex-direction: column;
+}
+
+.search-input {
+  font-family: inherit;
+  width: 100%;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.95rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.search-empty {
+  margin: 1rem 0 0;
+}
+
+.search-results {
+  list-style: none;
+  margin: 0.85rem 0 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.search-result {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.search-results [aria-selected='true'] .search-result {
+  background: var(--color-fill);
+}
+
+.search-result-name {
+  font-size: 0.9rem;
+  color: var(--color-label);
+}
+
+.search-result-name.is-done {
+  text-decoration: line-through;
+  color: var(--color-label-secondary);
+}
+
+.search-result-meta {
+  font-size: 0.76rem;
+  color: var(--color-label-secondary);
+}
+
 /* --- Month view --- */
 .sheet--month {
   max-width: 460px;

@@ -26,6 +26,7 @@ import GoalsDialog from './components/GoalsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import Report from './components/Report';
+import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
 import FocusHeatmap from './components/FocusHeatmap';
 import Analytics from './components/Analytics';
@@ -98,6 +99,7 @@ export default function App() {
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
   const [showReport, setShowReport] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -272,6 +274,19 @@ export default function App() {
     [refresh, guardIfRunning]
   );
 
+  // Desde la búsqueda: saltar a la semana/día de la tarea elegida. Las del
+  // inbox no tienen semana → solo cerramos (el inbox se ve en cualquier semana).
+  const handleSearchPick = useCallback(
+    (result: { weekLabel: string | null; day: string | null }) => {
+      setShowSearch(false);
+      if (!result.weekLabel) return;
+      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () =>
+        void refresh(result.day ?? undefined, result.weekLabel ?? undefined)
+      );
+    },
+    [refresh, guardIfRunning]
+  );
+
   const guardedSelectFile = useCallback(
     (fileId: string) => {
       if (fileId === selectedFileId) return;
@@ -303,6 +318,9 @@ export default function App() {
         e.preventDefault();
         if (timerPhase === 'idle') timerRef.current?.start();
         else timerRef.current?.stop();
+      } else if (e.key === '/') {
+        e.preventDefault();
+        setShowSearch(true);
       } else if (e.key === 't' || e.key === 'T') {
         toggleTheme();
       } else if (/^[1-5]$/.test(e.key)) {
@@ -623,6 +641,7 @@ export default function App() {
     <Menu ariaLabel="Ver" trigger={<>Ver<ChevronDownIcon /></>}>
       {(close) => (
         <>
+          <MenuItem onClick={() => { setShowSearch(true); close(); }}>Buscar tareas</MenuItem>
           <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
           <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
           <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
@@ -877,7 +896,7 @@ export default function App() {
 
           <footer className="shortcuts-hint">
             <kbd>espacio</kbd> inicia/detiene · <kbd>1</kbd>–<kbd>5</kbd> cambia de día ·{' '}
-            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>T</kbd> cambia el tema
+            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>/</kbd> busca · <kbd>T</kbd> cambia el tema
           </footer>
         </>
       )}
@@ -885,6 +904,15 @@ export default function App() {
       <Footer />
 
       {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
+
+      {showSearch && (
+        <SearchDialog
+          fileId={selectedFileId}
+          showContext={files.length > 1}
+          onPick={handleSearchPick}
+          onClose={() => setShowSearch(false)}
+        />
+      )}
 
       {showMonth && (
         <MonthView

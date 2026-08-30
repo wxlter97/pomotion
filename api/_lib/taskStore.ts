@@ -158,6 +158,22 @@ export type SessionRow = {
 
 export type FileEntry = { id: string; label: string };
 
+/** Una tarea encontrada por la búsqueda de texto (ver `searchTasks`). */
+export type TaskSearchResult = {
+  id: string;
+  name: string;
+  /** 'YYYY-MM-DD'; null = sin fecha (inbox). */
+  date: string | null;
+  done: boolean;
+  file: string | null;
+  /** Etiqueta "2026.08.24 - 2026.08.28" para saltar a esa semana; null si es del inbox. */
+  weekLabel: string | null;
+  /** Nombre del día laboral ("Lunes"); null si es del inbox o cae en fin de semana. */
+  day: string | null;
+  /** true si la tarea tiene al menos una sesión registrada. */
+  hasSessions: boolean;
+};
+
 export type RecurringRule = {
   id: string;
   name: string;
@@ -207,6 +223,7 @@ export type GoalProgress = Goal & {
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
+export type SearchTasksInput = { query?: string; fileId?: string };
 export type GetMonthSummaryInput = { month?: string; fileId?: string };
 export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
 export type GetAnalyticsInput = { fileId?: string; weeks?: number };
@@ -339,6 +356,8 @@ export interface TaskStore {
   /** Agregados para el panel de analítica (por día de semana, hora, semana…). */
   getAnalytics(input: GetAnalyticsInput): Promise<Analytics>;
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
+  /** Tareas cuyo nombre contiene `query` (todas las semanas + inbox del contexto). */
+  searchTasks(input: SearchTasksInput): Promise<TaskSearchResult[]>;
   listFiles(): Promise<FileEntry[]>;
   listTags(): Promise<Tag[]>;
   createTag(input: CreateTagInput): Promise<Tag>;

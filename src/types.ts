@@ -83,6 +83,21 @@ export type TasksResponse = {
   carryOverCount: number;
 };
 
+/** Una tarea encontrada por la búsqueda de texto. */
+export type TaskSearchResult = {
+  id: string;
+  name: string;
+  /** 'YYYY-MM-DD'; null = sin fecha (inbox). */
+  date: string | null;
+  done: boolean;
+  file: string | null;
+  /** Etiqueta "2026.08.24 - 2026.08.28" para saltar a esa semana; null si es del inbox. */
+  weekLabel: string | null;
+  /** Nombre del día laboral ("Lunes"); null si es del inbox o cae en fin de semana. */
+  day: string | null;
+  hasSessions: boolean;
+};
+
 export type MonthDaySummary = {
   date: string; // 'YYYY-MM-DD'
   taskCount: number;
