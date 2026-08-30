@@ -275,6 +275,7 @@ export const en: Record<MsgKey, string> = {
   'recurring.applyTitle': 'Apply to {week}',
   'recurring.weekly': 'Weekly',
   'recurring.monthly': 'Monthly',
+  'recurring.defaultTime': 'Default time',
   'recurring.lastDay': 'Last',
   'recurring.lastDayTitle': 'The last day of each month',
   'recurring.everyMonthDay': 'Day {n} of the month',

@@ -1518,6 +1518,19 @@ body.is-dragging * {
   font-size: 0.66rem;
 }
 
+.recurring-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.recurring-time-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-label-secondary);
+}
+
 .recurring-day {
   width: 1.5rem;
   height: 1.5rem;

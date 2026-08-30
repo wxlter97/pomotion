@@ -278,6 +278,7 @@ export const es = {
   'recurring.applyTitle': 'Aplicar a {week}',
   'recurring.weekly': 'Semanal',
   'recurring.monthly': 'Mensual',
+  'recurring.defaultTime': 'Hora por defecto',
   'recurring.lastDay': 'Últ.',
   'recurring.lastDayTitle': 'El último día de cada mes',
   'recurring.everyMonthDay': 'Día {n} del mes',

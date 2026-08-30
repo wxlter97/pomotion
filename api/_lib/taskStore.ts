@@ -242,6 +242,9 @@ export type RecurringRule = {
   weekdays: string;
   /** CSV de días del mes 1..31, más `-1` = último día. Relevante con freq 'monthly'; '' si no aplica. */
   monthdays: string;
+  /** Hora 'HH:MM' con la que nacen las tareas que genera esta regla (`Task.plannedStart`);
+   *  null = sin horario por defecto. */
+  defaultPlannedStart: string | null;
 };
 
 /** Un ítem de una plantilla de día. */
@@ -440,6 +443,7 @@ export type CreateRecurringRuleInput = {
   freq?: string;
   weekdays?: string;
   monthdays?: string;
+  defaultPlannedStart?: string | null;
 };
 export type UpdateRecurringRuleInput = {
   id?: string;
@@ -448,6 +452,7 @@ export type UpdateRecurringRuleInput = {
   freq?: string;
   weekdays?: string;
   monthdays?: string;
+  defaultPlannedStart?: string | null;
 };
 export type ApplyRecurringInput = { week?: string; fileId?: string };
 

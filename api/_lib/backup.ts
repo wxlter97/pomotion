@@ -32,7 +32,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     table: 'recurring_rules',
     hasUserId: true,
     scopeWhere: 'user_id = ?',
-    columns: ['id', 'name', 'file', 'weekdays', 'active', 'created_at', 'freq', 'monthdays'],
+    columns: ['id', 'name', 'file', 'weekdays', 'active', 'created_at', 'freq', 'monthdays', 'default_planned_start'],
   },
   {
     table: 'tags',

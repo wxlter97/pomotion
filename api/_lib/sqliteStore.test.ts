@@ -1143,6 +1143,50 @@ describe('recurrentes', () => {
     expect(await as(USER, () => sqliteStore.listRecurringRules())).toHaveLength(0);
   });
 
+  it('las tareas que materializa una regla con hora por defecto nacen agendadas', async () => {
+    await as(USER, () =>
+      sqliteStore.createRecurringRule({ name: 'Standup', weekdays: '1', defaultPlannedStart: '9:05' })
+    );
+    const view = await as(USER, async () => {
+      await sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks).toMatchObject([{ name: 'Standup', plannedStart: '09:05' }]);
+  });
+
+  it('sin hora por defecto, las tareas materializadas nacen sin horario', async () => {
+    await as(USER, () => sqliteStore.createRecurringRule({ name: 'Sin hora', weekdays: '1' }));
+    const view = await as(USER, async () => {
+      await sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0].plannedStart).toBeNull();
+  });
+
+  it('setea y limpia la hora por defecto de una regla existente', async () => {
+    const r = await as(USER, () => sqliteStore.createRecurringRule({ name: 'X' }));
+    const withTime = await as(USER, () =>
+      sqliteStore.updateRecurringRule({ id: r.id, defaultPlannedStart: '14:00' })
+    );
+    expect(withTime.defaultPlannedStart).toBe('14:00');
+
+    const cleared = await as(USER, () =>
+      sqliteStore.updateRecurringRule({ id: r.id, defaultPlannedStart: null })
+    );
+    expect(cleared.defaultPlannedStart).toBeNull();
+  });
+
+  it('rechaza una hora por defecto con formato inválido', async () => {
+    await expect(
+      as(USER, () => sqliteStore.createRecurringRule({ name: 'X', defaultPlannedStart: '9am' }))
+    ).rejects.toThrow();
+
+    const r = await as(USER, () => sqliteStore.createRecurringRule({ name: 'Y' }));
+    await expect(
+      as(USER, () => sqliteStore.updateRecurringRule({ id: r.id, defaultPlannedStart: '9am' }))
+    ).rejects.toThrow();
+  });
+
   it('cambiar una regla a mensual y de vuelta a semanal', async () => {
     const r = await as(USER, () => sqliteStore.createRecurringRule({ name: 'Flexible' }));
     const monthly = await as(USER, () =>
