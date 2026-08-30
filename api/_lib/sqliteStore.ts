@@ -31,11 +31,11 @@ import {
 } from './calendarSync.js';
 import { currentUserId } from './requestContext.js';
 import {
-  WEEKDAY_NAMES,
   mondayOf,
   resolveWeekStart,
   selectDay,
   toWeekday,
+  visibleDayNames,
   weekDates,
   weekLabelOf,
   weekdayIndex,
@@ -281,13 +281,20 @@ async function computeOrder(
 
 async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
   const userId = currentUserId();
+  const weekend = input.includeWeekend === true;
   const weekStart = resolveWeekStart(input.week, TIMEZONE);
-  const dates = weekDates(weekStart);
+  const dates = weekDates(weekStart, weekend);
+  const lastDate = dates[dates.length - 1];
   const today = todayDateStringInTz(TIMEZONE);
   const thisMonday = mondayOf(today);
   const isCurrentWeek = weekStart === thisMonday;
-  const selectedDay = selectDay({ requestedDay: input.day, isCurrentWeek, timeZone: TIMEZONE });
-  const selectedDate = dates[weekdayIndex(selectedDay) ?? 0];
+  const selectedDay = selectDay({
+    requestedDay: input.day,
+    isCurrentWeek,
+    timeZone: TIMEZONE,
+    includeWeekend: weekend,
+  });
+  const selectedDate = dates[weekdayIndex(selectedDay, weekend) ?? 0];
 
   const f = fileFilter(input.fileId);
   const db = getDb();
@@ -309,7 +316,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
       sql: `SELECT * FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
             ORDER BY date, "order", created_at`,
-      args: [userId, ...f.args, dates[0], dates[4]],
+      args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows;
 
@@ -318,7 +325,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
       sql: `SELECT * FROM work_sessions
             WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
             ORDER BY start_hhmm`,
-      args: [userId, ...f.args, dates[0], dates[4]],
+      args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows;
 
@@ -377,7 +384,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     isCurrentWeek,
     previousWeekLabel: weekLabelOf(addDaysToDate(weekStart, -7)),
     nextWeekLabel: weekLabelOf(addDaysToDate(weekStart, 7)),
-    days: WEEKDAY_NAMES.map((day, i) => ({ day, date: dates[i] })),
+    days: visibleDayNames(weekend).map((day, i) => ({ day, date: dates[i] })),
     selectedDay,
     selectedDate,
     today,
@@ -387,7 +394,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     dayTemplates,
     dayTotalSeconds,
     weekTotalSeconds,
-    carryOverCount: await countCarryOver(userId, input.fileId),
+    carryOverCount: await countCarryOver(userId, input.fileId, weekend),
     dueReminders,
   };
 }
@@ -398,9 +405,13 @@ const CARRY_OVER_WINDOW_DAYS = 14;
 
 /** Tareas pendientes (done=0, sin sesiones) de un día anterior a hoy dentro
  *  de la ventana: las candidatas a "traer a hoy". */
-async function countCarryOver(userId: string, fileId: string | undefined): Promise<number> {
+async function countCarryOver(
+  userId: string,
+  fileId: string | undefined,
+  includeWeekend = false
+): Promise<number> {
   const f = fileFilter(fileId);
-  const target = toWeekday(todayDateStringInTz(TIMEZONE));
+  const target = toWeekday(todayDateStringInTz(TIMEZONE), includeWeekend);
   const row = (
     await getDb().execute({
       sql: `SELECT count(*) AS c FROM tasks t
@@ -415,10 +426,14 @@ async function countCarryOver(userId: string, fileId: string | undefined): Promi
 
 /** Mueve a hoy las tareas pendientes sin sesiones de los últimos
  *  CARRY_OVER_WINDOW_DAYS, preservando su orden relativo (más viejas primero). */
-async function carryOverToToday(input: { fileId?: string }): Promise<{ moved: number }> {
+async function carryOverToToday(input: {
+  fileId?: string;
+  includeWeekend?: boolean;
+}): Promise<{ moved: number }> {
   const userId = currentUserId();
-  // Si hoy es fin de semana, se traen al lunes siguiente (la vista es Lun–Vie).
-  const target = toWeekday(todayDateStringInTz(TIMEZONE));
+  // Si hoy es fin de semana y la vista NO muestra el finde, se traen al lunes
+  // siguiente; si el usuario tiene el finde activado, se traen a hoy.
+  const target = toWeekday(todayDateStringInTz(TIMEZONE), input.includeWeekend === true);
   const f = fileFilter(input.fileId);
   const db = getDb();
 
@@ -1442,7 +1457,11 @@ async function applyRulesToWeek(
   weekStart: string,
   file: string | null
 ): Promise<{ added: number }> {
-  const dates = weekDates(weekStart);
+  // Materializa Lun–Dom siempre: las reglas de fin de semana son opt-in (hay
+  // que marcar S/D en la regla), y `recurring_runs` cierra la semana una sola
+  // vez — no habría segunda pasada si el usuario activa el finde después.
+  const dates = weekDates(weekStart, true);
+  const lastDate = dates[dates.length - 1];
   const f = fileFilter(file ?? undefined);
   const db = getDb();
 
@@ -1459,7 +1478,7 @@ async function applyRulesToWeek(
   const existing = (
     await db.execute({
       sql: `SELECT date, name FROM tasks WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?`,
-      args: [userId, ...f.args, dates[0], dates[4]],
+      args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows;
   const namesByDate = new Map<string, Set<string>>();
@@ -1472,7 +1491,7 @@ async function applyRulesToWeek(
   for (const r of (
     await db.execute({
       sql: `SELECT date, max("order") AS o FROM tasks WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ? GROUP BY date`,
-      args: [userId, ...f.args, dates[0], dates[4]],
+      args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows) {
     maxOrderByDate.set(String(r.date), Number(r.o));
@@ -1480,9 +1499,9 @@ async function applyRulesToWeek(
 
   const now = new Date().toISOString();
   const inserts: { sql: string; args: InValue[] }[] = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
-    const weekday = String(i + 1);
+    const weekday = String(i + 1); // 1(Lun)..7(Dom), coincide con el CSV de la regla
     const have = namesByDate.get(date) ?? new Set<string>();
     let order = maxOrderByDate.get(date) ?? 0;
     for (const rule of rules) {

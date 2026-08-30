@@ -65,6 +65,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
         week: typeof req.query.week === 'string' ? req.query.week : undefined,
         day: typeof req.query.day === 'string' ? req.query.day : undefined,
+        includeWeekend: req.query.weekend === '1',
       });
       return res.status(200).json(view);
     }
@@ -89,6 +90,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         backup?: unknown;
         op?: string;
         ids?: unknown;
+        weekend?: boolean;
       };
       if (body.action === 'bulk') {
         const result = await sqliteStore.bulkTasks({
@@ -104,7 +106,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'carry_over') {
-        const result = await sqliteStore.carryOverToToday({ fileId: body.file });
+        const result = await sqliteStore.carryOverToToday({
+          fileId: body.file,
+          includeWeekend: body.weekend === true,
+        });
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'create_tag') {

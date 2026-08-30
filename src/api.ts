@@ -92,11 +92,12 @@ export function getFiles() {
   return request<{ files: FileEntry[] }>('/api/files');
 }
 
-export function getTasks(day?: string, week?: string, fileId?: string) {
+export function getTasks(day?: string, week?: string, fileId?: string, weekend?: boolean) {
   const params = new URLSearchParams();
   if (day) params.set('day', day);
   if (week) params.set('week', week);
   if (fileId) params.set('file', fileId);
+  if (weekend) params.set('weekend', '1');
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
 }
@@ -152,10 +153,10 @@ export function getAnalytics(weeks?: number, fileId?: string) {
 // --- Tareas ---
 
 /** Mueve a hoy las tareas pendientes (sin sesiones) de días pasados. */
-export function carryOverToToday(fileId?: string) {
+export function carryOverToToday(fileId?: string, weekend?: boolean) {
   return request<{ ok: true; moved: number }>('/api/tasks', {
     method: 'POST',
-    body: JSON.stringify({ action: 'carry_over', file: fileId }),
+    body: JSON.stringify({ action: 'carry_over', file: fileId, weekend }),
   });
 }
 

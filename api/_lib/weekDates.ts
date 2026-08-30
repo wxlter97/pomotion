@@ -13,6 +13,14 @@ import {
 } from './parse.js';
 
 export const WEEKDAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'] as const;
+export const WEEKEND_NAMES = ['Sábado', 'Domingo'] as const;
+export const ALL_DAY_NAMES = [...WEEKDAY_NAMES, ...WEEKEND_NAMES] as const;
+
+/** Nombres de día visibles según el toggle "fin de semana opcional" (cliente).
+ *  El identificador de semana (la etiqueta) sigue siendo siempre Lun–Vie. */
+export function visibleDayNames(includeWeekend: boolean): readonly string[] {
+  return includeWeekend ? ALL_DAY_NAMES : WEEKDAY_NAMES;
+}
 
 function utcDay(dateStr: string): number {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -25,9 +33,11 @@ export function mondayOf(dateStr: string): string {
   return addDaysToDate(dateStr, dow === 0 ? -6 : 1 - dow);
 }
 
-/** Las 5 fechas Lun–Vie a partir del lunes dado. */
-export function weekDates(mondayStr: string): string[] {
-  return [0, 1, 2, 3, 4].map((n) => addDaysToDate(mondayStr, n));
+/** Las fechas de la semana a partir del lunes dado: 5 (Lun–Vie) o, con
+ *  `includeWeekend`, 7 (Lun–Dom). */
+export function weekDates(mondayStr: string, includeWeekend = false): string[] {
+  const n = includeWeekend ? 7 : 5;
+  return Array.from({ length: n }, (_, i) => addDaysToDate(mondayStr, i));
 }
 
 /** Etiqueta "2026.08.24 - 2026.08.28" de la semana del lunes dado. */
@@ -44,9 +54,11 @@ export function resolveWeekStart(requestedWeek: string | undefined, timeZone: st
   return mondayOf(todayDateStringInTz(timeZone));
 }
 
-/** Índice 0..4 de una etiqueta de día laboral, o null. */
-export function weekdayIndex(dayLabel: string): number | null {
-  const i = WEEKDAY_NAMES.findIndex((d) => normalize(d) === normalize(dayLabel));
+/** Índice de una etiqueta de día dentro de la semana visible (0..4, o 0..6
+ *  con `includeWeekend`), o null si no es un día de esa lista. */
+export function weekdayIndex(dayLabel: string, includeWeekend = false): number | null {
+  const names = visibleDayNames(includeWeekend);
+  const i = names.findIndex((d) => normalize(d) === normalize(dayLabel));
   return i === -1 ? null : i;
 }
 
@@ -56,31 +68,41 @@ export function weekdayNameOf(dateStr: string): string | null {
   return dow >= 1 && dow <= 5 ? WEEKDAY_NAMES[dow - 1] : null;
 }
 
-/** `dateStr` si es día laboral; si cae en fin de semana, el lunes siguiente. */
-export function toWeekday(dateStr: string): string {
+/** true si la fecha 'YYYY-MM-DD' cae en sábado o domingo. */
+export function isWeekend(dateStr: string): boolean {
+  const dow = utcDay(dateStr);
+  return dow === 0 || dow === 6;
+}
+
+/** `dateStr` tal cual si `includeWeekend`; si no, el mismo día cuando es
+ *  laboral y el lunes siguiente cuando cae en fin de semana. */
+export function toWeekday(dateStr: string, includeWeekend = false): string {
+  if (includeWeekend) return dateStr;
   let d = dateStr;
-  while (weekdayNameOf(d) === null) d = addDaysToDate(d, 1);
+  while (isWeekend(d)) d = addDaysToDate(d, 1);
   return d;
 }
 
 /**
- * Día seleccionado dentro de la semana visible: el pedido (si es un día
- * laboral válido), o "hoy" si es la semana actual y hoy es día laboral, o
- * Lunes. Siempre devuelve una etiqueta de WEEKDAY_NAMES.
+ * Día seleccionado dentro de la semana visible: el pedido (si está en la
+ * lista visible), o "hoy" si es la semana actual y hoy es un día visible, o
+ * Lunes. Siempre devuelve una etiqueta de `visibleDayNames(includeWeekend)`.
  */
 export function selectDay(opts: {
   requestedDay?: string;
   isCurrentWeek: boolean;
   timeZone: string;
+  includeWeekend?: boolean;
 }): string {
   const { requestedDay, isCurrentWeek, timeZone } = opts;
+  const names = visibleDayNames(opts.includeWeekend ?? false);
   if (requestedDay) {
-    const match = WEEKDAY_NAMES.find((d) => normalize(d) === normalize(requestedDay));
+    const match = names.find((d) => normalize(d) === normalize(requestedDay));
     if (match) return match;
   }
   if (isCurrentWeek) {
     const today = todayWeekdayNameInTz(timeZone);
-    const match = WEEKDAY_NAMES.find((d) => normalize(d) === today);
+    const match = names.find((d) => normalize(d) === today);
     if (match) return match;
   }
   return WEEKDAY_NAMES[0];
