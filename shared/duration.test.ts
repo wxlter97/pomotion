@@ -3,6 +3,7 @@ import {
   TIME_RE,
   formatDurationLabel,
   isValidTimeLabel,
+  normalizeTimeLabel,
   parseDurationToSeconds,
   roundDurationSeconds,
 } from './duration';
@@ -140,5 +141,22 @@ describe('TIME_RE / isValidTimeLabel', () => {
     // Limitación conocida: "25:99" pasa el formato. La validación de rango,
     // si algún día hace falta, va en otro lado.
     expect(TIME_RE.test('25:99')).toBe(true);
+  });
+});
+
+describe('normalizeTimeLabel', () => {
+  it('zero-pea la hora (los minutos ya vienen de a dos dígitos por TIME_RE)', () => {
+    expect(normalizeTimeLabel('9:05')).toBe('09:05');
+    expect(normalizeTimeLabel('0:00')).toBe('00:00');
+  });
+
+  it('deja igual una "HH:MM" ya zero-padeada', () => {
+    expect(normalizeTimeLabel('09:30')).toBe('09:30');
+    expect(normalizeTimeLabel('  23:45  ')).toBe('23:45');
+  });
+
+  it('devuelve null si no matchea TIME_RE', () => {
+    expect(normalizeTimeLabel('9am')).toBeNull();
+    expect(normalizeTimeLabel('')).toBeNull();
   });
 });

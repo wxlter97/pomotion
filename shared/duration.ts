@@ -13,6 +13,15 @@ export function isValidTimeLabel(value: string): boolean {
   return TIME_RE.test(value.trim());
 }
 
+/** Zero-padea la hora de una "HH:MM" válida ("9:05" → "09:05") para que
+ *  ordene bien como texto; `null` si `value` no matchea `TIME_RE`. */
+export function normalizeTimeLabel(value: string): string | null {
+  const trimmed = value.trim();
+  if (!TIME_RE.test(trimmed)) return null;
+  const [h, m] = trimmed.split(':');
+  return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
+}
+
 const PLAIN_NUMBER_RE = /^\d+(\.\d+)?$/;
 const JIRA_DURATION_RE = /^(?:(\d+(?:\.\d+)?)\s*h)?\s*(?:(\d+(?:\.\d+)?)\s*m)?\s*(?:(\d+(?:\.\d+)?)\s*s)?$/i;
 

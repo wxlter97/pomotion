@@ -465,7 +465,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 - UI en español. Zona `America/El_Salvador`.
 - Estado actual de `tasks`: `id, user_id, name, date (nullable), done, "order", file,
   priority, estimate_min, notes, due, recurring_rule_id, source, feed_id, external_uid,
-  external_date, created_at, updated_at`.
+  external_date, created_at, updated_at, planned_start, planned_minutes`.
 
 ### Tier 1 — alto valor, bajo costo
 
@@ -494,12 +494,28 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 ### Tier 3 — grande
 
-- **Time-blocking** (arrastrado del §9): hora planeada por tarea (`planned_start` +
-  `planned_minutes`, migración) + vista de **agenda/timeline** del día con las sesiones
-  reales superpuestas. Componente de calendario nuevo, drag para agendar/mover/redimensionar,
-  historia de touch. El estimate podría ser el largo por defecto del bloque. Recomendado
-  hacer primero un v1 "blando" (solo el campo de hora + chip + orden por hora, sin
-  timeline) y decidir después si vale la vista de agenda.
+- ~~**Time-blocking**~~ ✅ (arrastrado del §9), en dos tandas:
+  - **v1 "blando"**: hora planeada por tarea — campo "Hora planeada" en el panel de
+    detalle (`<input type="time">`), chip 🕐 HH:MM en la fila, y el día se ordena por
+    esa hora (las tareas sin horario quedan después, en su orden manual de siempre).
+    Migración `010_time_blocking.sql` (`tasks.planned_start` TEXT nullable).
+    `getWeekView` ordena `ORDER BY date, (planned_start IS NULL), planned_start,
+    "order", created_at`. `normalizeTimeLabel` nuevo en `shared/duration.ts`
+    (zero-pad para que el `ORDER BY` como texto ordene bien).
+  - **v2, vista de agenda/timeline**: diálogo "Agenda del día" (menú "Ver"): franja
+    vertical de 24h con los bloques planeados a la izquierda (arrastrar para mover,
+    borde inferior para redimensionar — cambia la duración) y las sesiones reales
+    superpuestas a la derecha; cola "Sin horario" arriba para arrastrar una tarea al
+    timeline y agendarla; línea de "ahora" si el día es hoy; click en un bloque abre
+    el panel de detalle (`TaskDetails`) inline. Migración `011_time_blocking_duration.sql`
+    (`tasks.planned_minutes` INTEGER nullable — NULL usa la estimación o el default de
+    30 min). `src/timeline.ts` puro (conversión hora↔minuto, snap de 5 min, rango de un
+    bloque/sesión recortado a medianoche, `layoutColumns` para repartir en columnas los
+    bloques que se solapan). `src/components/DayTimeline.tsx`: controlador de pointer
+    events hecho a mano (mismo enfoque que `src/drag/DragProvider.tsx` pero con tres
+    gestos — mover/redimensionar/agendar — en vez de uno), sin dependencias nuevas,
+    mouse + touch. Ambas tandas en el backup; sin función serverless nueva (todo
+    plegado en `PATCH /api/task` vía `plannedStart`/`plannedMinutes`).
 - ~~**PWA instalable + offline de lectura**~~ ✅ — service worker hecho a mano (`public/sw.js`,
   cero deps): navegación red-primero → cae al `index.html` cacheado; `/assets/*` (con hash)
   cache-primero; `GET /api/tasks` + `/api/auth/status` red-primero → caen a lo último

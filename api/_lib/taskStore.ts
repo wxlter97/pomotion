@@ -45,6 +45,11 @@ export type Task = {
   due: string | null;
   /** Estimación de esfuerzo en minutos; null = sin estimar. */
   estimateMinutes: number | null;
+  /** Hora planeada 'HH:MM' (time-blocking v1, ROADMAP §11 Tier 3); null = sin horario. */
+  plannedStart: string | null;
+  /** Duración del bloque en minutos (redimensionado a mano en el timeline);
+   *  null = usa `estimateMinutes` o el default del timeline. */
+  plannedMinutes: number | null;
   /** ids de las etiquetas asignadas (ver `Tag`). */
   tagIds: string[];
   /** 'manual' salvo que la tarea venga de un calendario suscripto. */
@@ -331,6 +336,10 @@ export type UpdateTaskInput = {
   due?: string | null;
   /** Minutos estimados (entero > 0) para setear, null para quitar. */
   estimateMinutes?: number | null;
+  /** 'HH:MM' para setear, null para quitar. */
+  plannedStart?: string | null;
+  /** Minutos (entero > 0) para setear, null para volver a la estimación/default. */
+  plannedMinutes?: number | null;
   /** Reemplaza el conjunto completo de etiquetas de la tarea. */
   tagIds?: string[];
   /** Reemplaza el checklist completo de la tarea (lista vacía lo borra). */
@@ -450,6 +459,8 @@ export type UpdateTaskResult = {
   notes?: string | null;
   due?: string | null;
   estimateMinutes?: number | null;
+  plannedStart?: string | null;
+  plannedMinutes?: number | null;
   tagIds?: string[];
   checklist?: ChecklistItem[];
 };

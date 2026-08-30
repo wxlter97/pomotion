@@ -18,6 +18,8 @@ type Fields = {
   notes?: string | null;
   due?: string | null;
   estimateMinutes?: number | null;
+  plannedStart?: string | null;
+  plannedMinutes?: number | null;
   tagIds?: string[];
   checklist?: ChecklistItem[];
 };
@@ -199,6 +201,27 @@ export default function TaskDetails({
             type="button"
             className="btn btn-plain btn-small"
             onClick={() => void save({ due: null })}
+            disabled={busy}
+          >
+            {t("details.remove")}
+          </button>
+        )}
+      </div>
+
+      <div className="task-details-row">
+        <span className="task-details-label">{t('details.plannedStart')}</span>
+        <input
+          type="time"
+          className="task-planned-start-input"
+          value={task.plannedStart ?? ''}
+          onChange={(e) => void save({ plannedStart: e.target.value || null })}
+          disabled={busy}
+        />
+        {task.plannedStart && (
+          <button
+            type="button"
+            className="btn btn-plain btn-small"
+            onClick={() => void save({ plannedStart: null, plannedMinutes: null })}
             disabled={busy}
           >
             {t("details.remove")}

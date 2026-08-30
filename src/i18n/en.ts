@@ -49,6 +49,7 @@ export const en: Record<MsgKey, string> = {
   'menu.monthView': 'Month view',
   'menu.heatmap': 'Focus heatmap',
   'menu.analytics': 'Analytics',
+  'menu.timeline': 'Day agenda',
   'menu.weeklyReview': 'Weekly review',
   'menu.goals': 'Monthly goals',
   'menu.report': 'Time report',
@@ -155,6 +156,7 @@ export const en: Record<MsgKey, string> = {
   'taskList.noText': '(no text)',
   'taskList.fromCalendar': 'From calendar',
   'taskList.checklistChipTitle': 'Steps completed',
+  'taskList.plannedStartTitle': 'Planned time',
   'taskList.stalledTitle': 'open for a while',
   'taskList.estimateVsLogged': 'Logged vs. estimated',
   'taskList.overBudget': ' — over',
@@ -195,6 +197,7 @@ export const en: Record<MsgKey, string> = {
   'details.priority': 'Priority',
   'details.due': 'Due',
   'details.estimate': 'Estimate',
+  'details.plannedStart': 'Planned time',
   'details.tags': 'Tags',
   'details.steps': 'Steps',
   'details.priorityHigh': 'High',
@@ -571,4 +574,12 @@ export const en: Record<MsgKey, string> = {
 
   'time.hoursShort': '{n}h',
   'time.minutesShort': '{n}m',
+
+  // --- Day agenda / timeline ---
+  'timeline.title': 'Day agenda',
+  'timeline.planned': 'Planned',
+  'timeline.actual': 'Actual',
+  'timeline.unscheduled': 'Unscheduled — drag a task onto the timeline to schedule it',
+  'timeline.resizeHandle': 'Drag to change the duration',
+  'timeline.saveError': 'Could not save the schedule',
 };

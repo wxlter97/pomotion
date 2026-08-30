@@ -224,13 +224,17 @@ export function updateTaskFields(
     notes?: string | null;
     due?: string | null;
     estimateMinutes?: number | null;
+    plannedStart?: string | null;
+    plannedMinutes?: number | null;
     tagIds?: string[];
     checklist?: ChecklistItem[];
   }
 ) {
-  const { estimateMinutes, tagIds, ...rest } = fields;
+  const { estimateMinutes, plannedStart, plannedMinutes, tagIds, ...rest } = fields;
   const body: Record<string, unknown> = { id, ...rest };
   if (estimateMinutes !== undefined) body.estimate_min = estimateMinutes;
+  if (plannedStart !== undefined) body.planned_start = plannedStart;
+  if (plannedMinutes !== undefined) body.planned_minutes = plannedMinutes;
   if (tagIds !== undefined) body.tag_ids = tagIds;
   return request<{ ok: true }>('/api/task', { method: 'PATCH', body: JSON.stringify(body) });
 }
