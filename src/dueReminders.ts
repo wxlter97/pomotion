@@ -1,24 +1,25 @@
 /**
  * Helpers puros para el aviso de vencimientos: el texto del banner en la
- * app y el cuerpo de la notificación del navegador. Sin React ni almacén.
+ * app y el cuerpo de la notificación del navegador. Sin React ni almacén —
+ * reciben un `t` para no depender del idioma.
  */
+import type { TFn as T } from './i18n';
 import type { DueReminder } from './types';
 
-/** "1 tarea vencida" / "2 tareas vencen hoy" / "3 tareas vencen hoy o ya vencieron". */
-export function dueBannerText(reminders: DueReminder[], today: string): string {
+/** Texto del banner de vencimientos ('' si no hay ninguno). */
+export function dueBannerText(reminders: DueReminder[], _today: string, t: T): string {
   const n = reminders.length;
   if (n === 0) return '';
-  const overdue = reminders.filter((r) => r.due < today).length;
-  const noun = n === 1 ? 'tarea' : 'tareas';
-  if (overdue === n) return `${n} ${noun} ${n === 1 ? 'vencida' : 'vencidas'}.`;
-  if (overdue === 0) return `${n} ${noun} ${n === 1 ? 'vence' : 'vencen'} hoy.`;
-  return `${n} ${noun} vencen hoy o ya vencieron.`;
+  return n === 1 ? t('due.one', { name: reminders[0].name }) : t('due.many', { count: n });
 }
 
 /** Cuerpo de la notificación del navegador: nombres, recortado a 3. */
-export function dueNotificationBody(reminders: DueReminder[]): string {
+export function dueNotificationBody(reminders: DueReminder[], t: T): string {
   const names = reminders.map((r) => r.name);
-  if (names.length === 1) return `«${names[0]}» vence hoy o ya venció.`;
+  if (names.length === 1) return t('due.one', { name: names[0] });
   const head = names.slice(0, 3).join(', ');
-  return names.length > 3 ? `${names.length} tareas: ${head}…` : `${names.length} tareas: ${head}.`;
+  return t('due.notifyMany', {
+    count: names.length,
+    names: names.length > 3 ? `${head}…` : `${head}.`,
+  });
 }

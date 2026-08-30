@@ -1,13 +1,6 @@
 import { googleLoginUrl } from '../api';
+import { useT, type MsgKey } from '../i18n';
 import Footer from './Footer';
-
-const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  google_denied: 'Cancelaste el acceso con Google.',
-  email_unverified: 'Tu email de Google no está verificado.',
-  state: 'El intento de login expiró. Probá de nuevo.',
-  token_exchange: 'No se pudo completar el login con Google. Probá de nuevo.',
-  server_misconfigured: 'El servidor no tiene configurado el login con Google.',
-};
 
 function GoogleGlyph() {
   return (
@@ -32,10 +25,21 @@ function GoogleGlyph() {
   );
 }
 
+const KNOWN_ERRORS = new Set([
+  'google_denied',
+  'email_unverified',
+  'state',
+  'token_exchange',
+  'server_misconfigured',
+]);
+
 export default function Login() {
+  const t = useT();
   const authError = new URLSearchParams(window.location.search).get('auth_error');
   const errorMessage = authError
-    ? AUTH_ERROR_MESSAGES[authError] ?? 'No se pudo iniciar sesión. Probá de nuevo.'
+    ? KNOWN_ERRORS.has(authError)
+      ? t(`login.err.${authError}` as MsgKey)
+      : t('login.genericError')
     : null;
 
   return (
@@ -43,11 +47,11 @@ export default function Login() {
       <div className="screen-content">
         <div className="login-card">
           <h1>pomotion</h1>
-          <p className="muted">Iniciá sesión para continuar</p>
+          <p className="muted">{t('login.subtitle')}</p>
           {errorMessage && <p className="error">{errorMessage}</p>}
           <a className="btn btn-filled btn-large google-btn" href={googleLoginUrl}>
             <GoogleGlyph />
-            Continuar con Google
+            {t('login.withGoogle')}
           </a>
         </div>
       </div>

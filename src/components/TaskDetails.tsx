@@ -9,6 +9,7 @@ import {
   toggleChecklistItem,
 } from '../checklist';
 import { estimateLabel, parseEstimateMinutes, PRIORITY_OPTIONS } from '../taskMeta';
+import { useT } from '../i18n';
 import { tagColorOf } from '../tags';
 import type { ChecklistItem, Tag, Task, TaskPriority } from '../types';
 
@@ -36,6 +37,7 @@ export default function TaskDetails({
   onManageTags: () => void;
   disabled?: boolean;
 }) {
+  const t = useT();
   const [notes, setNotes] = useState(task.notes ?? '');
   const [estimate, setEstimate] = useState(estimateLabel(task.estimateMinutes));
   const [newStep, setNewStep] = useState('');
@@ -51,10 +53,10 @@ export default function TaskDetails({
     } catch (err) {
       setError(
         err instanceof UnauthorizedError
-          ? 'La sesión expiró. Recargá la página para volver a entrar.'
+          ? t('common.sessionExpired')
           : err instanceof Error
             ? err.message
-            : 'No se pudo guardar'
+            : t('details.saveError')
       );
     } finally {
       setSaving(false);
@@ -75,7 +77,7 @@ export default function TaskDetails({
     }
     const minutes = parseEstimateMinutes(raw);
     if (minutes == null) {
-      setError('No entendí esa duración. Probá con "90" o "1h 30m".');
+      setError(t('details.badEstimate'));
       return;
     }
     setEstimate(estimateLabel(minutes)); // normaliza "90" → "1h 30m"
@@ -100,7 +102,7 @@ export default function TaskDetails({
   return (
     <div className="task-details">
       <div className="task-details-row">
-        <span className="task-details-label">Prioridad</span>
+        <span className="task-details-label">{t('details.priority')}</span>
         <div className="priority-pills">
           {PRIORITY_OPTIONS.map((p) => (
             <button
@@ -110,18 +112,18 @@ export default function TaskDetails({
               onClick={() => void save({ priority: task.priority === p.level ? null : p.level })}
               disabled={busy}
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="task-details-row">
-        <span className="task-details-label">Estimado</span>
+        <span className="task-details-label">{t('details.estimate')}</span>
         <input
           type="text"
           className="task-estimate-input"
-          placeholder="90 o 1h 30m"
+          placeholder={t('details.estimatePlaceholder')}
           value={estimate}
           onChange={(e) => setEstimate(e.target.value)}
           onBlur={commitEstimate}
@@ -143,32 +145,32 @@ export default function TaskDetails({
             }}
             disabled={busy}
           >
-            Quitar
+            {t("details.remove")}
           </button>
         )}
       </div>
 
       <div className="task-details-row">
-        <span className="task-details-label">Etiquetas</span>
+        <span className="task-details-label">{t('details.tags')}</span>
         <div className="tag-toggle-row">
-          {allTags.map((t) => {
-            const on = task.tagIds.includes(t.id);
+          {allTags.map((tag) => {
+            const on = task.tagIds.includes(tag.id);
             return (
               <button
-                key={t.id}
+                key={tag.id}
                 type="button"
                 className={on ? 'tag-toggle is-on' : 'tag-toggle'}
-                data-tag-color={tagColorOf(t.color)}
+                data-tag-color={tagColorOf(tag.color)}
                 onClick={() =>
                   void save({
                     tagIds: on
-                      ? task.tagIds.filter((x) => x !== t.id)
-                      : [...task.tagIds, t.id],
+                      ? task.tagIds.filter((x) => x !== tag.id)
+                      : [...task.tagIds, tag.id],
                   })
                 }
                 disabled={busy}
               >
-                {t.name}
+                {tag.name}
               </button>
             );
           })}
@@ -178,13 +180,13 @@ export default function TaskDetails({
             onClick={onManageTags}
             disabled={busy}
           >
-            {allTags.length ? 'Gestionar…' : 'Nueva…'}
+            {allTags.length ? t('details.manageTags') : t('details.newTag')}
           </button>
         </div>
       </div>
 
       <div className="task-details-row">
-        <span className="task-details-label">Vence</span>
+        <span className="task-details-label">{t('details.due')}</span>
         <input
           type="date"
           className="task-due-input"
@@ -199,14 +201,14 @@ export default function TaskDetails({
             onClick={() => void save({ due: null })}
             disabled={busy}
           >
-            Quitar
+            {t("details.remove")}
           </button>
         )}
       </div>
 
       <div className="task-details-row task-checklist-row">
         <span className="task-details-label">
-          Pasos{checklistText ? ` · ${checklistText}` : ''}
+          {t('details.steps')}{checklistText ? ` · ${checklistText}` : ''}
         </span>
         <div className="task-checklist">
           {checklist.length > 0 && (
@@ -218,7 +220,7 @@ export default function TaskDetails({
                     className={item.done ? 'task-check checked' : 'task-check'}
                     onClick={() => void save({ checklist: toggleChecklistItem(checklist, item.id) })}
                     disabled={busy}
-                    aria-label={item.done ? 'Marcar como pendiente' : 'Marcar como hecho'}
+                    aria-label={item.done ? t('details.markPending') : t('details.markDone')}
                   >
                     {item.done ? '✓' : ''}
                   </button>
@@ -228,8 +230,8 @@ export default function TaskDetails({
                     className="task-checklist-del"
                     onClick={() => void save({ checklist: removeChecklistItem(checklist, item.id) })}
                     disabled={busy}
-                    aria-label="Quitar paso"
-                    title="Quitar paso"
+                    aria-label={t('details.removeStep')}
+                    title={t('details.removeStep')}
                   >
                     ×
                   </button>
@@ -241,7 +243,7 @@ export default function TaskDetails({
             <input
               type="text"
               className="task-checklist-input"
-              placeholder="Agregar paso…"
+              placeholder={t('details.stepPlaceholder')}
               maxLength={CHECKLIST_TEXT_MAX}
               value={newStep}
               onChange={(e) => setNewStep(e.target.value)}
@@ -262,7 +264,7 @@ export default function TaskDetails({
 
       <textarea
         className="task-notes-input"
-        placeholder="Notas…"
+        placeholder={t('details.notesPlaceholder')}
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         onBlur={commitNotes}

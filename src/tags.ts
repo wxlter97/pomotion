@@ -16,16 +16,9 @@ export type TagColor =
   | 'violet'
   | 'pink';
 
-export const TAG_COLORS: { key: TagColor; label: string }[] = [
-  { key: 'slate', label: 'Gris' },
-  { key: 'red', label: 'Rojo' },
-  { key: 'orange', label: 'Naranja' },
-  { key: 'amber', label: 'Ámbar' },
-  { key: 'green', label: 'Verde' },
-  { key: 'teal', label: 'Turquesa' },
-  { key: 'blue', label: 'Azul' },
-  { key: 'violet', label: 'Violeta' },
-  { key: 'pink', label: 'Rosa' },
+export const TAG_COLORS: { key: TagColor }[] = [
+  { key: 'slate' }, { key: 'red' }, { key: 'orange' }, { key: 'amber' },
+  { key: 'green' }, { key: 'teal' }, { key: 'blue' }, { key: 'violet' }, { key: 'pink' },
 ];
 
 export const DEFAULT_TAG_COLOR: TagColor = 'slate';

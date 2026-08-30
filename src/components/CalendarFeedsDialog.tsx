@@ -9,10 +9,11 @@ import {
 } from '../api';
 import type { CalendarFeed, FileEntry } from '../types';
 import ConfirmDialog from './ConfirmDialog';
+import { useT, type TFn } from '../i18n';
 
-function errText(err: unknown): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
-  return err instanceof Error ? err.message : 'Algo salió mal';
+function errText(err: unknown, t: TFn): string {
+  if (err instanceof UnauthorizedError) return t('goals.sessionExpired');
+  return err instanceof Error ? err.message : t('common.somethingWrong');
 }
 
 function hostOf(url: string): string {
@@ -23,15 +24,15 @@ function hostOf(url: string): string {
   }
 }
 
-function syncLabel(feed: CalendarFeed): string {
-  if (feed.lastError) return `Error: ${feed.lastError}`;
-  if (!feed.lastSyncedAt) return 'Sin sincronizar todavía';
+function syncLabel(feed: CalendarFeed, t: TFn): string {
+  if (feed.lastError) return t('feeds.syncError', { msg: feed.lastError });
+  if (!feed.lastSyncedAt) return t('feeds.neverSynced');
   const mins = Math.floor((Date.now() - new Date(feed.lastSyncedAt).getTime()) / 60_000);
-  if (mins < 1) return 'Sincronizado recién';
-  if (mins < 60) return `Sincronizado hace ${mins} min`;
+  if (mins < 1) return t('feeds.syncedJustNow');
+  if (mins < 60) return t('feeds.syncedAgoMin', { n: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `Sincronizado hace ${hrs} h`;
-  return `Sincronizado hace ${Math.floor(hrs / 24)} días`;
+  if (hrs < 24) return t('feeds.syncedAgoHr', { n: hrs });
+  return t('feeds.syncedAgoDay', { n: Math.floor(hrs / 24) });
 }
 
 const NO_FILE = '__none__';
@@ -45,6 +46,7 @@ export default function CalendarFeedsDialog({
   onChanged: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [feeds, setFeeds] = useState<CalendarFeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -60,7 +62,7 @@ export default function CalendarFeedsDialog({
     try {
       setFeeds((await getCalendarFeeds()).feeds);
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setLoading(false);
     }
@@ -85,7 +87,7 @@ export default function CalendarFeedsDialog({
     setError(null);
     try {
       const { feed } = await createCalendarFeed(
-        name.trim() || 'Calendario',
+        name.trim() || t('feeds.defaultName'),
         url.trim(),
         fileId === NO_FILE ? null : fileId
       );
@@ -96,7 +98,7 @@ export default function CalendarFeedsDialog({
       await reload();
       onChanged();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setAdding(false);
     }
@@ -110,7 +112,7 @@ export default function CalendarFeedsDialog({
       await reload();
       onChanged();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setBusyId(null);
     }
@@ -132,7 +134,7 @@ export default function CalendarFeedsDialog({
         aria-labelledby="feeds-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="feeds-title">Calendarios</h2>
+        <h2 id="feeds-title">{t('feeds.title')}</h2>
         <p className="muted feeds-intro">
           Pegá la URL de suscripción iCal de un calendario (Google: “Dirección secreta en
           formato iCal”). Sus eventos con hora aparecen como tareas y se mantienen al día.
@@ -146,7 +148,7 @@ export default function CalendarFeedsDialog({
             placeholder="https://calendar.google.com/…/basic.ics"
             disabled={adding}
             className="feed-url-input"
-            aria-label="URL del calendario"
+            aria-label={t('feeds.urlLabel')}
             required
           />
           <div className="feed-new-row">
@@ -154,10 +156,10 @@ export default function CalendarFeedsDialog({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nombre"
+              placeholder={t('feeds.namePlaceholder')}
               disabled={adding}
               className="feed-name-input"
-              aria-label="Nombre del calendario"
+              aria-label={t('feeds.nameLabel')}
             />
             {files.length > 0 && (
               <select
@@ -165,9 +167,9 @@ export default function CalendarFeedsDialog({
                 onChange={(e) => setFileId(e.target.value)}
                 disabled={adding}
                 className="feed-file-select"
-                aria-label="Contexto destino"
+                aria-label={t('feeds.contextLabel')}
               >
-                <option value={NO_FILE}>Sin contexto</option>
+                <option value={NO_FILE}>{t('common.noContext')}</option>
                 {files.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.label}
@@ -176,15 +178,15 @@ export default function CalendarFeedsDialog({
               </select>
             )}
             <button type="submit" className="btn btn-tinted btn-small" disabled={adding || !url.trim()}>
-              {adding ? 'Agregando…' : 'Agregar'}
+              {adding ? t('common.adding') : t('common.add')}
             </button>
           </div>
         </form>
 
         {loading ? (
-          <p className="muted">Cargando…</p>
+          <p className="muted">{t('common.loading')}</p>
         ) : feeds.length === 0 ? (
-          <p className="muted">Todavía no suscribiste ningún calendario.</p>
+          <p className="muted">{t('feeds.none')}</p>
         ) : (
           <ul className="feed-list">
             {feeds.map((feed) => {
@@ -194,10 +196,10 @@ export default function CalendarFeedsDialog({
                   <div className="feed-item-main">
                     <span className="feed-item-name">{feed.name}</span>
                     <span className="feed-item-sub">{hostOf(feed.url)}</span>
-                    <span className="feed-item-sync">{syncLabel(feed)}</span>
+                    <span className="feed-item-sync">{syncLabel(feed, t)}</span>
                   </div>
                   <div className="feed-item-actions">
-                    <label className="feed-toggle" title="Sincronizar este calendario">
+                    <label className="feed-toggle" title={t('feeds.syncOne')}>
                       <input
                         type="checkbox"
                         checked={feed.enabled}
@@ -208,7 +210,7 @@ export default function CalendarFeedsDialog({
                           )
                         }
                       />
-                      <span>Activo</span>
+                      <span>{t('feeds.active')}</span>
                     </label>
                     <button
                       type="button"
@@ -216,7 +218,7 @@ export default function CalendarFeedsDialog({
                       disabled={busy || !feed.enabled}
                       onClick={() => void run(feed.id, () => syncCalendarFeeds(feed.id))}
                     >
-                      {busy ? '…' : 'Sincronizar'}
+                      {busy ? t('feeds.syncBusy') : t('feeds.sync')}
                     </button>
                     <button
                       type="button"
@@ -224,7 +226,7 @@ export default function CalendarFeedsDialog({
                       disabled={busy}
                       onClick={() => setPendingDelete(feed)}
                       aria-label={`Eliminar ${feed.name}`}
-                      title="Eliminar calendario"
+                      title={t('feeds.deleteTitle')}
                     >
                       ×
                     </button>
@@ -239,7 +241,7 @@ export default function CalendarFeedsDialog({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>
@@ -247,8 +249,8 @@ export default function CalendarFeedsDialog({
       {pendingDelete && (
         <ConfirmDialog
           title={`Eliminar «${pendingDelete.name}»`}
-          message="Se quitan las tareas de este calendario que no tengan tiempo registrado. Las que sí tienen sesiones quedan como tareas normales."
-          confirmLabel="Eliminar"
+          message={t('feeds.deleteBody')}
+          confirmLabel={t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}

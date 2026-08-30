@@ -28,6 +28,7 @@ import {
 import { checklistLabel } from '../checklist';
 import { resolveTags, tagColorOf } from '../tags';
 import { useDrag } from '../drag/DragProvider';
+import { useLang, useT } from '../i18n';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
  *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
@@ -158,6 +159,8 @@ export default function TaskList({
   const [addError, setAddError] = useState<string | null>(null);
 
   const { beginDrag, draggingId } = useDrag();
+  const t = useT();
+  const { lang } = useLang();
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskText, setEditingTaskText] = useState('');
@@ -180,7 +183,7 @@ export default function TaskList({
       onSessionDeleted(pendingDelete.taskId, pendingDelete.sessionId);
       setPendingDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la sesión');
+      setError(err instanceof Error ? err.message : t('session.deleteError'));
     } finally {
       setDeleting(false);
     }
@@ -195,7 +198,7 @@ export default function TaskList({
       onTaskDeleted(pendingTaskDelete.id);
       setPendingTaskDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar la tarea');
+      setError(err instanceof Error ? err.message : t('taskList.deleteError'));
     } finally {
       setDeletingTask(false);
     }
@@ -211,7 +214,7 @@ export default function TaskList({
       onTaskCreated(res.task);
       setNewTaskText('');
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'No se pudo crear la tarea');
+      setAddError(err instanceof Error ? err.message : t('taskList.createError'));
     } finally {
       setAdding(false);
     }
@@ -261,7 +264,7 @@ export default function TaskList({
       onTaskTextUpdated(task.id, trimmed);
       setEditingTaskId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea');
+      setError(err instanceof Error ? err.message : t('taskList.updateError'));
     } finally {
       setSavingTaskText(false);
     }
@@ -287,11 +290,11 @@ export default function TaskList({
     const start = draft.start.trim();
     const end = draft.end.trim();
     if (duration === null || duration <= 0) {
-      setError('La duración debe ser un número mayor a 0 o un formato tipo "1h 30m 45s"');
+      setError(t('session.badDuration'));
       return null;
     }
     if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
-      setError('Las horas deben tener formato HH:MM');
+      setError(t('session.badTime'));
       return null;
     }
     return { duration, start, end };
@@ -328,7 +331,7 @@ export default function TaskList({
       onSessionUpdated(taskId, res.session);
       setEditingSessionId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la sesión');
+      setError(err instanceof Error ? err.message : t('session.updateError'));
     } finally {
       setSavingSession(false);
     }
@@ -362,7 +365,7 @@ export default function TaskList({
       onManualSessionAdded(task.id, res.session);
       setManualEntryTaskId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo agregar la sesión');
+      setError(err instanceof Error ? err.message : t('session.addError'));
     } finally {
       setAddingManualSession(false);
     }
@@ -380,7 +383,7 @@ export default function TaskList({
         ) : (
           tasks.map((task, i) => {
             const total = sumSeconds(task);
-            const timeSummary = taskTimeSummary(total, task.estimateMinutes);
+            const timeSummary = taskTimeSummary(total, task.estimateMinutes, t);
             const taskTags = resolveTags(task.tagIds, allTags);
             const checklistText = checklistLabel(task.checklist);
             const checklistDone = task.checklist.length > 0 && task.checklist.every((c) => c.done);
@@ -388,7 +391,7 @@ export default function TaskList({
             // sean de un día futuro (planificar a futuro no es estar estancado).
             const ageLabel =
               !task.done && selectedDate <= today
-                ? taskAgeLabel(task.createdAt, today)
+                ? taskAgeLabel(task.createdAt, today, t)
                 : null;
             const manualOverlap =
               manualEntryTaskId === task.id
@@ -421,7 +424,7 @@ export default function TaskList({
                     .filter(Boolean)
                     .join(' ')}
                   data-priority={task.priority ?? undefined}
-                  title={isLocked ? 'Detén el timer para mover o borrar esta tarea' : undefined}
+                  title={isLocked ? t('taskList.lockedTitle') : undefined}
                 >
                   <button
                     type="button"
@@ -435,18 +438,18 @@ export default function TaskList({
                     aria-label={
                       selectMode
                         ? isSelected
-                          ? 'Quitar de la selección'
-                          : 'Agregar a la selección'
+                          ? t('taskList.removeFromSelection')
+                          : t('taskList.addToSelection')
                         : task.done
-                          ? 'Marcar como pendiente'
-                          : 'Marcar como hecha'
+                          ? t('taskList.markPending')
+                          : t('taskList.markDone')
                     }
                     title={
                       selectMode
-                        ? 'Seleccionar'
+                        ? t('taskList.select')
                         : task.done
-                          ? 'Marcar como pendiente'
-                          : 'Marcar como hecha'
+                          ? t('taskList.markPending')
+                          : t('taskList.markDone')
                     }
                   >
                     {(selectMode ? isSelected : !isToggling && task.done) ? '✓' : ''}
@@ -467,8 +470,8 @@ export default function TaskList({
                         className="btn btn-icon"
                         onClick={() => void submitTaskTextEdit(task)}
                         disabled={savingTaskText}
-                        aria-label="Guardar"
-                        title="Guardar"
+                        aria-label={t('common.save')}
+                        title={t('common.save')}
                       >
                         ✓
                       </button>
@@ -477,8 +480,8 @@ export default function TaskList({
                         className="btn btn-icon"
                         onClick={() => setEditingTaskId(null)}
                         disabled={savingTaskText}
-                        aria-label="Cancelar"
-                        title="Cancelar"
+                        aria-label={t('common.cancel')}
+                        title={t('common.cancel')}
                       >
                         ×
                       </button>
@@ -491,11 +494,11 @@ export default function TaskList({
                       disabled={selectDisabled}
                     >
                       {task.source === 'calendar' && (
-                        <span className="task-src" title="Del calendario" aria-label="Del calendario">
+                        <span className="task-src" title={t('taskList.fromCalendar')} aria-label={t('taskList.fromCalendar')}>
                           📅
                         </span>
                       )}
-                      <span className="task-text">{task.name || '(sin texto)'}</span>
+                      <span className="task-text">{task.name || t('taskList.noText')}</span>
                     </button>
                   )}
 
@@ -518,13 +521,13 @@ export default function TaskList({
                       {checklistText && (
                         <span
                           className={checklistDone ? 'task-checklist-chip is-done' : 'task-checklist-chip'}
-                          title="Pasos completados"
+                          title={t('taskList.checklistChipTitle')}
                         >
                           ☑ {checklistText}
                         </span>
                       )}
                       {ageLabel && (
-                        <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today)}>
+                        <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today, t)}>
                           {ageLabel}
                         </span>
                       )}
@@ -535,9 +538,9 @@ export default function TaskList({
                               ? 'task-due-chip overdue'
                               : 'task-due-chip'
                           }
-                          title={dueLabel(task.due, today)}
+                          title={dueLabel(task.due, today, t, lang)}
                         >
-                          {dueChipLabel(task.due, today)}
+                          {dueChipLabel(task.due, today, t, lang)}
                         </span>
                       )}
                       {timeSummary && (
@@ -545,7 +548,7 @@ export default function TaskList({
                           className={timeSummary.over ? 'task-total over' : 'task-total'}
                           title={
                             task.estimateMinutes != null
-                              ? `Registrado vs. estimado${timeSummary.over ? ' — te pasaste' : ''}`
+                              ? t('taskList.estimateVsLogged') + (timeSummary.over ? t('taskList.overBudget') : '')
                               : undefined
                           }
                         >
@@ -603,7 +606,7 @@ export default function TaskList({
                                 <div className="session-edit-form">
                                   <input
                                     type="text"
-                                    placeholder="90 o 1h 30m"
+                                    placeholder={t('session.durationPlaceholder')}
                                     className="session-edit-duration"
                                     value={sessionDraft.duration}
                                     onChange={(e) => handleSessionDurationChange(e.target.value)}
@@ -627,7 +630,7 @@ export default function TaskList({
                                     value={sessionDraft.end}
                                     onChange={(e) => setSessionDraft((d) => ({ ...d, end: e.target.value }))}
                                     disabled={savingSession}
-                                    title="Se calcula a partir de inicio + duración, pero puedes editarla"
+                                    title={t('session.endHint')}
                                   />
                                   <span>)</span>
                                   <button
@@ -635,8 +638,8 @@ export default function TaskList({
                                     className="session-delete"
                                     onClick={() => void submitSessionEdit(task.id, s.id)}
                                     disabled={savingSession}
-                                    aria-label="Guardar sesión"
-                                    title="Guardar"
+                                    aria-label={t('session.save')}
+                                    title={t('common.save')}
                                   >
                                     ✓
                                   </button>
@@ -645,16 +648,19 @@ export default function TaskList({
                                     className="session-delete"
                                     onClick={() => setEditingSessionId(null)}
                                     disabled={savingSession}
-                                    aria-label="Cancelar edición"
-                                    title="Cancelar"
+                                    aria-label={t('session.cancelEdit')}
+                                    title={t('common.cancel')}
                                   >
                                     ×
                                   </button>
                                 </div>
                                 {editOverlap && (
                                   <p className="warning">
-                                    ⚠ Se solapa con "{editOverlap.task.name || '(sin texto)'}" (
-                                    {editOverlap.session.start}–{editOverlap.session.end})
+                                    {t('session.overlap', {
+                                      name: editOverlap.task.name || t('taskList.noText'),
+                                      start: editOverlap.session.start,
+                                      end: editOverlap.session.end,
+                                    })}
                                   </p>
                                 )}
                               </>
@@ -667,8 +673,8 @@ export default function TaskList({
                                   <button
                                     type="button"
                                     className="session-delete"
-                                    aria-label="Editar sesión"
-                                    title="Editar sesión"
+                                    aria-label={t('session.edit')}
+                                    title={t('session.edit')}
                                     onClick={() => startEditSession(s)}
                                   >
                                     ✎
@@ -676,8 +682,8 @@ export default function TaskList({
                                   <button
                                     type="button"
                                     className="session-delete"
-                                    aria-label="Eliminar sesión"
-                                    title="Eliminar sesión"
+                                    aria-label={t('session.delete')}
+                                    title={t('session.delete')}
                                     onClick={() => setPendingDelete({ taskId: task.id, sessionId: s.id })}
                                   >
                                     ×
@@ -696,7 +702,7 @@ export default function TaskList({
                       <div className="manual-session-form">
                         <input
                           type="text"
-                          placeholder="90 o 1h 30m"
+                          placeholder={t('session.durationPlaceholder')}
                           className="session-edit-duration"
                           value={manualDraft.duration}
                           onChange={(e) => handleManualDurationChange(e.target.value)}
@@ -719,7 +725,7 @@ export default function TaskList({
                           value={manualDraft.end}
                           onChange={(e) => setManualDraft((d) => ({ ...d, end: e.target.value }))}
                           disabled={addingManualSession}
-                          title="Se calcula a partir de inicio + duración, pero puedes editarla"
+                          title={t('session.endHint')}
                         />
                         <button
                           type="button"
@@ -727,7 +733,7 @@ export default function TaskList({
                           onClick={() => void submitManualEntry(task)}
                           disabled={addingManualSession}
                         >
-                          {addingManualSession ? 'Guardando…' : 'Guardar'}
+                          {addingManualSession ? t('common.saving') : t('common.save')}
                         </button>
                         <button
                           type="button"
@@ -735,13 +741,16 @@ export default function TaskList({
                           onClick={() => setManualEntryTaskId(null)}
                           disabled={addingManualSession}
                         >
-                          Cancelar
+                          {t('common.cancel')}
                         </button>
                       </div>
                       {manualOverlap && (
                         <p className="warning">
-                          ⚠ Se solapa con "{manualOverlap.task.name || '(sin texto)'}" (
-                          {manualOverlap.session.start}–{manualOverlap.session.end})
+                          {t('session.overlap', {
+                            name: manualOverlap.task.name || t('taskList.noText'),
+                            start: manualOverlap.session.start,
+                            end: manualOverlap.session.end,
+                          })}
                         </p>
                       )}
                     </>
@@ -751,7 +760,7 @@ export default function TaskList({
                       className="manual-session-trigger"
                       onClick={() => openManualEntry(task)}
                     >
-                      + Agregar sesión manual
+                      {t('session.addManual')}
                     </button>
                   )}
                 </div>
@@ -767,11 +776,11 @@ export default function TaskList({
           value={newTaskText}
           onChange={(e) => setNewTaskText(e.target.value)}
           onKeyDown={handleAddKeyDown}
-          placeholder="Agregar tarea…"
+          placeholder={t('taskList.addPlaceholder')}
           disabled={adding}
         />
         <button type="submit" className="btn btn-tinted" disabled={adding || !newTaskText.trim()}>
-          {adding ? 'Agregando…' : 'Agregar'}
+          {adding ? t('common.adding') : t('common.add')}
         </button>
       </form>
       {addError && <p className="error">{addError}</p>}
@@ -780,9 +789,9 @@ export default function TaskList({
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Eliminar sesión"
-          message="Esto borra el registro de tiempo. No se puede deshacer."
-          confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+          title={t('session.deleteTitle')}
+          message={t('session.deleteBody')}
+          confirmLabel={deleting ? t('common.deleting') : t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}
@@ -791,15 +800,16 @@ export default function TaskList({
 
       {pendingTaskDelete && (
         <ConfirmDialog
-          title="Eliminar tarea"
+          title={t('taskList.deleteTaskTitle')}
           message={
             pendingTaskDelete.sessions.length > 0
-              ? `Esta tarea tiene ${pendingTaskDelete.sessions.length} sesión(es) registradas (${formatDurationLabel(
-                  sumSeconds(pendingTaskDelete)
-                )}). Borrarla también borra ese historial. No se puede deshacer.`
-              : 'Esto borra la tarea. No se puede deshacer.'
+              ? t('taskList.deleteWithSessions', {
+                  count: pendingTaskDelete.sessions.length,
+                  total: formatDurationLabel(sumSeconds(pendingTaskDelete)),
+                })
+              : t('taskList.deleteSimple')
           }
-          confirmLabel={deletingTask ? 'Eliminando…' : 'Eliminar'}
+          confirmLabel={deletingTask ? t('common.deleting') : t('common.delete')}
           destructive
           onConfirm={confirmDeleteTask}
           onCancel={() => setPendingTaskDelete(null)}

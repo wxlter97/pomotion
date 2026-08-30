@@ -1,18 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getFocusHeatmap, UnauthorizedError } from '../api';
 import { formatDurationLabel } from '../duration';
-import {
-  focusDateLabel,
-  heatmapColumns,
-  HEATMAP_ROW_LABELS,
-  intensityLevel,
-  monthLabels,
-} from '../focusHeatmap';
+import { focusDateLabel, heatmapColumns, intensityLevel, monthLabels } from '../focusHeatmap';
+import { plural, useLang, useT } from '../i18n';
 import type { FocusHeatmap as FocusHeatmapData } from '../types';
 
 const RANGES = [
-  { weeks: 26, label: '6 meses' },
-  { weeks: 52, label: '1 año' },
+  { weeks: 26, labelKey: 'heatmap.range6m' as const },
+  { weeks: 52, labelKey: 'heatmap.range1y' as const },
 ] as const;
 
 export default function FocusHeatmap({
@@ -22,6 +17,8 @@ export default function FocusHeatmap({
   fileId: string | null;
   onClose: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const [weeks, setWeeks] = useState(26);
   const [data, setData] = useState<FocusHeatmapData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,10 +42,10 @@ export default function FocusHeatmap({
       } catch (err) {
         setError(
           err instanceof UnauthorizedError
-            ? 'La sesión expiró. Recargá la página para volver a entrar.'
+            ? t('common.sessionExpired')
             : err instanceof Error
               ? err.message
-              : 'No se pudo cargar el heatmap'
+              : t('heatmap.error')
         );
       } finally {
         setLoading(false);
@@ -69,7 +66,7 @@ export default function FocusHeatmap({
 
   const columns = data ? heatmapColumns(data.startDate, data.endDate) : [];
   const byDate = new Map(data?.days.map((d) => [d.date, d.totalSeconds]) ?? []);
-  const months = monthLabels(columns);
+  const months = monthLabels(columns, lang);
   const colStyle = { gridTemplateColumns: `repeat(${columns.length}, var(--hm-size))` };
 
   return (
@@ -81,7 +78,7 @@ export default function FocusHeatmap({
         aria-labelledby="heatmap-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="heatmap-title">Heatmap de foco</h2>
+        <h2 id="heatmap-title">{t('heatmap.title')}</h2>
 
         <div className="heatmap-controls">
           <div className="segmented">
@@ -93,14 +90,15 @@ export default function FocusHeatmap({
                 onClick={() => setWeeks(r.weeks)}
                 disabled={loading}
               >
-                {r.label}
+                {t(r.labelKey)}
               </button>
             ))}
           </div>
           {data && (
             <p className="heatmap-summary">
-              <strong>{formatDurationLabel(data.totalSeconds)}</strong> en {data.activeDays}{' '}
-              {data.activeDays === 1 ? 'día con foco' : 'días con foco'}
+              <strong>{formatDurationLabel(data.totalSeconds)}</strong>
+              {t('heatmap.inDays')}
+              {data.activeDays} {plural(data.activeDays, t('heatmap.dayOne'), t('heatmap.dayMany'))}
             </p>
           )}
         </div>
@@ -118,7 +116,7 @@ export default function FocusHeatmap({
                 ))}
               </div>
               <div className="heatmap-rows">
-                {HEATMAP_ROW_LABELS.map((l, i) => (
+                {t('heatmap.rowLabels').split(',').map((l: string, i: number) => (
                   <span key={i}>{l}</span>
                 ))}
               </div>
@@ -136,8 +134,8 @@ export default function FocusHeatmap({
                           className={`heatmap-cell l${intensityLevel(secs)}${
                             date === data.today ? ' is-today' : ''
                           }`}
-                          title={`${focusDateLabel(date)}: ${
-                            secs > 0 ? formatDurationLabel(secs) : 'sin foco'
+                          title={`${focusDateLabel(date, lang)}: ${
+                            secs > 0 ? formatDurationLabel(secs) : t('heatmap.noFocus')
                           }`}
                         />
                       );
@@ -150,18 +148,18 @@ export default function FocusHeatmap({
         )}
 
         <div className="heatmap-legend">
-          <span>menos</span>
+          <span>{t('heatmap.less')}</span>
           <span className="heatmap-cell l0" />
           <span className="heatmap-cell l1" />
           <span className="heatmap-cell l2" />
           <span className="heatmap-cell l3" />
           <span className="heatmap-cell l4" />
-          <span>más</span>
+          <span>{t('heatmap.more')}</span>
         </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>

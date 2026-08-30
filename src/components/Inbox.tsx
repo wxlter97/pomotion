@@ -10,6 +10,7 @@ import { createInboxTask, deleteTask, updateTaskText } from '../api';
 import type { Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 import Menu, { MenuItem } from './Menu';
+import { useT } from '../i18n';
 import { useDrag } from '../drag/DragProvider';
 
 const COLLAPSED_KEY = 'pomotion:inbox-collapsed';
@@ -59,6 +60,7 @@ export default function Inbox({
   onTextUpdated: (id: string, name: string) => void;
 }) {
   const { beginDrag, draggingId } = useDrag();
+  const t = useT();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
@@ -90,7 +92,7 @@ export default function Inbox({
       setText('');
       inputRef.current?.focus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo anotar');
+      setError(err instanceof Error ? err.message : t('inbox.addError'));
     } finally {
       setAdding(false);
     }
@@ -114,7 +116,7 @@ export default function Inbox({
       onTextUpdated(task.id, trimmed);
       setEditingId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo renombrar');
+      setError(err instanceof Error ? err.message : t('inbox.renameError'));
     } finally {
       setSavingEdit(false);
     }
@@ -148,7 +150,7 @@ export default function Inbox({
       onDeleted(pendingDelete.id);
       setPendingDelete(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo eliminar');
+      setError(err instanceof Error ? err.message : t('inbox.deleteError'));
     } finally {
       setDeleting(false);
     }
@@ -166,7 +168,7 @@ export default function Inbox({
         aria-expanded={!collapsed}
       >
         <ChevronIcon />
-        <span>Sin fecha</span>
+        <span>{t('inbox.title')}</span>
         {tasks.length > 0 && <span className="inbox-count">{tasks.length}</span>}
       </button>
 
@@ -178,16 +180,16 @@ export default function Inbox({
               type="text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Anotar algo para después…"
+              placeholder={t('inbox.addPlaceholder')}
               disabled={adding}
             />
             <button type="submit" className="btn btn-tinted" disabled={adding || !text.trim()}>
-              {adding ? 'Anotando…' : 'Anotar'}
+              {adding ? t('inbox.adding') : t('inbox.addButton')}
             </button>
           </form>
 
           {tasks.length === 0 ? (
-            <p className="muted inbox-empty">Nada anotado todavía.</p>
+            <p className="muted inbox-empty">{t('inbox.empty')}</p>
           ) : (
             <ul className="inbox-list">
               {tasks.map((task) => (
@@ -208,13 +210,13 @@ export default function Inbox({
                       autoFocus
                     />
                   ) : (
-                    <span className="inbox-item-name">{task.name || '(sin texto)'}</span>
+                    <span className="inbox-item-name">{task.name || t('taskList.noText')}</span>
                   )}
 
                   <Menu
                     triggerClassName="task-row-menu-trigger"
                     trigger="⋮"
-                    ariaLabel="Acciones de la tarea"
+                    ariaLabel={t('rowMenu.actions')}
                   >
                     {(close) => (
                       <>
@@ -224,7 +226,7 @@ export default function Inbox({
                             close();
                           }}
                         >
-                          Editar
+                          {t('common.edit')}
                         </MenuItem>
                         <MenuItem
                           danger
@@ -233,7 +235,7 @@ export default function Inbox({
                             close();
                           }}
                         >
-                          Eliminar
+                          {t('common.delete')}
                         </MenuItem>
                       </>
                     )}
@@ -249,9 +251,9 @@ export default function Inbox({
 
       {pendingDelete && (
         <ConfirmDialog
-          title="Eliminar del inbox"
-          message="Esto borra la nota. No se puede deshacer."
-          confirmLabel={deleting ? 'Eliminando…' : 'Eliminar'}
+          title={t('inbox.deleteTitle')}
+          message={t('inbox.deleteBody')}
+          confirmLabel={deleting ? t('common.deleting') : t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}

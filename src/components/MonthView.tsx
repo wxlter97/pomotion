@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMonthSummary, UnauthorizedError } from '../api';
-import { isWeekend, monthGrid, monthTitle, WEEKDAY_HEADERS, weekTargetForDate } from '../monthGrid';
+import { isWeekend, monthGrid, monthTitle, weekTargetForDate } from '../monthGrid';
+import { useLang, useT } from '../i18n';
 import type { MonthDaySummary, MonthSummary } from '../types';
 
 /** Compacta segundos para la celda del día: "45m" / "1h" / "1h30". */
@@ -26,6 +27,8 @@ export default function MonthView({
   onPick: (week: string, day: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const [month, setMonth] = useState<string | undefined>(initialMonth);
   const [data, setData] = useState<MonthSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,10 +56,10 @@ export default function MonthView({
       } catch (err) {
         setError(
           err instanceof UnauthorizedError
-            ? 'La sesión expiró. Recargá la página para volver a entrar.'
+            ? t('common.sessionExpired')
             : err instanceof Error
               ? err.message
-              : 'No se pudo cargar el mes'
+              : t('month.error')
         );
       } finally {
         setLoading(false);
@@ -88,17 +91,17 @@ export default function MonthView({
             className="btn btn-icon"
             onClick={() => void load(data?.previousMonth)}
             disabled={loading}
-            aria-label="Mes anterior"
+            aria-label={t('month.prev')}
           >
             ‹
           </button>
-          <h2 id="month-title">{month ? monthTitle(month) : '—'}</h2>
+          <h2 id="month-title">{month ? monthTitle(month, lang) : '—'}</h2>
           <button
             type="button"
             className="btn btn-icon"
             onClick={() => void load(data?.nextMonth)}
             disabled={loading}
-            aria-label="Mes siguiente"
+            aria-label={t('month.next')}
           >
             ›
           </button>
@@ -109,7 +112,7 @@ export default function MonthView({
               onClick={() => void load(undefined)}
               disabled={loading}
             >
-              Hoy
+              {t('month.today')}
             </button>
           )}
         </div>
@@ -118,7 +121,7 @@ export default function MonthView({
 
         <div className="month-grid" aria-busy={loading}>
           <div className="month-weekdays">
-            {WEEKDAY_HEADERS.map((h, i) => (
+            {t('month.weekdayHeaders').split(',').map((h, i) => (
               <span key={i}>{h}</span>
             ))}
           </div>
@@ -161,7 +164,7 @@ export default function MonthView({
                     className="month-cell month-cell--day"
                     key={di}
                     onClick={() => onPick(target.week, target.day)}
-                    title={`Ir a ${date}`}
+                    title={t('month.goTo', { date })}
                   >
                     {body}
                   </button>
@@ -173,7 +176,7 @@ export default function MonthView({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>

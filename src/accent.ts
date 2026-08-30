@@ -17,15 +17,9 @@ export type Accent =
   | 'pink'
   | 'graphite';
 
-export const ACCENTS: { key: Accent; label: string }[] = [
-  { key: 'tomato', label: 'Tomate' },
-  { key: 'amber', label: 'Ámbar' },
-  { key: 'green', label: 'Verde' },
-  { key: 'teal', label: 'Turquesa' },
-  { key: 'blue', label: 'Azul' },
-  { key: 'indigo', label: 'Índigo' },
-  { key: 'pink', label: 'Rosa' },
-  { key: 'graphite', label: 'Grafito' },
+export const ACCENTS: { key: Accent }[] = [
+  { key: 'tomato' }, { key: 'amber' }, { key: 'green' }, { key: 'teal' },
+  { key: 'blue' }, { key: 'indigo' }, { key: 'pink' }, { key: 'graphite' },
 ];
 
 export const DEFAULT_ACCENT: Accent = 'tomato';

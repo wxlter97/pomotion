@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   bulkTasks,
   carryOverToToday,
@@ -49,6 +49,7 @@ import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
 import DragProvider from './drag/DragProvider';
 import { computeReorderTarget, type DragItem, type DropZone } from './drag/dnd';
+import { LANGS, useLang, useT, type MsgKey } from './i18n';
 import { loadActiveTimer } from './timerStorage';
 import { dueBannerText } from './dueReminders';
 import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
@@ -61,6 +62,10 @@ import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
+import { usePomodoroSetting } from './usePomodoroSetting';
+import { readFileOrder, useFileOrder } from './useFileOrder';
+import { orderFiles } from './fileOrder';
+import ContextOrderDialog from './components/ContextOrderDialog';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
@@ -148,6 +153,11 @@ export default function App() {
   const [accent, chooseAccent] = useAccent();
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
+  const [pomodoroEnabled, togglePomodoro] = usePomodoroSetting();
+  const t = useT();
+  const { lang, setLang } = useLang();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const [showWeekend, toggleWeekend] = useWeekendSetting();
   const notifications = useNotificationSetting();
@@ -163,6 +173,9 @@ export default function App() {
   // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
   // tareas con `file` → modo de un solo contexto, el selector no aparece.
   const [files, setFiles] = useState<FileEntry[]>([]);
+  const [fileOrder, setFileOrder] = useFileOrder();
+  const orderedFiles = useMemo(() => orderFiles(files, fileOrder), [files, fileOrder]);
+  const [showContextOrder, setShowContextOrder] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const selectedFileIdRef = useRef<string | null>(null);
   const filesLoadedRef = useRef(false);
@@ -208,7 +221,8 @@ export default function App() {
         setFiles(filesRes.files);
         if (filesRes.files.length > 0 && !fileId) {
           const stored = localStorage.getItem(FILE_STORAGE_KEY);
-          fileId = filesRes.files.find((f) => f.id === stored)?.id ?? filesRes.files[0].id;
+          const ordered = orderFiles(filesRes.files, readFileOrder());
+          fileId = ordered.find((f) => f.id === stored)?.id ?? ordered[0].id;
         }
         if (fileId) {
           setSelectedFileId(fileId);
@@ -238,7 +252,7 @@ export default function App() {
         setData(null);
         setSelectedTask(null);
       } else {
-        setError(err instanceof Error ? err.message : 'Error cargando tareas');
+        setError(err instanceof Error ? err.message : tRef.current('app.loadTasksError'));
         setAuthState((prev) => (prev === 'checking' ? 'error' : prev));
       }
     } finally {
@@ -285,7 +299,7 @@ export default function App() {
   const guardedSelectTask = useCallback(
     (task: Task) => {
       if (task.id === selectedTask?.id) return;
-      guardIfRunning('Cambiar de tarea lo cancela sin guardar esa sesión.', () => setSelectedTask(task));
+      guardIfRunning(tRef.current('guard.switchTask'), () => setSelectedTask(task));
     },
     [selectedTask, guardIfRunning]
   );
@@ -293,7 +307,7 @@ export default function App() {
   const guardedSelectDay = useCallback(
     (day: string) => {
       if (day === data?.selectedDay) return;
-      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () =>
+      guardIfRunning(tRef.current('guard.switchDay'), () =>
         void refresh(day, data?.week)
       );
     },
@@ -303,7 +317,7 @@ export default function App() {
   // weekLabel === undefined => volver a la semana actual (hoy).
   const guardedGoToWeek = useCallback(
     (weekLabel: string | undefined) => {
-      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () =>
+      guardIfRunning(tRef.current('guard.switchWeek'), () =>
         void refresh(undefined, weekLabel)
       );
     },
@@ -314,7 +328,7 @@ export default function App() {
   const guardedGoToDate = useCallback(
     (week: string, day: string) => {
       setShowMonth(false);
-      guardIfRunning('Cambiar de día lo cancela sin guardar esa sesión.', () =>
+      guardIfRunning(tRef.current('guard.switchDay'), () =>
         void refresh(day, week)
       );
     },
@@ -327,7 +341,7 @@ export default function App() {
     (result: { weekLabel: string | null; day: string | null }) => {
       setShowSearch(false);
       if (!result.weekLabel) return;
-      guardIfRunning('Cambiar de semana lo cancela sin guardar esa sesión.', () =>
+      guardIfRunning(tRef.current('guard.switchWeek'), () =>
         void refresh(result.day ?? undefined, result.weekLabel ?? undefined)
       );
     },
@@ -337,7 +351,7 @@ export default function App() {
   const guardedSelectFile = useCallback(
     (fileId: string) => {
       if (fileId === selectedFileId) return;
-      guardIfRunning('Cambiar de archivo lo cancela sin guardar esa sesión.', () => {
+      guardIfRunning(tRef.current('guard.switchFile'), () => {
         setSelectedFileId(fileId);
         selectedFileIdRef.current = fileId;
         localStorage.setItem(FILE_STORAGE_KEY, fileId);
@@ -439,7 +453,7 @@ export default function App() {
       await updateTaskDone(task.id, next);
     } catch (err) {
       setTaskDone(task.id, task.done); // revertir
-      setError(err instanceof Error ? err.message : 'No se pudo actualizar la tarea');
+      setError(err instanceof Error ? err.message : tRef.current('taskList.updateError'));
     } finally {
       setTogglingIds((prev) => {
         const s = new Set(prev);
@@ -525,7 +539,7 @@ export default function App() {
       void refresh(data.selectedDay, data.week);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
-      setError(err instanceof Error ? err.message : 'No se pudo reordenar la tarea');
+      setError(err instanceof Error ? err.message : tRef.current('drag.reorderError'));
     } finally {
       setBusyTaskIds((prev) => {
         const s = new Set(prev);
@@ -549,7 +563,7 @@ export default function App() {
       void refresh(selectedDay, week);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
-      setError(err instanceof Error ? err.message : `No se pudo mover la tarea a ${target.destLabel}`);
+      setError(err instanceof Error ? err.message : tRef.current('drag.moveError', { dest: target.destLabel }));
     } finally {
       setBusyTaskIds((prev) => {
         const s = new Set(prev);
@@ -623,7 +637,7 @@ export default function App() {
       const res = await carryOverToToday(selectedFileId ?? undefined, showWeekend);
       if (res.moved > 0) void refresh(data.selectedDay, data.week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudieron traer las tareas');
+      setError(err instanceof Error ? err.message : tRef.current('carryOver.error'));
     } finally {
       setCarryingOver(false);
     }
@@ -690,7 +704,7 @@ export default function App() {
       await moveTask(task.id, { date });
       void refresh(selectedDay, week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo programar la tarea');
+      setError(err instanceof Error ? err.message : tRef.current('drag.scheduleError'));
       void refresh(selectedDay, week); // restaura el inbox
     } finally {
       setBusyTaskIds((prev) => {
@@ -711,7 +725,7 @@ export default function App() {
       await moveTaskToInbox(task.id);
       void refresh(selectedDay, week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo sacar de la agenda');
+      setError(err instanceof Error ? err.message : tRef.current('drag.toInboxError'));
       void refresh(selectedDay, week);
     } finally {
       setBusyTaskIds((prev) => {
@@ -763,7 +777,7 @@ export default function App() {
         }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo aplicar la acción en lote');
+      setError(err instanceof Error ? err.message : tRef.current('bulk.error'));
     } finally {
       setBulkBusy(false);
     }
@@ -788,8 +802,8 @@ export default function App() {
       type="button"
       className="btn btn-icon"
       onClick={toggleTheme}
-      title="Cambiar tema (T)"
-      aria-label="Cambiar tema"
+      title={t('app.toggleTheme')}
+      aria-label={t('app.toggleTheme')}
     >
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>
@@ -797,38 +811,38 @@ export default function App() {
 
   const notificationsState =
     notifications.permission === 'denied'
-      ? 'Bloqueadas'
+      ? t('menu.notificationsBlocked')
       : notifications.enabled
-        ? 'Sí'
-        : 'No';
+        ? t('common.yes')
+        : t('common.no');
 
   const viewMenu = (
-    <Menu ariaLabel="Ver" trigger={<>Ver<ChevronDownIcon /></>}>
+    <Menu ariaLabel={t('menu.view')} trigger={<>{t('menu.view')}<ChevronDownIcon /></>}>
       {(close) => (
         <>
-          <MenuItem onClick={() => { setShowSearch(true); close(); }}>Buscar tareas</MenuItem>
-          <MenuItem onClick={() => { setShowMonth(true); close(); }}>Vista mensual</MenuItem>
-          <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>Heatmap de foco</MenuItem>
-          <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>Analítica</MenuItem>
-          <MenuItem onClick={() => { setShowReview(true); close(); }}>Revisión semanal</MenuItem>
-          <MenuItem onClick={() => { setShowGoals(true); close(); }}>Metas del mes</MenuItem>
-          <MenuItem onClick={() => { setShowReport(true); close(); }}>Reporte de tiempo</MenuItem>
-          <MenuItem onClick={() => { setShowRecurring(true); close(); }}>Tareas recurrentes</MenuItem>
-          <MenuItem onClick={() => { setShowTemplates(true); close(); }}>Plantillas de día</MenuItem>
-          <MenuItem onClick={() => { setShowTags(true); close(); }}>Etiquetas</MenuItem>
-          <MenuItem onClick={() => { setShowFeeds(true); close(); }}>Calendarios</MenuItem>
+          <MenuItem onClick={() => { setShowSearch(true); close(); }}>{t('menu.search')}</MenuItem>
+          <MenuItem onClick={() => { setShowMonth(true); close(); }}>{t('menu.monthView')}</MenuItem>
+          <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>{t('menu.heatmap')}</MenuItem>
+          <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>{t('menu.analytics')}</MenuItem>
+          <MenuItem onClick={() => { setShowReview(true); close(); }}>{t('menu.weeklyReview')}</MenuItem>
+          <MenuItem onClick={() => { setShowGoals(true); close(); }}>{t('menu.goals')}</MenuItem>
+          <MenuItem onClick={() => { setShowReport(true); close(); }}>{t('menu.report')}</MenuItem>
+          <MenuItem onClick={() => { setShowRecurring(true); close(); }}>{t('menu.recurring')}</MenuItem>
+          <MenuItem onClick={() => { setShowTemplates(true); close(); }}>{t('menu.templates')}</MenuItem>
+          <MenuItem onClick={() => { setShowTags(true); close(); }}>{t('menu.tags')}</MenuItem>
+          <MenuItem onClick={() => { setShowFeeds(true); close(); }}>{t('menu.feeds')}</MenuItem>
         </>
       )}
     </Menu>
   );
 
   const moreMenu = (
-    <Menu ariaLabel="Más opciones" triggerClassName="btn btn-icon" trigger={<MoreIcon />}>
+    <Menu ariaLabel={t('menu.more')} triggerClassName="btn btn-icon" trigger={<MoreIcon />}>
       {(close) => (
         <>
-          <div className="menu-heading">Ajustes</div>
-          <MenuItem onClick={toggleSounds} state={soundsEnabled ? 'Sí' : 'No'}>
-            Sonidos
+          <div className="menu-heading">{t('menu.settings')}</div>
+          <MenuItem onClick={toggleSounds} state={soundsEnabled ? t('common.yes') : t('common.no')}>
+            {t('menu.sounds')}
           </MenuItem>
           {notifications.permission !== 'unsupported' && (
             <MenuItem
@@ -836,47 +850,63 @@ export default function App() {
               disabled={notifications.permission === 'denied'}
               state={notificationsState}
             >
-              Notificaciones
+              {t('menu.notifications')}
             </MenuItem>
           )}
-          <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? 'Sí' : 'No'}>
-            Traer pendientes al abrir
+          <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? t('common.yes') : t('common.no')}>
+            {t('menu.carryOverAuto')}
           </MenuItem>
-          <MenuItem onClick={handleToggleWeekend} state={showWeekend ? 'Sí' : 'No'}>
-            Mostrar fin de semana
+          <MenuItem onClick={handleToggleWeekend} state={showWeekend ? t('common.yes') : t('common.no')}>
+            {t('menu.showWeekend')}
           </MenuItem>
-          <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
-            Pomodoro
+          <MenuItem onClick={togglePomodoro} state={pomodoroEnabled ? t('common.yes') : t('common.no')}>
+            {t('menu.usePomodoro')}
           </MenuItem>
-          <div className="menu-heading">Color de acento</div>
-          <div className="accent-row" role="group" aria-label="Color de acento">
+          {pomodoroEnabled && (
+            <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
+              {t('menu.pomodoroSettings')}
+            </MenuItem>
+          )}
+          <MenuItem
+            onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
+            state={LANGS.find((l) => l.code === lang)?.label}
+          >
+            {t('menu.language')}
+          </MenuItem>
+          <div className="menu-heading">{t('menu.accent')}</div>
+          <div className="accent-row" role="group" aria-label={t('menu.accent')}>
             {ACCENTS.map((a) => (
               <button
                 key={a.key}
                 type="button"
                 className={accent === a.key ? 'accent-swatch is-on' : 'accent-swatch'}
                 data-accent={a.key}
-                title={a.label}
-                aria-label={a.label}
+                title={t(`accent.${a.key}` as MsgKey)}
+                aria-label={t(`accent.${a.key}` as MsgKey)}
                 aria-pressed={accent === a.key}
                 onClick={() => chooseAccent(a.key)}
               />
             ))}
           </div>
           <div className="menu-sep" />
-          <MenuItem onClick={() => { setFocusMode(true); close(); }}>Modo foco</MenuItem>
-          <MenuItem onClick={() => { setShowBackup(true); close(); }}>Copia de seguridad</MenuItem>
+          <MenuItem onClick={() => { setFocusMode(true); close(); }}>{t('menu.focusMode')}</MenuItem>
+          {orderedFiles.length > 1 && (
+            <MenuItem onClick={() => { setShowContextOrder(true); close(); }}>
+              {t('menu.contextOrder')}
+            </MenuItem>
+          )}
+          <MenuItem onClick={() => { setShowBackup(true); close(); }}>{t('menu.backup')}</MenuItem>
           {authIsAdmin && (
-            <MenuItem onClick={() => { setShowAdmin(true); close(); }}>Aprobar usuarios</MenuItem>
+            <MenuItem onClick={() => { setShowAdmin(true); close(); }}>{t('menu.approveUsers')}</MenuItem>
           )}
           <MenuItem
             onClick={() => { void refresh(data?.selectedDay, data?.week); close(); }}
             disabled={loading}
           >
-            Actualizar
+            {t('app.refresh')}
           </MenuItem>
           <MenuItem danger onClick={() => { close(); void handleLogout(); }}>
-            Salir
+            {t('menu.logout')}
           </MenuItem>
         </>
       )}
@@ -887,7 +917,7 @@ export default function App() {
     return (
       <div className="center-screen">
         <div className="screen-content">
-          <p className="muted">Cargando…</p>
+          <p className="muted">{t('common.loading')}</p>
         </div>
         <Footer />
       </div>
@@ -908,14 +938,14 @@ export default function App() {
         <div className="screen-content">
           <div className="login-card">
             <h1>pomotion</h1>
-            <p className="error">{error ?? 'No se pudo conectar con el servidor'}</p>
+            <p className="error">{error ?? t('app.serverError')}</p>
             <button
               type="button"
               className="btn btn-filled"
               onClick={() => void refresh()}
               disabled={loading}
             >
-              {loading ? 'Reintentando…' : 'Reintentar'}
+              {loading ? t('common.retrying') : t('common.retry')}
             </button>
           </div>
         </div>
@@ -932,9 +962,9 @@ export default function App() {
           type="button"
           className="focus-exit"
           onClick={() => setFocusMode(false)}
-          title="Salir del modo foco (Esc)"
+          title={t('app.exitFocusTitle')}
         >
-          Salir de foco
+          {t('app.exitFocus')}
         </button>
       )}
       <header className="app-header">
@@ -947,22 +977,18 @@ export default function App() {
       </header>
 
       <FileSelector
-        files={files}
+        files={orderedFiles}
         selectedFileId={selectedFileId}
         onSelectFile={guardedSelectFile}
         loading={loading}
       />
 
-      {!online && (
-        <div className="warning banner">
-          Sin conexión — estás viendo lo último que se guardó.
-        </div>
-      )}
+      {!online && <div className="warning banner">{t('app.offline')}</div>}
       {updateReady && (
         <div className="info banner pwa-update-banner">
-          <span>Hay una versión nueva de pomotion.</span>
+          <span>{t('app.updateReady')}</span>
           <button type="button" className="btn btn-tinted btn-small" onClick={applyUpdate}>
-            Actualizar
+            {t('app.update')}
           </button>
         </div>
       )}
@@ -975,7 +1001,7 @@ export default function App() {
         <DismissibleBanner
           key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
           tone="warning"
-          message={dueBannerText(data.dueReminders, data.today)}
+          message={dueBannerText(data.dueReminders, data.today, t)}
         />
       )}
       {data && data.carryOverCount > 0 && (
@@ -1005,10 +1031,10 @@ export default function App() {
             {(data.dayTotalSeconds > 0 ||
               data.weekTotalSeconds > 0 ||
               dayEstimateSeconds > 0) && (
-              <div className="total-pill" title="Tiempo registrado y estimado">
+              <div className="total-pill" title={t("total.title")}>
                 {data.dayTotalSeconds > 0 && (
                   <span className="total-seg">
-                    <span className="total-pill-label">Día</span>
+                    <span className="total-pill-label">{t("total.day")}</span>
                     <span className="total-pill-value">
                       {formatDurationLabel(data.dayTotalSeconds)}
                     </span>
@@ -1016,7 +1042,7 @@ export default function App() {
                 )}
                 {dayEstimateSeconds > 0 && (
                   <span className="total-seg">
-                    <span className="total-pill-label">Est</span>
+                    <span className="total-pill-label">{t("total.estimate")}</span>
                     <span className="total-pill-value total-pill-est">
                       {formatDurationLabel(dayEstimateSeconds)}
                     </span>
@@ -1024,7 +1050,7 @@ export default function App() {
                 )}
                 {data.weekTotalSeconds > 0 && (
                   <span className="total-seg">
-                    <span className="total-pill-label">Sem</span>
+                    <span className="total-pill-label">{t("total.week")}</span>
                     <span className="total-pill-value">
                       {formatDurationLabel(data.weekTotalSeconds)}
                     </span>
@@ -1126,7 +1152,7 @@ export default function App() {
             <section className="timer-panel card">
               {focusMode && timerPhase !== 'work' && (
                 <p className="focus-task">
-                  {selectedTask?.name ?? 'Ninguna tarea seleccionada'}
+                  {selectedTask?.name ?? t("app.noTaskSelected")}
                 </p>
               )}
               <Timer
@@ -1137,13 +1163,15 @@ export default function App() {
                 onPhaseChange={setTimerPhase}
                 soundsEnabled={soundsEnabled}
                 notificationsEnabled={notifications.enabled}
+                pomodoroEnabled={pomodoroEnabled}
               />
             </section>
           </div>
 
           <footer className="shortcuts-hint">
-            <kbd>espacio</kbd> inicia/detiene · <kbd>1</kbd>–<kbd>5</kbd> cambia de día ·{' '}
-            <kbd>[</kbd>/<kbd>]</kbd> cambia de semana · <kbd>/</kbd> busca · <kbd>T</kbd> cambia el tema
+            <kbd>{t('shortcut.space')}</kbd> {t('shortcut.startStop')} · <kbd>1</kbd>–<kbd>5</kbd>{' '}
+            {t('shortcut.switchDay')} · <kbd>[</kbd>/<kbd>]</kbd> {t('shortcut.switchWeek')} ·{' '}
+            <kbd>/</kbd> {t('shortcut.search')} · <kbd>T</kbd> {t('shortcut.toggleTheme')}
           </footer>
         </>
       )}
@@ -1196,7 +1224,7 @@ export default function App() {
 
       {showFeeds && (
         <CalendarFeedsDialog
-          files={files}
+          files={orderedFiles}
           onChanged={() => void refresh(data?.selectedDay, data?.week)}
           onClose={() => setShowFeeds(false)}
         />
@@ -1205,6 +1233,15 @@ export default function App() {
       {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
 
       {showBackup && <BackupDialog onClose={() => setShowBackup(false)} />}
+
+      {showContextOrder && (
+        <ContextOrderDialog
+          files={orderedFiles}
+          order={fileOrder}
+          onSave={setFileOrder}
+          onClose={() => setShowContextOrder(false)}
+        />
+      )}
 
       {showTimerSettings && (
         <TimerSettingsDialog
@@ -1234,8 +1271,11 @@ export default function App() {
               n: (prev?.n ?? 0) + 1,
               text:
                 added === 0
-                  ? 'Las recurrentes ya estaban en la semana.'
-                  : `${added} ${added === 1 ? 'tarea recurrente agregada' : 'tareas recurrentes agregadas'}.`,
+                  ? t('recurring.notice.none')
+                  : t('recurring.notice.added', {
+                      count: added,
+                      taskWord: t(added === 1 ? 'recurring.taskAddedOne' : 'recurring.taskAddedMany'),
+                    }),
             }));
             void refresh(data.selectedDay, data.week);
           }}
@@ -1255,8 +1295,11 @@ export default function App() {
               n: (prev?.n ?? 0) + 1,
               text:
                 added === 0
-                  ? 'La plantilla ya estaba en el día.'
-                  : `${added} ${added === 1 ? 'tarea agregada' : 'tareas agregadas'} desde la plantilla.`,
+                  ? t('templates.notice.none')
+                  : t('templates.notice.added', {
+                      count: added,
+                      word: t(added === 1 ? 'templates.taskAddedOne' : 'templates.taskAddedMany'),
+                    }),
             }));
             void refresh(data.selectedDay, data.week);
           }}
@@ -1266,10 +1309,10 @@ export default function App() {
 
       {pendingSwitch && (
         <ConfirmDialog
-          title="¿Cancelar el timer en curso?"
-          message={`Tienes un timer corriendo. ${pendingSwitch.message}`}
-          confirmLabel="Cancelar timer y cambiar"
-          cancelLabel="Seguir con el timer"
+          title={t('guard.title')}
+          message={t('guard.body', { message: pendingSwitch.message })}
+          confirmLabel={t('guard.confirm')}
+          cancelLabel={t('guard.keepRunning')}
           destructive
           onConfirm={confirmPendingSwitch}
           onCancel={() => setPendingSwitch(null)}
@@ -1278,10 +1321,9 @@ export default function App() {
 
       {pendingBulkDelete && (
         <ConfirmDialog
-          title={`¿Eliminar ${selectedIds.size} ${selectedIds.size === 1 ? 'tarea' : 'tareas'}?`}
-          message="Se borran junto con sus sesiones registradas. No se puede deshacer."
-          confirmLabel="Eliminar"
-          cancelLabel="Cancelar"
+          title={t('bulk.deleteTitle', { count: selectedIds.size })}
+          message={t('bulk.deleteBody')}
+          confirmLabel={t('common.delete')}
           destructive
           onConfirm={() => void runBulk('delete')}
           onCancel={() => setPendingBulkDelete(false)}

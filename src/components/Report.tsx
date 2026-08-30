@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getReport, reportCsvUrl, UnauthorizedError, type ReportRow } from '../api';
 import { formatDurationLabel } from '../duration';
 import type { Tag } from '../types';
+import { plural, useT } from '../i18n';
 
 const NO_TAG = '__none__';
 
@@ -23,6 +24,7 @@ function aggregate(rows: ReportRow[], key: (r: ReportRow) => string): [string, n
 }
 
 export default function Report({ fileId, onClose }: { fileId: string | null; onClose: () => void }) {
+  const t = useT();
   const [from, setFrom] = useState(firstOfMonthLocal);
   const [to, setTo] = useState(todayLocal);
   const [loading, setLoading] = useState(false);
@@ -53,10 +55,10 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
       setResult(null);
       setError(
         err instanceof UnauthorizedError
-          ? 'La sesión expiró. Recargá la página para volver a entrar.'
+          ? t('common.sessionExpired')
           : err instanceof Error
             ? err.message
-            : 'No se pudo generar el reporte'
+            : t('report.error')
       );
     } finally {
       setLoading(false);
@@ -75,7 +77,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
     return [...totals].sort((a, b) => b[1] - a[1]);
   }, [result]);
   const tagName = useMemo(
-    () => new Map((result?.tags ?? []).map((t) => [t.id, t.name] as const)),
+    () => new Map((result?.tags ?? []).map((tag) => [tag.id, tag.name] as const)),
     [result]
   );
   const hasTaggedRows = byTag.some(([k]) => k !== NO_TAG);
@@ -89,20 +91,20 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
         aria-labelledby="report-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="report-title">Reporte de tiempo</h2>
+        <h2 id="report-title">{t('report.title')}</h2>
 
         <div className="report-range">
           <label>
-            Desde
+            {t('report.from')}
             <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
           </label>
           <label>
-            Hasta
+            {t('report.to')}
             <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
           </label>
         </div>
 
-        {!rangeValid && <p className="error">El "desde" no puede ser posterior al "hasta".</p>}
+        {!rangeValid && <p className="error">{t('report.badRange')}</p>}
 
         <div className="report-buttons">
           <button
@@ -111,7 +113,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
             onClick={() => void generate()}
             disabled={loading || !rangeValid}
           >
-            {loading ? 'Generando…' : 'Generar'}
+            {loading ? t('report.generating') : t('report.generate')}
           </button>
           {rangeValid && (
             <a
@@ -119,7 +121,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
               href={reportCsvUrl(from, to, fileId ?? undefined)}
               download={`pomotion-${from}_${to}.csv`}
             >
-              Descargar CSV
+              {t('report.downloadCsv')}
             </a>
           )}
         </div>
@@ -129,11 +131,11 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
         {result && (
           <div className="report-result">
             <p className="report-total">
-              Total <strong>{formatDurationLabel(result.totalSeconds)}</strong> · {result.rows.length}{' '}
-              {result.rows.length === 1 ? 'sesión' : 'sesiones'}
+              {t('report.total')} <strong>{formatDurationLabel(result.totalSeconds)}</strong> · {result.rows.length}{' '}
+              {plural(result.rows.length, t('report.sessionOne'), t('report.sessionMany'))}
               {result.estimatedMinutes > 0 && (
                 <>
-                  {' · '}Estimado{' '}
+                  {' · '}{t('report.estimated')}{' '}
                   <strong
                     className={
                       result.totalSeconds > result.estimatedMinutes * 60 ? 'report-over' : undefined
@@ -146,10 +148,10 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
             </p>
 
             {result.rows.length === 0 ? (
-              <p className="muted">No hay sesiones registradas en ese rango.</p>
+              <p className="muted">{t('report.empty')}</p>
             ) : (
               <>
-                <h3>Por tarea</h3>
+                <h3>{t('report.byTask')}</h3>
                 <table className="report-table">
                   <tbody>
                     {byTask.map(([task, secs]) => (
@@ -161,7 +163,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
                   </tbody>
                 </table>
 
-                <h3>Por día</h3>
+                <h3>{t('report.byDay')}</h3>
                 <table className="report-table">
                   <tbody>
                     {byDay.map(([date, secs]) => (
@@ -175,16 +177,15 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
 
                 {hasTaggedRows && (
                   <>
-                    <h3>Por etiqueta</h3>
+                    <h3>{t('report.byTag')}</h3>
                     <p className="report-note">
-                      Una sesión cuenta en cada etiqueta de su tarea, así que la suma
-                      puede pasar el total.
+                      {t('report.byTagNote')}
                     </p>
                     <table className="report-table">
                       <tbody>
                         {byTag.map(([key, secs]) => (
                           <tr key={key}>
-                            <td>{key === NO_TAG ? 'Sin etiqueta' : (tagName.get(key) ?? '(borrada)')}</td>
+                            <td>{key === NO_TAG ? t('common.noTag') : (tagName.get(key) ?? t('report.deletedTag'))}</td>
                             <td>{formatDurationLabel(secs)}</td>
                           </tr>
                         ))}
@@ -199,7 +200,7 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>

@@ -3,20 +3,23 @@ import { createTag, deleteTag, updateTag, UnauthorizedError } from '../api';
 import { DEFAULT_TAG_COLOR, TAG_COLORS, tagColorOf, type TagColor } from '../tags';
 import type { Tag } from '../types';
 import ConfirmDialog from './ConfirmDialog';
+import { useT, type MsgKey, type TFn } from '../i18n';
 
-function errText(err: unknown): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
-  return err instanceof Error ? err.message : 'Algo salió mal';
+function errText(err: unknown, t: TFn): string {
+  if (err instanceof UnauthorizedError) return t('goals.sessionExpired');
+  return err instanceof Error ? err.message : t('common.somethingWrong');
 }
 
 function Swatches({
   value,
   onPick,
   disabled,
+  label,
 }: {
   value: TagColor;
   onPick: (c: TagColor) => void;
   disabled?: boolean;
+  label: (key: TagColor) => string;
 }) {
   return (
     <div className="tag-swatches">
@@ -28,8 +31,8 @@ function Swatches({
           data-tag-color={c.key}
           onClick={() => onPick(c.key)}
           disabled={disabled}
-          aria-label={c.label}
-          title={c.label}
+          aria-label={label(c.key)}
+          title={label(c.key)}
         />
       ))}
     </div>
@@ -47,6 +50,8 @@ export default function TagsDialog({
   onChanged: () => void;
   onClose: () => void;
 }) {
+  const t = useT();
+  const colorLabel = (key: TagColor) => t(`tags.color.${key}` as MsgKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +78,7 @@ export default function TagsDialog({
       await fn();
       onChanged();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setBusy(false);
     }
@@ -113,25 +118,25 @@ export default function TagsDialog({
         aria-labelledby="tags-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="tags-title">Etiquetas</h2>
+        <h2 id="tags-title">{t('tags.title')}</h2>
 
         <form className="tag-new-form" onSubmit={submitNew}>
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Nueva etiqueta…"
+            placeholder={t('tags.newPlaceholder')}
             disabled={busy}
             maxLength={40}
           />
-          <Swatches value={newColor} onPick={setNewColor} disabled={busy} />
+          <Swatches value={newColor} onPick={setNewColor} disabled={busy} label={colorLabel} />
           <button type="submit" className="btn btn-tinted btn-small" disabled={busy || !newName.trim()}>
-            Crear
+            {t('common.add')}
           </button>
         </form>
 
         {tags.length === 0 ? (
-          <p className="muted">Todavía no creaste etiquetas.</p>
+          <p className="muted">{t('tags.none')}</p>
         ) : (
           <ul className="tag-manage-list">
             {tags.map((tag) => (
@@ -165,7 +170,7 @@ export default function TagsDialog({
                       setEditingId(tag.id);
                       setEditingName(tag.name);
                     }}
-                    title="Renombrar"
+                    title={t('common.rename')}
                   >
                     {tag.name}
                   </button>
@@ -174,14 +179,15 @@ export default function TagsDialog({
                   value={tagColorOf(tag.color)}
                   onPick={(c) => void run(() => updateTag(tag.id, { color: c }))}
                   disabled={busy}
+                  label={colorLabel}
                 />
                 <button
                   type="button"
                   className="tag-manage-delete"
                   onClick={() => setPendingDelete(tag)}
                   disabled={busy}
-                  aria-label={`Eliminar ${tag.name}`}
-                  title="Eliminar etiqueta"
+                  aria-label={t('common.delete') + ' ' + tag.name}
+                  title={t('tags.deleteTitle')}
                 >
                   ×
                 </button>
@@ -194,16 +200,16 @@ export default function TagsDialog({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>
 
       {pendingDelete && (
         <ConfirmDialog
-          title={`Eliminar "${pendingDelete.name}"`}
-          message="Se quita de todas las tareas que la tengan. No borra las tareas."
-          confirmLabel="Eliminar"
+          title={t('tags.deleteTitle')}
+          message={t('tags.deleteBody')}
+          confirmLabel={t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}

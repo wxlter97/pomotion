@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { saveDayNote, UnauthorizedError } from '../api';
+import { useT } from '../i18n';
 
 const COLLAPSED_KEY = 'pomotion:day-note-collapsed';
 /** Coincide con el tope del backend. */
@@ -46,6 +47,7 @@ export default function DayNote({
   note: string;
   onSaved: (date: string, body: string) => void;
 }) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [text, setText] = useState(note);
   const [saving, setSaving] = useState(false);
@@ -73,10 +75,10 @@ export default function DayNote({
     } catch (err) {
       setError(
         err instanceof UnauthorizedError
-          ? 'La sesión expiró. Recargá la página para volver a entrar.'
+          ? t('common.sessionExpired')
           : err instanceof Error
             ? err.message
-            : 'No se pudo guardar la nota'
+            : t('dayNote.error')
       );
     } finally {
       setSaving(false);
@@ -94,16 +96,16 @@ export default function DayNote({
         aria-expanded={!collapsed}
       >
         <ChevronIcon />
-        <span>Nota del día</span>
-        {hasNote && <span className="day-note-dot" aria-label="Tiene nota" />}
-        {saving && <span className="day-note-status">guardando…</span>}
+        <span>{t('dayNote.title')}</span>
+        {hasNote && <span className="day-note-dot" aria-label={t('dayNote.hasNote')} />}
+        {saving && <span className="day-note-status">{t('dayNote.saving')}</span>}
       </button>
 
       {!collapsed && (
         <div className="day-note-body">
           <textarea
             className="task-notes-input"
-            placeholder="Cómo viene el día, qué pasó, ideas sueltas…"
+            placeholder={t('dayNote.placeholder')}
             value={text}
             maxLength={MAX}
             onChange={(e) => setText(e.target.value)}

@@ -1,3 +1,4 @@
+import { localizeDay, plural, useLang, useT } from '../i18n';
 import type { DayColumn, Tag } from '../types';
 import Menu, { MenuItem } from './Menu';
 import { movableTargets } from './TaskRowMenu';
@@ -32,21 +33,23 @@ export default function BulkActionBar({
   onDelete: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const moveTargets = movableTargets(days, currentDay);
 
   return (
-    <div className="bulk-bar" role="region" aria-label="Acciones en lote">
+    <div className="bulk-bar" role="region" aria-label={t('bulk.title')}>
       <div className="bulk-bar-top">
         <span className="bulk-count">
-          {count} {count === 1 ? 'seleccionada' : 'seleccionadas'}
+          {count} {plural(count, t('bulk.selectedOne'), t('bulk.selectedMany'))}
         </span>
         <button
           type="button"
           className="bulk-cancel"
           onClick={onCancel}
           disabled={busy}
-          aria-label="Cancelar selección"
-          title="Cancelar (Esc)"
+          aria-label={t('bulk.cancel')}
+          title={t('bulk.cancelTitle')}
         >
           ✕
         </button>
@@ -54,11 +57,15 @@ export default function BulkActionBar({
 
       <div className="bulk-actions">
         <button type="button" className="btn btn-plain btn-small" onClick={onComplete} disabled={busy}>
-          Completar
+          {t('bulk.complete')}
         </button>
 
         {moveTargets.length > 0 && (
-          <Menu ariaLabel="Mover a otro día" triggerClassName="btn btn-plain btn-small" trigger="Mover a…">
+          <Menu
+            ariaLabel={t('bulk.moveTitle')}
+            triggerClassName="btn btn-plain btn-small"
+            trigger={t('bulk.move')}
+          >
             {(close) => (
               <>
                 {moveTargets.map((d) => (
@@ -69,7 +76,7 @@ export default function BulkActionBar({
                       close();
                     }}
                   >
-                    {d.day}
+                    {localizeDay(d.day, lang)}
                   </MenuItem>
                 ))}
               </>
@@ -78,18 +85,22 @@ export default function BulkActionBar({
         )}
 
         {tags.length > 0 && (
-          <Menu ariaLabel="Agregar etiqueta" triggerClassName="btn btn-plain btn-small" trigger="Etiquetar…">
+          <Menu
+            ariaLabel={t('bulk.tagTitle')}
+            triggerClassName="btn btn-plain btn-small"
+            trigger={t('bulk.tag')}
+          >
             {(close) => (
               <>
-                {tags.map((t) => (
+                {tags.map((tag) => (
                   <MenuItem
-                    key={t.id}
+                    key={tag.id}
                     onClick={() => {
-                      onAddTag(t.id);
+                      onAddTag(tag.id);
                       close();
                     }}
                   >
-                    {t.name}
+                    {tag.name}
                   </MenuItem>
                 ))}
               </>
@@ -98,10 +109,10 @@ export default function BulkActionBar({
         )}
 
         <button type="button" className="btn btn-plain btn-small" onClick={onInbox} disabled={busy}>
-          Sin fecha
+          {t('inbox.title')}
         </button>
         <button type="button" className="btn btn-destructive btn-small" onClick={onDelete} disabled={busy}>
-          Eliminar
+          {t('common.delete')}
         </button>
       </div>
     </div>

@@ -1370,6 +1370,38 @@ body.is-dragging * {
   gap: 2px;
 }
 
+.context-order-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.context-order-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: var(--color-fill);
+  border-radius: 12px;
+  padding: 0.5rem 0.7rem;
+}
+
+.context-order-name {
+  font-size: 0.92rem;
+  color: var(--color-label);
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.context-order-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 .recurring-list li {
   display: flex;
   flex-direction: column;

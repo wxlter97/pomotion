@@ -8,10 +8,11 @@ import {
 } from '../api';
 import type { DayTemplate } from '../types';
 import ConfirmDialog from './ConfirmDialog';
+import { localizeDay, plural, useLang, useT, type TFn } from '../i18n';
 
-function errText(err: unknown): string {
-  if (err instanceof UnauthorizedError) return 'La sesión expiró. Recargá la página.';
-  return err instanceof Error ? err.message : 'Algo salió mal';
+function errText(err: unknown, t: TFn): string {
+  if (err instanceof UnauthorizedError) return t('goals.sessionExpired');
+  return err instanceof Error ? err.message : t('common.somethingWrong');
 }
 
 /**
@@ -40,6 +41,9 @@ export default function DayTemplatesDialog({
   onApplied: (added: number) => void;
   onClose: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
+  const dayName = localizeDay(dayLabel, lang);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,7 +69,7 @@ export default function DayTemplatesDialog({
       await fn();
       onChanged();
     } catch (err) {
-      setError(errText(err));
+      setError(errText(err, t));
     } finally {
       setBusy(false);
     }
@@ -118,7 +122,7 @@ export default function DayTemplatesDialog({
         onApplied(res.added);
         onClose();
       } catch (err) {
-        setError(errText(err));
+        setError(errText(err, t));
         setBusy(false);
       }
     })();
@@ -133,21 +137,21 @@ export default function DayTemplatesDialog({
         aria-labelledby="templates-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="templates-title">Plantillas de día</h2>
+        <h2 id="templates-title">{t('templates.title')}</h2>
 
         <form className="dt-create" onSubmit={createBlank}>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Nombre de la plantilla"
+            placeholder={t('templates.namePlaceholder')}
             disabled={busy}
             maxLength={60}
           />
           <textarea
             value={itemsText}
             onChange={(e) => setItemsText(e.target.value)}
-            placeholder="Una tarea por línea…"
+            placeholder={t('templates.itemsPlaceholder')}
             rows={3}
             disabled={busy}
           />
@@ -157,7 +161,7 @@ export default function DayTemplatesDialog({
               className="btn btn-tinted btn-small"
               disabled={busy || !name.trim() || !itemsText.trim()}
             >
-              Crear
+              {t('common.add')}
             </button>
             {dayTaskCount > 0 && (
               <button
@@ -166,14 +170,14 @@ export default function DayTemplatesDialog({
                 onClick={createFromDay}
                 disabled={busy || !name.trim()}
               >
-                …o copiar «{dayLabel}» ({dayTaskCount})
+                {t('templates.copyDayN', { day: dayName, count: dayTaskCount })}
               </button>
             )}
           </div>
         </form>
 
         {templates.length === 0 ? (
-          <p className="muted">Todavía no guardaste plantillas.</p>
+          <p className="muted">{t('templates.none')}</p>
         ) : (
           <ul className="dt-list">
             {templates.map((tpl) => (
@@ -207,13 +211,13 @@ export default function DayTemplatesDialog({
                         setEditingId(tpl.id);
                         setEditingName(tpl.name);
                       }}
-                      title={tpl.items.map((i) => i.name).join('\n') || 'Sin tareas'}
+                      title={tpl.items.map((i) => i.name).join('\n') || t('templates.noItems')}
                     >
                       {tpl.name}
                     </button>
                   )}
                   <span className="dt-item-count">
-                    {tpl.items.length} {tpl.items.length === 1 ? 'tarea' : 'tareas'}
+                    {tpl.items.length} {plural(tpl.items.length, t('templates.taskCountOne'), t('templates.taskCountMany'))}
                   </span>
                 </div>
                 <div className="dt-item-actions">
@@ -223,15 +227,15 @@ export default function DayTemplatesDialog({
                     onClick={() => apply(tpl)}
                     disabled={busy || tpl.items.length === 0}
                   >
-                    Aplicar a {dayLabel}
+                    {t('templates.applyTo', { day: dayName })}
                   </button>
                   <button
                     type="button"
                     className="dt-item-delete"
                     onClick={() => setPendingDelete(tpl)}
                     disabled={busy}
-                    aria-label={`Eliminar ${tpl.name}`}
-                    title="Eliminar plantilla"
+                    aria-label={t('templates.deleteAria', { name: tpl.name })}
+                    title={t('templates.deleteTitle')}
                   >
                     ×
                   </button>
@@ -245,16 +249,16 @@ export default function DayTemplatesDialog({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>
 
       {pendingDelete && (
         <ConfirmDialog
-          title={`Eliminar "${pendingDelete.name}"`}
-          message="Borra la plantilla. Las tareas que ya estampaste no se tocan."
-          confirmLabel="Eliminar"
+          title={t('templates.deleteTitle')}
+          message={t('templates.deleteBody')}
+          confirmLabel={t('common.delete')}
           destructive
           onConfirm={confirmDelete}
           onCancel={() => setPendingDelete(null)}

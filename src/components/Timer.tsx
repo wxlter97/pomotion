@@ -6,6 +6,7 @@ import { playChime, unlockAudio } from '../sound';
 import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
 import { overrunElapsedHours, shouldWarnOverrun } from '../timerOverrun';
 import { isLongBreakDue, type TimerSettings } from '../timerSettings';
+import { useT } from '../i18n';
 import type { Session, Task, TimerMode, TimerPhase } from '../types';
 import ProgressRing from './ProgressRing';
 
@@ -33,12 +34,15 @@ const Timer = forwardRef<
     onPhaseChange?: (phase: TimerPhase) => void;
     soundsEnabled: boolean;
     notificationsEnabled: boolean;
+    /** Con `false`, solo el modo "Libre" y sin selector de modo. */
+    pomodoroEnabled: boolean;
   }
 >(function Timer(
-  { task, settings, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled },
+  { task, settings, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled, pomodoroEnabled },
   ref
 ) {
-  const [mode, setMode] = useState<TimerMode>('pomodoro');
+  const t = useT();
+  const [mode, setMode] = useState<TimerMode>(pomodoroEnabled ? 'pomodoro' : 'free');
   const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
@@ -71,7 +75,7 @@ const Timer = forwardRef<
     restoredRef.current = true;
     const persisted = loadActiveTimer();
     if (persisted && persisted.taskId === task.id) {
-      setMode(persisted.mode);
+      setMode(pomodoroEnabled ? persisted.mode : 'free');
       setPhase(persisted.phase);
       setStartedAt(persisted.startedAt);
       setCompletedPomodoros(persisted.completedPomodoros ?? 0);
@@ -88,6 +92,12 @@ const Timer = forwardRef<
       setStartedAt(null);
     }
   }, [task, phase]);
+
+  // Si se apaga el Pomodoro mientras el timer está quieto, pasar a "Libre".
+  // Un pomodoro en curso se respeta hasta que termine.
+  useEffect(() => {
+    if (!pomodoroEnabled && phase === 'idle' && mode !== 'free') setMode('free');
+  }, [pomodoroEnabled, phase, mode]);
 
   useEffect(() => {
     if (phase === 'idle') return;
@@ -165,7 +175,7 @@ const Timer = forwardRef<
       });
       onSessionLogged(currentTask.id, res.session);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo guardar la sesión');
+      setError(err instanceof Error ? err.message : t('timer.saveError'));
     } finally {
       setPosting(false);
     }
@@ -246,28 +256,30 @@ const Timer = forwardRef<
 
   return (
     <div className="timer">
-      <div className="segmented-control" role="tablist" aria-label="Modo de timer">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'pomodoro'}
-          className={mode === 'pomodoro' ? 'segment active' : 'segment'}
-          disabled={phase !== 'idle'}
-          onClick={() => setMode('pomodoro')}
-        >
-          Pomodoro
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'free'}
-          className={mode === 'free' ? 'segment active' : 'segment'}
-          disabled={phase !== 'idle'}
-          onClick={() => setMode('free')}
-        >
-          Libre
-        </button>
-      </div>
+      {pomodoroEnabled && (
+        <div className="segmented-control" role="tablist" aria-label={t('timer.mode')}>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'pomodoro'}
+            className={mode === 'pomodoro' ? 'segment active' : 'segment'}
+            disabled={phase !== 'idle'}
+            onClick={() => setMode('pomodoro')}
+          >
+            {t('timer.pomodoro')}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'free'}
+            className={mode === 'free' ? 'segment active' : 'segment'}
+            disabled={phase !== 'idle'}
+            onClick={() => setMode('free')}
+          >
+            {t('timer.free')}
+          </button>
+        </div>
+      )}
 
       <div className="timer-dial">
         <ProgressRing progress={ringProgress} pulse={mode === 'free' && phase === 'work'} />
@@ -275,27 +287,26 @@ const Timer = forwardRef<
       </div>
 
       <p className="timer-phase-label">
-        {phase === 'idle' && (task ? 'Listo para iniciar' : 'Selecciona una tarea')}
-        {phase === 'work' && (task ? task.name : 'Trabajando')}
-        {phase === 'break' && (breakIsLong ? 'Descanso largo' : 'Descanso')}
+        {phase === 'idle' && (task ? t('timer.idleReady') : t('timer.idleNoTask'))}
+        {phase === 'work' && (task ? task.name : t('timer.working'))}
+        {phase === 'break' && (breakIsLong ? t('timer.longBreak') : t('timer.break'))}
       </p>
 
       {showOverrunWarning && (
         <div className="warning banner timer-overrun" role="alert">
           <span>
-            Este timer lleva <strong>{formatDurationLabel(Math.floor(elapsed / 1000))}</strong>{' '}
-            corriendo. ¿Seguís?
+            {t('timer.overrun', { duration: formatDurationLabel(Math.floor(elapsed / 1000)) })}
           </span>
           <span className="timer-overrun-actions">
             <button type="button" className="btn btn-destructive btn-small" onClick={stop}>
-              Detener
+              {t('timer.overrunStop')}
             </button>
             <button
               type="button"
               className="banner-dismiss"
               onClick={() => setOverrunAckHours(elapsedHours)}
-              aria-label="Ignorar aviso"
-              title="Ignorar"
+              aria-label={t('timer.overrunIgnore')}
+              title={t('timer.overrunIgnore')}
             >
               ×
             </button>
@@ -306,17 +317,17 @@ const Timer = forwardRef<
       <div className="timer-actions">
         {phase === 'idle' && (
           <button type="button" className="btn btn-filled btn-large" onClick={start} disabled={!task}>
-            Iniciar
+            {t('timer.start')}
           </button>
         )}
         {phase === 'work' && (
           <button type="button" className="btn btn-destructive btn-large" onClick={stop} disabled={posting}>
-            {posting ? 'Guardando…' : 'Detener'}
+            {posting ? t('common.saving') : t('timer.stop')}
           </button>
         )}
         {phase === 'break' && (
           <button type="button" className="btn btn-tinted btn-large" onClick={stop}>
-            Saltar descanso
+            {t('timer.skipBreak')}
           </button>
         )}
       </div>

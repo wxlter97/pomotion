@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { localizeDay, useLang, useT } from '../i18n';
 
 function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
@@ -25,6 +26,8 @@ export default function DaySelector({
   onGoToCurrentWeek: () => void;
   loading?: boolean;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const tabsRef = useRef<HTMLDivElement>(null);
   const activeTabRef = useRef<HTMLButtonElement>(null);
 
@@ -42,8 +45,8 @@ export default function DaySelector({
           className="btn btn-icon"
           onClick={onPreviousWeek}
           disabled={loading}
-          aria-label="Semana anterior"
-          title="Semana anterior ([)"
+          aria-label={t('day.prevWeek')}
+          title={t('day.prevWeekTitle')}
         >
           ‹
         </button>
@@ -56,8 +59,8 @@ export default function DaySelector({
           className="btn btn-icon"
           onClick={onNextWeek}
           disabled={loading}
-          aria-label="Semana siguiente"
-          title="Semana siguiente (])"
+          aria-label={t('day.nextWeek')}
+          title={t('day.nextWeekTitle')}
         >
           ›
         </button>
@@ -68,7 +71,7 @@ export default function DaySelector({
             onClick={onGoToCurrentWeek}
             disabled={loading}
           >
-            Hoy
+            {t('day.today')}
           </button>
         )}
       </div>
@@ -83,7 +86,7 @@ export default function DaySelector({
             type="button"
             data-drag-zone={`day:${day}`}
           >
-            {day}
+            {localizeDay(day, lang)}
           </button>
         ))}
       </div>

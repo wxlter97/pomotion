@@ -2,23 +2,24 @@ import { useCallback, useEffect, useState } from 'react';
 import { getAnalytics, UnauthorizedError } from '../api';
 import { formatDurationLabel } from '../duration';
 import type { Analytics as AnalyticsData, EstimateAccuracy } from '../types';
+import { plural, useT, type TFn } from '../i18n';
 
 /** Bloque "Precisión de estimación": el mensaje + dos barras estimado/registrado. */
-function EstimateAccuracyBlock({ a }: { a: EstimateAccuracy }) {
+function EstimateAccuracyBlock({ a, t }: { a: EstimateAccuracy; t: TFn }) {
   const max = Math.max(a.totalEstimatedSeconds, a.totalLoggedSeconds, 1);
   const message =
     a.biasPct >= 5
-      ? `En promedio tardás un ${a.biasPct}% más de lo que estimás.`
+      ? t('analytics.accOver', { pct: a.biasPct })
       : a.biasPct <= -5
-        ? `En promedio terminás un ${Math.abs(a.biasPct)}% antes de lo que estimás.`
-        : 'Tus estimaciones vienen bastante justas.';
+        ? t('analytics.accUnder', { pct: Math.abs(a.biasPct) })
+        : t('analytics.accOk');
 
   return (
     <div className="an-estimate">
       <p className="an-estimate-msg">{message}</p>
       <div className="an-weekday">
         <div className="an-weekday-row">
-          <span className="an-weekday-name">Estimado</span>
+          <span className="an-weekday-name">{t('analytics.estimated')}</span>
           <div className="an-weekday-track">
             <div
               className="an-weekday-fill"
@@ -28,7 +29,7 @@ function EstimateAccuracyBlock({ a }: { a: EstimateAccuracy }) {
           <span className="an-weekday-value">{formatDurationLabel(a.totalEstimatedSeconds)}</span>
         </div>
         <div className="an-weekday-row">
-          <span className="an-weekday-name">Registrado</span>
+          <span className="an-weekday-name">{t('analytics.logged2')}</span>
           <div className="an-weekday-track">
             <div
               className={a.biasPct >= 5 ? 'an-weekday-fill is-over' : 'an-weekday-fill'}
@@ -40,18 +41,18 @@ function EstimateAccuracyBlock({ a }: { a: EstimateAccuracy }) {
       </div>
       <p className="an-estimate-hint">
         {Math.abs(a.biasPct) >= 5 && (
-          <>Multiplicá tus estimaciones por ~{a.suggestedFactor}. · </>
+          <>{t('analytics.accFactor', { factor: a.suggestedFactor })}</>
         )}
-        {a.count} {a.count === 1 ? 'tarea completada' : 'tareas completadas'}
+        {t('analytics.accCount', { count: a.count, word: plural(a.count, t('analytics.taskCompletedOne'), t('analytics.taskCompletedMany')) })}
       </p>
     </div>
   );
 }
 
 const RANGES = [
-  { weeks: 4, label: '4 sem' },
-  { weeks: 12, label: '12 sem' },
-  { weeks: 26, label: '26 sem' },
+  { weeks: 4, key: 'analytics.range4w' as const },
+  { weeks: 12, key: 'analytics.range12w' as const },
+  { weeks: 26, key: 'analytics.range26w' as const },
 ] as const;
 
 function pct(value: number, max: number): number {
@@ -99,6 +100,7 @@ export default function Analytics({
   fileId: string | null;
   onClose: () => void;
 }) {
+  const t = useT();
   const [weeks, setWeeks] = useState(12);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -121,10 +123,10 @@ export default function Analytics({
       } catch (err) {
         setError(
           err instanceof UnauthorizedError
-            ? 'La sesión expiró. Recargá la página para volver a entrar.'
+            ? t('common.sessionExpired')
             : err instanceof Error
               ? err.message
-              : 'No se pudo cargar la analítica'
+              : t('analytics.error')
         );
       } finally {
         setLoading(false);
@@ -151,7 +153,7 @@ export default function Analytics({
         aria-labelledby="analytics-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="analytics-title">Analítica</h2>
+        <h2 id="analytics-title">{t('analytics.title')}</h2>
 
         <div className="segmented an-range">
           {RANGES.map((r) => (
@@ -162,7 +164,7 @@ export default function Analytics({
               onClick={() => setWeeks(r.weeks)}
               disabled={loading}
             >
-              {r.label}
+              {t(r.key)}
             </button>
           ))}
         </div>
@@ -170,7 +172,7 @@ export default function Analytics({
         {error && <p className="error">{error}</p>}
 
         {data && data.totalSeconds === 0 && !error && (
-          <p className="muted">Sin tiempo registrado en este período.</p>
+          <p className="muted">{t('analytics.empty')}</p>
         )}
 
         {data && data.totalSeconds > 0 && (
@@ -178,49 +180,49 @@ export default function Analytics({
             <div className="an-stats">
               <div className="an-stat">
                 <span className="an-stat-value">{formatDurationLabel(data.totalSeconds)}</span>
-                <span className="an-stat-label">registrado</span>
+                <span className="an-stat-label">{t('analytics.logged')}</span>
               </div>
               <div className="an-stat">
                 <span className="an-stat-value">{data.activeDays}</span>
                 <span className="an-stat-label">
-                  {data.activeDays === 1 ? 'día activo' : 'días activos'}
+                  {plural(data.activeDays, t('analytics.activeDay'), t('analytics.activeDays'))}
                 </span>
               </div>
               <div className="an-stat">
                 <span className="an-stat-value">{data.streak.current}</span>
-                <span className="an-stat-label">racha actual</span>
+                <span className="an-stat-label">{t('analytics.currentStreak')}</span>
               </div>
               <div className="an-stat">
                 <span className="an-stat-value">{data.streak.longest}</span>
-                <span className="an-stat-label">mejor racha</span>
+                <span className="an-stat-label">{t('analytics.bestStreak')}</span>
               </div>
             </div>
 
             <section className="an-section">
-              <h3>Tasa de completado</h3>
+              <h3>{t('analytics.completionRate')}</h3>
               <div className="an-completion">
                 <div className="an-completion-track">
                   <div className="an-completion-fill" style={{ width: `${rate}%` }} />
                 </div>
                 <span className="an-completion-text">
-                  {rate}% · {data.completion.done}/{data.completion.total} tareas
+                  {t('analytics.completionText', { pct: rate, done: data.completion.done, total: data.completion.total })}
                 </span>
               </div>
             </section>
 
             {data.estimateAccuracy && (
               <section className="an-section">
-                <h3>Precisión de estimación</h3>
-                <EstimateAccuracyBlock a={data.estimateAccuracy} />
+                <h3>{t('analytics.estimateAccuracy')}</h3>
+                <EstimateAccuracyBlock a={data.estimateAccuracy} t={t} />
               </section>
             )}
 
             <section className="an-section">
-              <h3>Por día de la semana</h3>
+              <h3>{t('analytics.byWeekday')}</h3>
               <div className="an-weekday">
-                {data.byWeekday.map((d) => (
-                  <div className="an-weekday-row" key={d.label}>
-                    <span className="an-weekday-name">{d.label}</span>
+                {data.byWeekday.map((d, i) => (
+                  <div className="an-weekday-row" key={i}>
+                    <span className="an-weekday-name">{t('analytics.weekdayAbbrs').split(',')[i]}</span>
                     <div className="an-weekday-track">
                       <div
                         className="an-weekday-fill"
@@ -228,7 +230,7 @@ export default function Analytics({
                       />
                     </div>
                     <span className="an-weekday-value">
-                      {d.totalSeconds > 0 ? compactHours(d.totalSeconds) : '—'}
+                      {d.totalSeconds > 0 ? compactHours(d.totalSeconds) : t('analytics.noData')}
                     </span>
                   </div>
                 ))}
@@ -236,7 +238,7 @@ export default function Analytics({
             </section>
 
             <section className="an-section">
-              <h3>Por hora del día</h3>
+              <h3>{t('analytics.byHour')}</h3>
               <BarStrip
                 label={formatDurationLabel}
                 items={data.byHour.map((h) => ({
@@ -249,7 +251,7 @@ export default function Analytics({
             </section>
 
             <section className="an-section">
-              <h3>Tendencia semanal</h3>
+              <h3>{t('analytics.weeklyTrend')}</h3>
               <BarStrip
                 label={formatDurationLabel}
                 items={data.byWeek.map((w, i) => ({
@@ -265,7 +267,7 @@ export default function Analytics({
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
-            Cerrar
+            {t('common.close')}
           </button>
         </div>
       </div>

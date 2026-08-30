@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { useT } from '../i18n';
 
 export default function ConfirmDialog({
   title,
   message,
-  confirmLabel = 'Confirmar',
-  cancelLabel = 'Cancelar',
+  confirmLabel,
+  cancelLabel,
   destructive = false,
   onConfirm,
   onCancel,
@@ -17,6 +18,7 @@ export default function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const t = useT();
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -42,7 +44,7 @@ export default function ConfirmDialog({
         <p>{message}</p>
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onCancel}>
-            {cancelLabel}
+            {cancelLabel ?? t('common.cancel')}
           </button>
           <button
             ref={confirmRef}
@@ -50,7 +52,7 @@ export default function ConfirmDialog({
             className={destructive ? 'btn btn-destructive' : 'btn btn-filled'}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmLabel ?? t('common.confirm')}
           </button>
         </div>
       </div>
