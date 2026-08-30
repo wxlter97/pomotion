@@ -2467,6 +2467,50 @@ h3 {
   color: var(--color-label-secondary);
 }
 
+/* --- Backup dialog --- */
+.sheet--backup {
+  max-width: 420px;
+}
+
+.backup-section {
+  margin-top: 1rem;
+}
+
+.backup-section:first-of-type {
+  margin-top: 0.25rem;
+}
+
+.backup-section h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-label-secondary);
+}
+
+.backup-section p {
+  margin: 0 0 0.7rem;
+}
+
+.backup-section code {
+  font-size: 0.85em;
+  background: var(--color-fill);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+}
+
+.backup-file {
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--color-label-secondary);
+  max-width: 100%;
+}
+
+.backup-ready {
+  margin: 0.6rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-label);
+}
+
 /* --- Month view --- */
 .sheet--month {
   max-width: 460px;

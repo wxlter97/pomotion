@@ -25,6 +25,7 @@ import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
+import BackupDialog from './components/BackupDialog';
 import Report from './components/Report';
 import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
@@ -109,6 +110,7 @@ export default function App() {
   const [showTags, setShowTags] = useState(false);
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showBackup, setShowBackup] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
@@ -677,6 +679,7 @@ export default function App() {
             Traer pendientes al abrir
           </MenuItem>
           <div className="menu-sep" />
+          <MenuItem onClick={() => { setShowBackup(true); close(); }}>Copia de seguridad</MenuItem>
           {authIsAdmin && (
             <MenuItem onClick={() => { setShowAdmin(true); close(); }}>Aprobar usuarios</MenuItem>
           )}
@@ -948,6 +951,8 @@ export default function App() {
       )}
 
       {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
+
+      {showBackup && <BackupDialog onClose={() => setShowBackup(false)} />}
 
       {showTags && data && (
         <TagsDialog

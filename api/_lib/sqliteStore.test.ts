@@ -1045,6 +1045,89 @@ describe('searchTasks (búsqueda de tareas)', () => {
   });
 });
 
+describe('backup / restore', () => {
+  async function seedDataset(): Promise<void> {
+    await as(USER, async () => {
+      const tag = await sqliteStore.createTag({ name: 'Proyecto X', color: 'blue' });
+      const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'Tarea con todo', fileId: 'Trabajo' });
+      await sqliteStore.updateTask({
+        taskId: task.id,
+        tagIds: [tag.id],
+        priority: 'high',
+        estimateMinutes: 90,
+        notes: 'unas notas',
+      });
+      await sqliteStore.logSession({ taskId: task.id, durationSeconds: 1500, start: '09:00', end: '09:25' });
+      await sqliteStore.createTask({ text: 'Pendiente sin fecha', fileId: 'Trabajo' });
+      await sqliteStore.createRecurringRule({ name: 'Standup', weekdays: '1,2,3,4,5' });
+      await sqliteStore.createDayTemplate({
+        name: 'Día tipo',
+        items: [{ name: 'Revisar inbox', priority: 'med' }],
+      });
+      await sqliteStore.createGoal({ tagId: tag.id, targetMinutes: 1200 });
+      await sqliteStore.createCalendarFeed({ name: 'Trabajo', url: 'https://x.test/c.ics', fileId: 'Trabajo' });
+    });
+  }
+
+  it('exporta todas las tablas de dominio del usuario, sin user_id', async () => {
+    await seedDataset();
+    const dump = await as(USER, () => sqliteStore.exportBackup());
+
+    expect(dump.format).toBe('pomotion-backup');
+    expect(dump.version).toBe(1);
+    expect(dump.data.tasks).toHaveLength(2);
+    expect(dump.data.work_sessions).toHaveLength(1);
+    expect(dump.data.tags).toHaveLength(1);
+    expect(dump.data.task_tags).toHaveLength(1);
+    expect(dump.data.recurring_rules).toHaveLength(1);
+    expect(dump.data.day_templates).toHaveLength(1);
+    expect(dump.data.day_template_items).toHaveLength(1);
+    expect(dump.data.goals).toHaveLength(1);
+    expect(dump.data.calendar_feeds).toHaveLength(1);
+    expect(dump.data.tasks[0]).not.toHaveProperty('user_id');
+  });
+
+  it('restaura un backup en una cuenta vacía preservando las referencias', async () => {
+    await seedDataset();
+    const dump = await as(USER, () => sqliteStore.exportBackup());
+
+    const result = await as(OTHER, () => sqliteStore.importBackup({ backup: dump }));
+    expect(result.imported.tasks).toBe(2);
+    expect(result.imported.work_sessions).toBe(1);
+
+    const view = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes', fileId: 'Trabajo' })
+    );
+    const restored = view.tasks.find((t) => t.name === 'Tarea con todo');
+    expect(restored).toBeDefined();
+    expect(restored!.priority).toBe('high');
+    expect(restored!.estimateMinutes).toBe(90);
+    expect(restored!.sessions).toHaveLength(1);
+    expect(restored!.tagIds).toEqual([view.tags[0].id]); // el task_tag sigue apuntando bien
+    expect(view.inbox.map((t) => t.name)).toEqual(['Pendiente sin fecha']);
+    expect(view.dayTemplates[0].items[0].name).toBe('Revisar inbox');
+
+    const goals = await as(OTHER, () => sqliteStore.listGoals());
+    expect(goals[0].targetMinutes).toBe(1200);
+    const feeds = await as(OTHER, () => sqliteStore.listCalendarFeeds());
+    expect(feeds[0].url).toBe('https://x.test/c.ics');
+  });
+
+  it('rechaza el restore si la cuenta ya tiene datos', async () => {
+    await seedDataset();
+    const dump = await as(USER, () => sqliteStore.exportBackup());
+    await as(OTHER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'ya tengo algo' }));
+
+    await expect(as(OTHER, () => sqliteStore.importBackup({ backup: dump }))).rejects.toThrow(
+      /cuenta vacía/
+    );
+  });
+
+  it('rechaza un payload que no es un backup válido', async () => {
+    await expect(as(USER, () => sqliteStore.importBackup({ backup: { nope: true } }))).rejects.toThrow();
+  });
+});
+
 afterEach(() => {
   resetDb();
 });

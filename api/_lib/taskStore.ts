@@ -224,6 +224,23 @@ export type GoalProgress = Goal & {
 
 export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
 export type SearchTasksInput = { query?: string; fileId?: string };
+
+/** Valores que sobreviven al round-trip por JSON de una fila de la DB. */
+export type BackupValue = string | number | null;
+
+/**
+ * Volcado completo del dataset de un usuario (todas las tablas de dominio,
+ * sin `user_id`). Formato para el backup / restore manual (ROADMAP §11).
+ */
+export type Backup = {
+  format: 'pomotion-backup';
+  version: 1;
+  exportedAt: string;
+  data: Record<string, Array<Record<string, BackupValue>>>;
+};
+
+/** Conteo de filas insertadas por tabla al restaurar. */
+export type ImportResult = { imported: Record<string, number> };
 export type GetMonthSummaryInput = { month?: string; fileId?: string };
 export type GetFocusHeatmapInput = { fileId?: string; weeks?: number };
 export type GetAnalyticsInput = { fileId?: string; weeks?: number };
@@ -358,6 +375,13 @@ export interface TaskStore {
   getSessionsInRange(input: ReportInput): Promise<SessionRow[]>;
   /** Tareas cuyo nombre contiene `query` (todas las semanas + inbox del contexto). */
   searchTasks(input: SearchTasksInput): Promise<TaskSearchResult[]>;
+  /** Volcado completo del dataset del usuario, para descargar como backup. */
+  exportBackup(): Promise<Backup>;
+  /**
+   * Restaura un backup. v1: solo si la cuenta está vacía (sin tareas, tags,
+   * reglas, plantillas, metas ni calendarios) — si no, lanza ConflictError.
+   */
+  importBackup(input: { backup: unknown }): Promise<ImportResult>;
   listFiles(): Promise<FileEntry[]>;
   listTags(): Promise<Tag[]>;
   createTag(input: CreateTagInput): Promise<Tag>;
