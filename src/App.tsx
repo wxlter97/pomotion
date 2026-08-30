@@ -37,11 +37,13 @@ import TagsDialog from './components/TagsDialog';
 import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
+import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
 import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
+import { useAccent } from './useAccent';
 import { useCarryOverSetting } from './useCarryOverSetting';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
@@ -115,6 +117,7 @@ export default function App() {
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
   const [theme, toggleTheme] = useTheme();
+  const [accent, chooseAccent] = useAccent();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const notifications = useNotificationSetting();
@@ -678,6 +681,21 @@ export default function App() {
           <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? 'Sí' : 'No'}>
             Traer pendientes al abrir
           </MenuItem>
+          <div className="menu-heading">Color de acento</div>
+          <div className="accent-row" role="group" aria-label="Color de acento">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.key}
+                type="button"
+                className={accent === a.key ? 'accent-swatch is-on' : 'accent-swatch'}
+                data-accent={a.key}
+                title={a.label}
+                aria-label={a.label}
+                aria-pressed={accent === a.key}
+                onClick={() => chooseAccent(a.key)}
+              />
+            ))}
+          </div>
           <div className="menu-sep" />
           <MenuItem onClick={() => { setShowBackup(true); close(); }}>Copia de seguridad</MenuItem>
           {authIsAdmin && (

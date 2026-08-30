@@ -45,6 +45,28 @@
   color-scheme: dark;
 }
 
+/* ---------------------------------------------------------------------
+ * Acento configurable (data-accent en <html>, ver src/accent.ts).
+ * `tomato` es el default y no necesita reglas (gana el bloque base).
+ * Cada acento define su par claro + oscuro; el bloque oscuro lleva más
+ * especificidad para ganarle al bloque claro sin importar el orden.
+ * ------------------------------------------------------------------- */
+:root[data-accent='amber']    { --color-accent: #a56a00; --color-accent-contrast: #ffffff; }
+:root[data-accent='green']    { --color-accent: #1a854b; --color-accent-contrast: #ffffff; }
+:root[data-accent='teal']     { --color-accent: #0d8f82; --color-accent-contrast: #ffffff; }
+:root[data-accent='blue']     { --color-accent: #2f6fed; --color-accent-contrast: #ffffff; }
+:root[data-accent='indigo']   { --color-accent: #5a4fcf; --color-accent-contrast: #ffffff; }
+:root[data-accent='pink']     { --color-accent: #d63384; --color-accent-contrast: #ffffff; }
+:root[data-accent='graphite'] { --color-accent: #52525b; --color-accent-contrast: #ffffff; }
+
+:root[data-theme='dark'][data-accent='amber']    { --color-accent: #f0b429; --color-accent-contrast: #1c1c1e; }
+:root[data-theme='dark'][data-accent='green']    { --color-accent: #3ecf8e; --color-accent-contrast: #06231a; }
+:root[data-theme='dark'][data-accent='teal']     { --color-accent: #2dd4bf; --color-accent-contrast: #06231f; }
+:root[data-theme='dark'][data-accent='blue']     { --color-accent: #5b93f7; --color-accent-contrast: #0b1830; }
+:root[data-theme='dark'][data-accent='indigo']   { --color-accent: #9b8cf5; --color-accent-contrast: #14103a; }
+:root[data-theme='dark'][data-accent='pink']     { --color-accent: #f472b6; --color-accent-contrast: #2a0b1e; }
+:root[data-theme='dark'][data-accent='graphite'] { --color-accent: #a1a1aa; --color-accent-contrast: #18181b; }
+
 * {
   box-sizing: border-box;
 }
@@ -487,6 +509,45 @@ h3 {
   background: var(--color-separator);
   margin: 0.25rem 0.3rem;
 }
+
+.accent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  padding: 0.15rem 0.55rem 0.55rem;
+}
+
+.accent-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.accent-swatch:hover {
+  transform: scale(1.12);
+}
+
+.accent-swatch.is-on {
+  border-color: var(--color-label);
+}
+
+.accent-swatch:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.accent-swatch[data-accent='tomato']   { background: #ff6a48; }
+.accent-swatch[data-accent='amber']    { background: #e0a020; }
+.accent-swatch[data-accent='green']    { background: #24a35c; }
+.accent-swatch[data-accent='teal']     { background: #13a594; }
+.accent-swatch[data-accent='blue']     { background: #3b82f6; }
+.accent-swatch[data-accent='indigo']   { background: #6d63e0; }
+.accent-swatch[data-accent='pink']     { background: #e0559a; }
+.accent-swatch[data-accent='graphite'] { background: #71717a; }
 
 /* --- Selector de archivo / contexto (Trabajo/Casa/…). Oculto si hay 0 o 1
  * (ver FileSelector.tsx). --- */

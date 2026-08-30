@@ -26,8 +26,12 @@
             ? stored
             : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
           document.documentElement.dataset.theme = theme;
+
+          var accents = ['tomato', 'amber', 'green', 'teal', 'blue', 'indigo', 'pink', 'graphite'];
+          var accent = localStorage.getItem('pomotion:accent');
+          document.documentElement.dataset.accent = accents.indexOf(accent) >= 0 ? accent : 'tomato';
         } catch (e) {
-          // localStorage no disponible — se queda con el tema por defecto (claro).
+          // localStorage no disponible — se queda con el tema/acento por defecto.
         }
       })();
     </script>
