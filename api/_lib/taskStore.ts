@@ -233,7 +233,13 @@ export type GoalProgress = Goal & {
 
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
-export type GetWeekViewInput = { week?: string; day?: string; fileId?: string };
+export type GetWeekViewInput = {
+  week?: string;
+  day?: string;
+  fileId?: string;
+  /** Cliente: mostrar Sáb/Dom en la vista (columnas y día seleccionable). */
+  includeWeekend?: boolean;
+};
 export type SearchTasksInput = { query?: string; fileId?: string };
 
 /** Valores que sobreviven al round-trip por JSON de una fila de la DB. */
@@ -423,7 +429,7 @@ export interface TaskStore {
   /** Completar / reabrir / mover / etiquetar / borrar varias tareas de una. */
   bulkTasks(input: BulkTasksInput): Promise<BulkResult>;
   /** Trae a hoy las tareas pendientes sin sesiones de días pasados. */
-  carryOverToToday(input: { fileId?: string }): Promise<{ moved: number }>;
+  carryOverToToday(input: { fileId?: string; includeWeekend?: boolean }): Promise<{ moved: number }>;
 
   logSession(input: LogSessionInput): Promise<Session>;
   updateSession(input: UpdateSessionInput): Promise<Session>;

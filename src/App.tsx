@@ -53,6 +53,7 @@ import { useCarryOverSetting } from './useCarryOverSetting';
 import { useDueNotifications } from './useDueNotifications';
 import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
+import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { useTheme } from './useTheme';
 
@@ -136,11 +137,16 @@ export default function App() {
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
+  const [showWeekend, toggleWeekend] = useWeekendSetting();
   const notifications = useNotificationSetting();
   useDueNotifications(data?.dueReminders ?? NO_DUE_REMINDERS, data?.today ?? '', notifications.enabled);
   const timerRef = useRef<TimerHandle>(null);
   const carryOverDoneRef = useRef(false);
   const feedSyncDoneRef = useRef(false);
+  const showWeekendRef = useRef(showWeekend);
+  useEffect(() => {
+    showWeekendRef.current = showWeekend;
+  }, [showWeekend]);
 
   // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
   // tareas con `file` → modo de un solo contexto, el selector no aparece.
@@ -174,7 +180,12 @@ export default function App() {
       ? data.tasks.filter((t) => t.tagIds.includes(filterTagId))
       : (data?.tasks ?? []);
 
-  const refresh = useCallback(async (day?: string, week?: string, fileIdParam?: string) => {
+  const refresh = useCallback(async (
+    day?: string,
+    week?: string,
+    fileIdParam?: string,
+    weekendParam?: boolean
+  ) => {
     setLoading(true);
     setError(null);
     try {
@@ -192,7 +203,7 @@ export default function App() {
           selectedFileIdRef.current = fileId;
         }
       }
-      const res = await getTasks(day, week, fileId);
+      const res = await getTasks(day, week, fileId, weekendParam ?? showWeekendRef.current);
       setData(res);
       setAuthState('authed');
       setSelectedTask((prev) => {
@@ -357,7 +368,7 @@ export default function App() {
       } else if (e.key === '/') {
         e.preventDefault();
         setShowSearch(true);
-      } else if (/^[1-5]$/.test(e.key)) {
+      } else if (/^[1-7]$/.test(e.key)) {
         const day = data.days[Number(e.key) - 1]?.day;
         if (day) guardedSelectDay(day);
       } else if (e.key === '[') {
@@ -536,12 +547,18 @@ export default function App() {
     }
   }
 
+  function handleToggleWeekend() {
+    const next = !showWeekend;
+    toggleWeekend();
+    void refresh(data?.selectedDay, data?.week, undefined, next);
+  }
+
   async function handleCarryOver() {
     if (!data) return;
     setCarryingOver(true);
     setError(null);
     try {
-      const res = await carryOverToToday(selectedFileId ?? undefined);
+      const res = await carryOverToToday(selectedFileId ?? undefined, showWeekend);
       if (res.moved > 0) void refresh(data.selectedDay, data.week);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudieron traer las tareas');
@@ -558,7 +575,7 @@ export default function App() {
     carryOverDoneRef.current = true;
     void (async () => {
       try {
-        const res = await carryOverToToday(selectedFileIdRef.current ?? undefined);
+        const res = await carryOverToToday(selectedFileIdRef.current ?? undefined, showWeekendRef.current);
         if (res.moved > 0) void refresh(data.selectedDay, data.week);
       } catch {
         // silencioso — el usuario igual ve el banner y puede hacerlo a mano
@@ -756,6 +773,9 @@ export default function App() {
           )}
           <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? 'Sí' : 'No'}>
             Traer pendientes al abrir
+          </MenuItem>
+          <MenuItem onClick={handleToggleWeekend} state={showWeekend ? 'Sí' : 'No'}>
+            Mostrar fin de semana
           </MenuItem>
           <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
             Pomodoro

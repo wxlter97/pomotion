@@ -62,6 +62,33 @@ describe('createTask + getWeekView', () => {
     expect(otherView.tasks).toHaveLength(0);
   });
 
+  it('includeWeekend agrega Sáb/Dom a la vista y deja seleccionarlos', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-29', text: 'sábado' }); // sábado
+      await sqliteStore.createTask({ date: '2026-08-30', text: 'domingo' });
+    });
+
+    const sinFinde = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(sinFinde.days).toHaveLength(5);
+
+    const conFinde = await as(USER, () =>
+      sqliteStore.getWeekView({
+        week: '2026.08.24 - 2026.08.28',
+        day: 'Sábado',
+        includeWeekend: true,
+      })
+    );
+    expect(conFinde.days.map((d) => d.day)).toEqual([
+      'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
+    ]);
+    expect(conFinde.days[6].date).toBe('2026-08-30');
+    expect(conFinde.week).toBe('2026.08.24 - 2026.08.28'); // la etiqueta no cambia
+    expect(conFinde.selectedDay).toBe('Sábado');
+    expect(conFinde.tasks.map((t) => t.name)).toEqual(['sábado']);
+  });
+
   it('afterId ubica la tarea entre dos', async () => {
     const view = await as(USER, async () => {
       const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
@@ -866,6 +893,26 @@ describe('recurrentes', () => {
       sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Viernes' })
     );
     expect(vie.tasks.map((t) => t.name).sort()).toEqual(['Repaso semanal', 'Standup']);
+  });
+
+  it('materializa reglas de fin de semana (weekdays 6/7)', async () => {
+    await as(USER, () =>
+      sqliteStore.createRecurringRule({ name: 'Meal prep', weekdays: '6,7' }) // Sáb + Dom
+    );
+
+    const res = await as(USER, () =>
+      sqliteStore.applyRecurringToWeek({ week: '2026.08.24 - 2026.08.28' })
+    );
+    expect(res.added).toBe(2);
+
+    const dom = await as(USER, () =>
+      sqliteStore.getWeekView({
+        week: '2026.08.24 - 2026.08.28',
+        day: 'Domingo',
+        includeWeekend: true,
+      })
+    );
+    expect(dom.tasks.map((t) => t.name)).toEqual(['Meal prep']);
   });
 
   it('CRUD de reglas', async () => {
