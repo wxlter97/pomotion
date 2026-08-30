@@ -518,6 +518,11 @@ export default function TaskList({
 
                   {!isEditingText && (
                     <div className="task-item-trailing">
+                      {task.plannedStart && (
+                        <span className="task-planned-chip" title={t('taskList.plannedStartTitle')}>
+                          🕐 {task.plannedStart}
+                        </span>
+                      )}
                       {checklistText && (
                         <span
                           className={checklistDone ? 'task-checklist-chip is-done' : 'task-checklist-chip'}
@@ -569,6 +574,7 @@ export default function TaskList({
                             task.notes ||
                             task.due ||
                             task.estimateMinutes != null ||
+                            task.plannedStart ||
                             task.tagIds.length > 0 ||
                             task.checklist.length > 0
                         )}

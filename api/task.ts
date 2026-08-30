@@ -15,6 +15,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         notes?: string | null;
         due?: string | null;
         estimate_min?: number | null;
+        planned_start?: string | null;
         tag_ids?: string[];
         checklist?: unknown;
       };
@@ -26,6 +27,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         notes: body.notes,
         due: body.due,
         estimateMinutes: body.estimate_min,
+        plannedStart: body.planned_start,
         tagIds: body.tag_ids,
         checklist: body.checklist,
       });

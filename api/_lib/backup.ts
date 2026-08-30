@@ -47,7 +47,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     columns: [
       'id', 'name', 'date', 'done', 'order', 'file', 'priority', 'estimate_min',
       'notes', 'due', 'recurring_rule_id', 'created_at', 'updated_at', 'source',
-      'feed_id', 'external_uid', 'external_date', 'checklist',
+      'feed_id', 'external_uid', 'external_date', 'checklist', 'planned_start',
     ],
   },
   {

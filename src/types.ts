@@ -30,6 +30,8 @@ export type Task = {
   due: string | null;
   /** Estimación de esfuerzo en minutos; null = sin estimar. */
   estimateMinutes: number | null;
+  /** Hora planeada 'HH:MM' (time-blocking v1); null = sin horario. */
+  plannedStart: string | null;
   /** ids de las etiquetas asignadas. */
   tagIds: string[];
   /** 'manual' salvo que la tarea venga de un calendario suscripto. */

@@ -465,7 +465,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 - UI en español. Zona `America/El_Salvador`.
 - Estado actual de `tasks`: `id, user_id, name, date (nullable), done, "order", file,
   priority, estimate_min, notes, due, recurring_rule_id, source, feed_id, external_uid,
-  external_date, created_at, updated_at`.
+  external_date, created_at, updated_at, planned_start`.
 
 ### Tier 1 — alto valor, bajo costo
 
@@ -494,12 +494,17 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 ### Tier 3 — grande
 
-- **Time-blocking** (arrastrado del §9): hora planeada por tarea (`planned_start` +
-  `planned_minutes`, migración) + vista de **agenda/timeline** del día con las sesiones
-  reales superpuestas. Componente de calendario nuevo, drag para agendar/mover/redimensionar,
-  historia de touch. El estimate podría ser el largo por defecto del bloque. Recomendado
-  hacer primero un v1 "blando" (solo el campo de hora + chip + orden por hora, sin
-  timeline) y decidir después si vale la vista de agenda.
+- ~~**Time-blocking v1 "blando"**~~ ✅ (arrastrado del §9) — hora planeada por tarea:
+  campo "Hora planeada" en el panel de detalle (`<input type="time">`), chip 🕐 HH:MM
+  en la fila, y el día se ordena por esa hora (las tareas sin horario quedan después,
+  en su orden manual de siempre). Migración `010_time_blocking.sql` (`tasks.planned_start`
+  TEXT nullable). `getWeekView` ordena
+  `ORDER BY date, (planned_start IS NULL), planned_start, "order", created_at`.
+  `normalizeTimeLabel` nuevo en `shared/duration.ts` (zero-pad para que el `ORDER BY`
+  como texto ordene bien). En el backup. Sin función serverless nueva.
+  **Pendiente**: vista de **agenda/timeline** del día con las sesiones reales
+  superpuestas (`planned_minutes`, componente de calendario, drag para
+  agendar/mover/redimensionar) — se decide después de probar este v1.
 - ~~**PWA instalable + offline de lectura**~~ ✅ — service worker hecho a mano (`public/sw.js`,
   cero deps): navegación red-primero → cae al `index.html` cacheado; `/assets/*` (con hash)
   cache-primero; `GET /api/tasks` + `/api/auth/status` red-primero → caen a lo último

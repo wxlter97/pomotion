@@ -49,7 +49,7 @@ import {
   weekdayIndex,
   weekdayNameOf,
 } from './weekDates.js';
-import { isValidTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
+import { isValidTimeLabel, normalizeTimeLabel, roundDurationSeconds } from '../../shared/duration.js';
 import type {
   Analytics,
   ApplyDayTemplateInput,
@@ -154,6 +154,7 @@ function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
     notes: notes && notes.length > 0 ? notes : null,
     due: r.due == null ? null : String(r.due),
     estimateMinutes: r.estimate_min == null ? null : Number(r.estimate_min),
+    plannedStart: r.planned_start == null ? null : String(r.planned_start),
     tagIds,
     source: String(r.source ?? 'manual') === 'calendar' ? 'calendar' : 'manual',
     createdAt: String(r.created_at),
@@ -328,7 +329,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     await db.execute({
       sql: `SELECT * FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
-            ORDER BY date, "order", created_at`,
+            ORDER BY date, (planned_start IS NULL), planned_start, "order", created_at`,
       args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows;
@@ -1116,6 +1117,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     notes: null,
     due: null,
     estimateMinutes: null,
+    plannedStart: null,
     tagIds: [],
     source: 'manual',
     createdAt: now,
@@ -1192,6 +1194,19 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     sets.push('estimate_min = ?');
     args.push(value);
     result.estimateMinutes = value;
+  }
+  if (input.plannedStart !== undefined) {
+    const p = input.plannedStart;
+    let value: string | null = null;
+    if (p !== null) {
+      value = normalizeTimeLabel(p);
+      if (value === null) {
+        throw new BadRequestError('invalid_planned_start', 'planned_start debe ser "HH:MM" o null');
+      }
+    }
+    sets.push('planned_start = ?');
+    args.push(value);
+    result.plannedStart = value;
   }
   if (input.checklist !== undefined) {
     const items = normalizeChecklistInput(input.checklist, () => crypto.randomUUID());

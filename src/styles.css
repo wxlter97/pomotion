@@ -1098,6 +1098,19 @@ body.is-dragging * {
   background: color-mix(in srgb, var(--color-destructive) 14%, transparent);
 }
 
+/* Hora planeada (time-blocking v1): mismo look que el chip de vencimiento. */
+.task-planned-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-label-secondary);
+  background: var(--color-fill-strong);
+  border-radius: 980px;
+  padding: 0.1rem 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Edad de la tarea: deliberadamente tenue, no compite con el chip de vencimiento. */
 .task-age-chip {
   font-size: 0.68rem;
@@ -1188,6 +1201,7 @@ body.is-dragging * {
 }
 
 .task-due-input,
+.task-planned-start-input,
 .task-estimate-input,
 .task-notes-input {
   font-family: inherit;
@@ -1197,7 +1211,8 @@ body.is-dragging * {
   border-radius: 8px;
   font-size: 0.84rem;
 }
-.task-due-input {
+.task-due-input,
+.task-planned-start-input {
   padding: 0.25rem 0.5rem;
 }
 .task-estimate-input {
@@ -1210,6 +1225,7 @@ body.is-dragging * {
   width: 100%;
 }
 .task-due-input:focus,
+.task-planned-start-input:focus,
 .task-estimate-input:focus,
 .task-notes-input:focus {
   outline: none;

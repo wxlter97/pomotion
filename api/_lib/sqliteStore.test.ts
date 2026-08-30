@@ -195,6 +195,40 @@ describe('updateTask / deleteTask', () => {
     await expect(as(USER, () => sqliteStore.updateTask({ taskId: t.id }))).rejects.toThrow();
   });
 
+  it('setea la hora planeada (zero-pad incluido) y la limpia con null', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({ taskId: t.id, plannedStart: '9:05' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks[0].plannedStart).toBe('09:05');
+
+    const cleared = await as(USER, async () => {
+      await sqliteStore.updateTask({ taskId: view.tasks[0].id, plannedStart: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0].plannedStart).toBeNull();
+  });
+
+  it('rechaza una hora planeada con formato inválido', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, plannedStart: '9am' }))
+    ).rejects.toThrow();
+  });
+
+  it('ordena el día por hora planeada, dejando las tareas sin horario después', async () => {
+    const view = await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Sin horario' });
+      const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'A las 14:00' });
+      const c = await sqliteStore.createTask({ date: '2026-08-24', text: 'A las 09:00' });
+      await sqliteStore.updateTask({ taskId: b.id, plannedStart: '14:00' });
+      await sqliteStore.updateTask({ taskId: c.id, plannedStart: '9:00' });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks.map((t) => t.name)).toEqual(['A las 09:00', 'A las 14:00', 'Sin horario']);
+  });
+
   it('guarda el checklist, lo saneia y lo devuelve en la vista', async () => {
     const view = await as(USER, async () => {
       const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
