@@ -753,6 +753,63 @@ h3 {
   align-self: start;
 }
 
+/* --- Modo foco: solo el timer + la tarea en curso --- */
+.app--focus {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.app--focus > .app-header,
+.app--focus > .file-tabs,
+.app--focus > .day-row,
+.app--focus > .inbox,
+.app--focus > .shortcuts-hint,
+.app--focus > .app-footer,
+.app--focus > .banner,
+.app--focus .tasks-panel {
+  display: none;
+}
+
+.app--focus .main-grid {
+  grid-template-columns: 1fr;
+  max-width: 380px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.app--focus .timer-panel {
+  position: static;
+}
+
+.focus-task {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-label);
+}
+
+.focus-exit {
+  position: fixed;
+  top: calc(0.75rem + env(safe-area-inset-top));
+  right: calc(0.75rem + env(safe-area-inset-right));
+  z-index: 40;
+  background: var(--color-fill);
+  color: var(--color-label-secondary);
+  border: none;
+  border-radius: 980px;
+  padding: 0.35rem 0.85rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.focus-exit:hover {
+  color: var(--color-label);
+}
+
 /* --- Task list --- */
 .task-list {
   list-style: none;

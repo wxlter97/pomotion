@@ -115,6 +115,8 @@ export default function App() {
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  // Modo foco: oculta todo menos el timer y la tarea en curso. Efímero.
+  const [focusMode, setFocusMode] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
@@ -327,11 +329,17 @@ export default function App() {
         e.preventDefault();
         if (timerPhase === 'idle') timerRef.current?.start();
         else timerRef.current?.stop();
+      } else if (e.key === 'f' || e.key === 'F') {
+        setFocusMode((v) => !v);
+      } else if (e.key === 'Escape' && focusMode) {
+        setFocusMode(false);
+      } else if (e.key === 't' || e.key === 'T') {
+        toggleTheme();
+      } else if (focusMode) {
+        // En modo foco solo valen espacio / F / Esc / T.
       } else if (e.key === '/') {
         e.preventDefault();
         setShowSearch(true);
-      } else if (e.key === 't' || e.key === 'T') {
-        toggleTheme();
       } else if (/^[1-5]$/.test(e.key)) {
         const day = data.days[Number(e.key) - 1]?.day;
         if (day) guardedSelectDay(day);
@@ -343,7 +351,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [timerPhase, data, pendingSwitch, authState, toggleTheme, guardedSelectDay, guardedGoToWeek]);
+  }, [timerPhase, data, pendingSwitch, authState, focusMode, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(taskId: string, session: Session) {
     setData((prev) =>
@@ -704,6 +712,7 @@ export default function App() {
             ))}
           </div>
           <div className="menu-sep" />
+          <MenuItem onClick={() => { setFocusMode(true); close(); }}>Modo foco</MenuItem>
           <MenuItem onClick={() => { setShowBackup(true); close(); }}>Copia de seguridad</MenuItem>
           {authIsAdmin && (
             <MenuItem onClick={() => { setShowAdmin(true); close(); }}>Aprobar usuarios</MenuItem>
@@ -764,7 +773,17 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={focusMode ? 'app app--focus' : 'app'}>
+      {focusMode && (
+        <button
+          type="button"
+          className="focus-exit"
+          onClick={() => setFocusMode(false)}
+          title="Salir del modo foco (Esc)"
+        >
+          Salir de foco
+        </button>
+      )}
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
@@ -911,6 +930,11 @@ export default function App() {
             </section>
 
             <section className="timer-panel card">
+              {focusMode && timerPhase !== 'work' && (
+                <p className="focus-task">
+                  {selectedTask?.name ?? 'Ninguna tarea seleccionada'}
+                </p>
+              )}
               <Timer
                 ref={timerRef}
                 task={selectedTask}
