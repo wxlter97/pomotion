@@ -1303,14 +1303,28 @@ h3 {
 
 .recurring-list li {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.4rem;
-  padding: 0.35rem 0.2rem 0.35rem 0.5rem;
+  padding: 0.45rem 0.4rem 0.5rem 0.5rem;
   border-radius: 8px;
 }
 
 .recurring-list li:hover {
   background: var(--color-fill);
+}
+
+.recurring-row-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.recurring-freq {
+  flex-shrink: 0;
+}
+.recurring-freq button {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
 }
 
 .recurring-text {
@@ -1352,9 +1366,39 @@ h3 {
 }
 
 .recurring-days {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   gap: 2px;
-  flex-shrink: 0;
+}
+
+.recurring-monthdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.recurring-monthday {
+  min-width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid var(--color-separator);
+  background: none;
+  color: var(--color-label-secondary);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+
+.recurring-monthday.on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.recurring-monthday.is-last {
+  padding: 0 0.45rem;
+  font-size: 0.66rem;
 }
 
 .recurring-day {

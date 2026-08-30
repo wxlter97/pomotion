@@ -18,6 +18,13 @@ import {
 } from './parse.js';
 import { computeAnalytics } from './analytics.js';
 import { normalizeChecklistInput, parseChecklist, serializeChecklist } from './checklist.js';
+import {
+  isValidMonthdays,
+  isValidWeekdays,
+  parseMonthdays,
+  ruleFiresOn,
+  serializeMonthdays,
+} from './recurrence.js';
 import { ACCOUNT_NONEMPTY_TABLES, BACKUP_TABLES, buildInserts, parseBackup, remapIds } from './backup.js';
 import {
   desiredTasksFromEvents,
@@ -99,7 +106,6 @@ import type {
 
 const TIMEZONE = process.env.APP_TIMEZONE || 'America/El_Salvador';
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const WEEKDAYS_RE = /^[1-7](,[1-7])*$/;
 
 // --- Mappers ---
 
@@ -184,8 +190,10 @@ function toRule(r: Row): RecurringRule {
     id: String(r.id),
     name: String(r.name),
     file: r.file == null ? null : String(r.file),
-    weekdays: String(r.weekdays),
     active: Number(r.active) === 1,
+    freq: String(r.freq ?? 'weekly') === 'monthly' ? 'monthly' : 'weekly',
+    weekdays: String(r.weekdays),
+    monthdays: r.monthdays == null ? '' : String(r.monthdays),
   };
 }
 
@@ -1395,15 +1403,28 @@ async function createRecurringRule(input: CreateRecurringRuleInput): Promise<Rec
   const userId = currentUserId();
   const name = typeof input.name === 'string' ? input.name.trim() : '';
   if (!name) throw new BadRequestError('invalid_name', 'El nombre no puede estar vacío');
-  const weekdays = input.weekdays && WEEKDAYS_RE.test(input.weekdays) ? input.weekdays : '1,2,3,4,5';
+  const freq = input.freq === 'monthly' ? 'monthly' : 'weekly';
+
+  let weekdays = '1,2,3,4,5';
+  let monthdays: string | null = null;
+  if (freq === 'monthly') {
+    if (!isValidMonthdays(input.monthdays ?? '')) {
+      throw new BadRequestError('invalid_monthdays', 'monthdays debe ser una lista de días 1..31 (o -1)');
+    }
+    monthdays = serializeMonthdays(parseMonthdays(input.monthdays ?? ''));
+  } else if (input.weekdays) {
+    if (!isValidWeekdays(input.weekdays)) throw new BadRequestError('invalid_weekdays', 'weekdays inválido');
+    weekdays = input.weekdays;
+  }
+
   const file = input.fileId ?? null;
   const id = crypto.randomUUID();
   await getDb().execute({
-    sql: `INSERT INTO recurring_rules (id, user_id, name, file, weekdays, active, created_at)
-          VALUES (?, ?, ?, ?, ?, 1, ?)`,
-    args: [id, userId, name, file, weekdays, new Date().toISOString()],
+    sql: `INSERT INTO recurring_rules (id, user_id, name, file, freq, weekdays, monthdays, active, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    args: [id, userId, name, file, freq, weekdays, monthdays, new Date().toISOString()],
   });
-  return { id, name, file, weekdays, active: true };
+  return { id, name, file, active: true, freq, weekdays, monthdays: monthdays ?? '' };
 }
 
 async function updateRecurringRule(input: UpdateRecurringRuleInput): Promise<RecurringRule> {
@@ -1418,10 +1439,24 @@ async function updateRecurringRule(input: UpdateRecurringRuleInput): Promise<Rec
     sets.push('name = ?');
     args.push(n);
   }
+  if (input.freq !== undefined) {
+    if (input.freq !== 'weekly' && input.freq !== 'monthly') {
+      throw new BadRequestError('invalid_freq', "freq debe ser 'weekly' o 'monthly'");
+    }
+    sets.push('freq = ?');
+    args.push(input.freq);
+  }
   if (input.weekdays !== undefined) {
-    if (!WEEKDAYS_RE.test(input.weekdays)) throw new BadRequestError('invalid_weekdays', 'weekdays inválido');
+    if (!isValidWeekdays(input.weekdays)) throw new BadRequestError('invalid_weekdays', 'weekdays inválido');
     sets.push('weekdays = ?');
     args.push(input.weekdays);
+  }
+  if (input.monthdays !== undefined) {
+    if (!isValidMonthdays(input.monthdays)) {
+      throw new BadRequestError('invalid_monthdays', 'monthdays debe ser una lista de días 1..31 (o -1)');
+    }
+    sets.push('monthdays = ?');
+    args.push(serializeMonthdays(parseMonthdays(input.monthdays)));
   }
   if (input.active !== undefined) {
     sets.push('active = ?');
@@ -1499,9 +1534,10 @@ async function applyRulesToWeek(
   weekStart: string,
   file: string | null
 ): Promise<{ added: number }> {
-  // Materializa Lun–Dom siempre: las reglas de fin de semana son opt-in (hay
-  // que marcar S/D en la regla), y `recurring_runs` cierra la semana una sola
-  // vez — no habría segunda pasada si el usuario activa el finde después.
+  // Materializa Lun–Dom siempre: las reglas de fin de semana (o las mensuales
+  // que caen sábado/domingo) son opt-in, y `recurring_runs` cierra la semana
+  // una sola vez — no habría segunda pasada si el usuario activa el finde
+  // después. `ruleFiresOn` decide, por día, si cada regla aplica.
   const dates = weekDates(weekStart, true);
   const lastDate = dates[dates.length - 1];
   const f = fileFilter(file ?? undefined);
@@ -1543,11 +1579,10 @@ async function applyRulesToWeek(
   const inserts: { sql: string; args: InValue[] }[] = [];
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
-    const weekday = String(i + 1); // 1(Lun)..7(Dom), coincide con el CSV de la regla
     const have = namesByDate.get(date) ?? new Set<string>();
     let order = maxOrderByDate.get(date) ?? 0;
     for (const rule of rules) {
-      if (!rule.weekdays.split(',').includes(weekday)) continue;
+      if (!ruleFiresOn(rule, date)) continue;
       const key = normalize(rule.name);
       if (have.has(key)) continue;
       have.add(key);

@@ -7,7 +7,7 @@ import {
   updateRecurringRule,
   UnauthorizedError,
 } from '../api';
-import type { RecurringRule } from '../types';
+import type { RecurringFreq, RecurringRule } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 
 const DAYS: { n: string; label: string }[] = [
@@ -20,8 +20,17 @@ const DAYS: { n: string; label: string }[] = [
   { n: '7', label: 'D' },
 ];
 
-function weekdaysSummary(csv: string): string {
-  const set = new Set(csv.split(','));
+const MONTHDAYS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+function ruleSummary(rule: RecurringRule): string {
+  if (rule.freq === 'monthly') {
+    const days = rule.monthdays.split(',').filter(Boolean);
+    if (days.length === 0) return 'sin días';
+    return days
+      .map((d) => (d === '-1' ? 'último día' : `día ${d}`))
+      .join(', ');
+  }
+  const set = new Set(rule.weekdays.split(','));
   if (['1', '2', '3', '4', '5'].every((d) => set.has(d)) && set.size === 5) return 'Lun–Vie';
   return DAYS.filter((d) => set.has(d.n))
     .map((d) => d.label)
@@ -128,21 +137,44 @@ export default function RecurringTasksDialog({
     }
   }
 
-  async function toggleDay(rule: RecurringRule, day: string) {
+  /** Guarda un cambio de recurrencia con optimismo + revertir si falla. */
+  async function patchRule(rule: RecurringRule, patch: Partial<RecurringRule>) {
+    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, ...patch } : r)));
+    setError(null);
+    try {
+      await updateRecurringRule(rule.id, patch);
+    } catch (err) {
+      setRules((prev) => prev.map((r) => (r.id === rule.id ? rule : r))); // revertir
+      setError(errMessage(err, 'No se pudo actualizar la regla'));
+    }
+  }
+
+  function setFreq(rule: RecurringRule, freq: RecurringFreq) {
+    if (rule.freq === freq) return;
+    // Al pasar a mensual sin días elegidos, arrancar en "día 1".
+    const monthdays = freq === 'monthly' && !rule.monthdays ? '1' : rule.monthdays;
+    void patchRule(rule, { freq, monthdays });
+  }
+
+  function toggleDay(rule: RecurringRule, day: string) {
     const set = new Set(rule.weekdays.split(','));
     if (set.has(day)) set.delete(day);
     else set.add(day);
     if (set.size === 0) return; // al menos un día
-    const weekdays = DAYS.filter((d) => set.has(d.n))
-      .map((d) => d.n)
+    const weekdays = DAYS.filter((d) => set.has(d.n)).map((d) => d.n).join(',');
+    void patchRule(rule, { weekdays });
+  }
+
+  function toggleMonthday(rule: RecurringRule, token: string) {
+    const set = new Set(rule.monthdays.split(',').filter(Boolean));
+    if (set.has(token)) set.delete(token);
+    else set.add(token);
+    if (set.size === 0) return; // al menos un día
+    const monthdays = [...set]
+      .map(Number)
+      .sort((a, b) => a - b)
       .join(',');
-    setRules((prev) => prev.map((r) => (r.id === rule.id ? { ...r, weekdays } : r)));
-    try {
-      await updateRecurringRule(rule.id, { weekdays });
-    } catch (err) {
-      setRules((prev) => prev.map((r) => (r.id === rule.id ? rule : r))); // revertir
-      setError(errMessage(err, 'No se pudo actualizar los días'));
-    }
+    void patchRule(rule, { monthdays });
   }
 
   async function confirmDelete() {
@@ -186,8 +218,9 @@ export default function RecurringTasksDialog({
       >
         <h2 id="recurring-title">Tareas recurrentes</h2>
         <p className="muted">
-          Se agregan solas a cada semana nueva, en los días marcados. Si creás una regla a mitad de
-          semana, usá «Aplicar» para traerla a la semana visible.
+          Se agregan solas a cada semana nueva: las semanales en los días marcados, las mensuales en
+          los días del mes elegidos. Si creás una regla a mitad de semana, usá «Aplicar» para traerla
+          a la semana visible.
         </p>
 
         {loading ? (
@@ -233,46 +266,99 @@ export default function RecurringTasksDialog({
                       </div>
                     ) : (
                       <>
-                        <span className="recurring-text">{rule.name}</span>
-                        <div className="recurring-days" title={weekdaysSummary(rule.weekdays)}>
-                          {DAYS.map((d) => (
+                        <div className="recurring-row-top">
+                          <span className="recurring-text">{rule.name}</span>
+
+                          <div className="segmented recurring-freq">
                             <button
-                              key={d.n}
+                              type="button"
+                              className={rule.freq === 'weekly' ? 'is-active' : undefined}
+                              onClick={() => setFreq(rule, 'weekly')}
+                            >
+                              Semanal
+                            </button>
+                            <button
+                              type="button"
+                              className={rule.freq === 'monthly' ? 'is-active' : undefined}
+                              onClick={() => setFreq(rule, 'monthly')}
+                            >
+                              Mensual
+                            </button>
+                          </div>
+
+                          <div className="recurring-actions">
+                            <button
+                              type="button"
+                              className="task-move"
+                              onClick={() => startEdit(rule)}
+                              disabled={busy}
+                              aria-label="Editar"
+                              title="Editar"
+                            >
+                              ✎
+                            </button>
+                            <button
+                              type="button"
+                              className="task-delete"
+                              onClick={() => setPendingDelete(rule)}
+                              disabled={busy}
+                              aria-label="Eliminar"
+                              title="Eliminar"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+
+                        {rule.freq === 'weekly' ? (
+                          <div className="recurring-days" title={ruleSummary(rule)}>
+                            {DAYS.map((d) => (
+                              <button
+                                key={d.n}
+                                type="button"
+                                className={
+                                  rule.weekdays.split(',').includes(d.n)
+                                    ? 'recurring-day on'
+                                    : 'recurring-day'
+                                }
+                                onClick={() => toggleDay(rule, d.n)}
+                                aria-label={`Día ${d.label}`}
+                              >
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="recurring-monthdays" title={ruleSummary(rule)}>
+                            {MONTHDAYS.map((n) => (
+                              <button
+                                key={n}
+                                type="button"
+                                className={
+                                  rule.monthdays.split(',').includes(String(n))
+                                    ? 'recurring-monthday on'
+                                    : 'recurring-monthday'
+                                }
+                                onClick={() => toggleMonthday(rule, String(n))}
+                                aria-label={`Día ${n} del mes`}
+                              >
+                                {n}
+                              </button>
+                            ))}
+                            <button
                               type="button"
                               className={
-                                rule.weekdays.split(',').includes(d.n)
-                                  ? 'recurring-day on'
-                                  : 'recurring-day'
+                                rule.monthdays.split(',').includes('-1')
+                                  ? 'recurring-monthday is-last on'
+                                  : 'recurring-monthday is-last'
                               }
-                              onClick={() => void toggleDay(rule, d.n)}
-                              aria-label={`Día ${d.label}`}
+                              onClick={() => toggleMonthday(rule, '-1')}
+                              title="El último día de cada mes"
                             >
-                              {d.label}
+                              Últ.
                             </button>
-                          ))}
-                        </div>
-                        <div className="recurring-actions">
-                          <button
-                            type="button"
-                            className="task-move"
-                            onClick={() => startEdit(rule)}
-                            disabled={busy}
-                            aria-label="Editar"
-                            title="Editar"
-                          >
-                            ✎
-                          </button>
-                          <button
-                            type="button"
-                            className="task-delete"
-                            onClick={() => setPendingDelete(rule)}
-                            disabled={busy}
-                            aria-label="Eliminar"
-                            title="Eliminar"
-                          >
-                            ×
-                          </button>
-                        </div>
+                          </div>
+                        )}
                       </>
                     )}
                   </li>

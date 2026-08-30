@@ -175,13 +175,19 @@ export type EstimateAccuracy = {
   suggestedFactor: number;
 };
 
+export type RecurringFreq = 'weekly' | 'monthly';
+
 export type RecurringRule = {
   id: string;
   name: string;
   file: string | null;
+  active: boolean;
+  /** 'weekly' usa `weekdays`; 'monthly' usa `monthdays`. */
+  freq: RecurringFreq;
   /** CSV de días 1(Lun)..7(Dom). */
   weekdays: string;
-  active: boolean;
+  /** CSV de días del mes 1..31, más `-1` = último día. '' si la regla es weekly. */
+  monthdays: string;
 };
 
 export type DayTemplateItem = {

@@ -13,7 +13,9 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         action?: string;
         id?: string;
         name?: string;
+        freq?: string;
         weekdays?: string;
+        monthdays?: string;
         active?: boolean;
         week?: string;
         file?: string;
@@ -22,8 +24,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         case 'create': {
           const rule = await sqliteStore.createRecurringRule({
             name: body.name,
-            weekdays: body.weekdays,
             fileId: body.file,
+            freq: body.freq,
+            weekdays: body.weekdays,
+            monthdays: body.monthdays,
           });
           return res.status(200).json({ ok: true, rule });
         }
@@ -31,8 +35,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
           const rule = await sqliteStore.updateRecurringRule({
             id: body.id,
             name: body.name,
-            weekdays: body.weekdays,
             active: body.active,
+            freq: body.freq,
+            weekdays: body.weekdays,
+            monthdays: body.monthdays,
           });
           return res.status(200).json({ ok: true, rule });
         }
