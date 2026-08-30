@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   bulkTasks,
   carryOverToToday,
@@ -62,6 +62,9 @@ import { useNotificationSetting } from './useNotificationSetting';
 import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
 import { usePomodoroSetting } from './usePomodoroSetting';
+import { readFileOrder, useFileOrder } from './useFileOrder';
+import { orderFiles } from './fileOrder';
+import ContextOrderDialog from './components/ContextOrderDialog';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
@@ -165,6 +168,9 @@ export default function App() {
   // Selector de archivo (Trabajo/Casa/…). Vacío si el usuario no tiene
   // tareas con `file` → modo de un solo contexto, el selector no aparece.
   const [files, setFiles] = useState<FileEntry[]>([]);
+  const [fileOrder, setFileOrder] = useFileOrder();
+  const orderedFiles = useMemo(() => orderFiles(files, fileOrder), [files, fileOrder]);
+  const [showContextOrder, setShowContextOrder] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const selectedFileIdRef = useRef<string | null>(null);
   const filesLoadedRef = useRef(false);
@@ -210,7 +216,8 @@ export default function App() {
         setFiles(filesRes.files);
         if (filesRes.files.length > 0 && !fileId) {
           const stored = localStorage.getItem(FILE_STORAGE_KEY);
-          fileId = filesRes.files.find((f) => f.id === stored)?.id ?? filesRes.files[0].id;
+          const ordered = orderFiles(filesRes.files, readFileOrder());
+          fileId = ordered.find((f) => f.id === stored)?.id ?? ordered[0].id;
         }
         if (fileId) {
           setSelectedFileId(fileId);
@@ -872,6 +879,11 @@ export default function App() {
           </div>
           <div className="menu-sep" />
           <MenuItem onClick={() => { setFocusMode(true); close(); }}>Modo foco</MenuItem>
+          {orderedFiles.length > 1 && (
+            <MenuItem onClick={() => { setShowContextOrder(true); close(); }}>
+              Orden de contextos
+            </MenuItem>
+          )}
           <MenuItem onClick={() => { setShowBackup(true); close(); }}>Copia de seguridad</MenuItem>
           {authIsAdmin && (
             <MenuItem onClick={() => { setShowAdmin(true); close(); }}>Aprobar usuarios</MenuItem>
@@ -954,7 +966,7 @@ export default function App() {
       </header>
 
       <FileSelector
-        files={files}
+        files={orderedFiles}
         selectedFileId={selectedFileId}
         onSelectFile={guardedSelectFile}
         loading={loading}
@@ -1204,7 +1216,7 @@ export default function App() {
 
       {showFeeds && (
         <CalendarFeedsDialog
-          files={files}
+          files={orderedFiles}
           onChanged={() => void refresh(data?.selectedDay, data?.week)}
           onClose={() => setShowFeeds(false)}
         />
@@ -1213,6 +1225,15 @@ export default function App() {
       {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
 
       {showBackup && <BackupDialog onClose={() => setShowBackup(false)} />}
+
+      {showContextOrder && (
+        <ContextOrderDialog
+          files={orderedFiles}
+          order={fileOrder}
+          onSave={setFileOrder}
+          onClose={() => setShowContextOrder(false)}
+        />
+      )}
 
       {showTimerSettings && (
         <TimerSettingsDialog
