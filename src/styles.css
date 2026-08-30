@@ -819,6 +819,13 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
+  /* Siempre presente (aunque el día esté vacío) para poder soltar tareas
+     de otros días acá; un poco de alto mínimo para que sea un blanco real. */
+  min-height: 2.5rem;
+}
+
+.task-list-empty {
+  padding: 0.5rem 0.25rem;
 }
 
 .task-item {
@@ -849,10 +856,67 @@ h3 {
   opacity: 0.6;
 }
 
-.task-list li.drag-over {
+/* --- Arrastrar y soltar (pointer events, ver src/drag/) --- */
+
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.task-item.is-draggable {
+  cursor: grab;
+}
+
+/* La fila / nota que se está arrastrando queda atenuada en su lugar. */
+.task-list li.is-drag-src,
+.inbox-item.is-drag-src {
+  opacity: 0.4;
+}
+
+/* Zona de drop válida bajo el puntero. */
+[data-drop-state='hot'] {
   outline: 2px dashed var(--color-accent);
   outline-offset: 2px;
   border-radius: 14px;
+}
+
+.day-tab[data-drop-state='hot'] {
+  outline-offset: 3px;
+}
+
+.inbox[data-drop-state='hot'] {
+  outline-offset: 4px;
+}
+
+/* Zona bajo el puntero que NO acepta lo que se arrastra (p. ej. una tarea
+   con tiempo registrado sobre el inbox). */
+[data-drop-state='reject'] {
+  outline: 2px dashed var(--color-destructive);
+  outline-offset: 2px;
+  border-radius: 14px;
+}
+
+/* El "fantasma" que sigue al puntero mientras se arrastra. */
+.drag-ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: 15rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  color: var(--color-label);
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-separator);
+  opacity: 0.95;
 }
 
 .task-select {

@@ -81,6 +81,7 @@ export default function DaySelector({
             onClick={() => onSelectDay(day)}
             disabled={loading}
             type="button"
+            data-drag-zone={`day:${day}`}
           >
             {day}
           </button>

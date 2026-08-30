@@ -46,6 +46,8 @@ import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
+import DragProvider from './drag/DragProvider';
+import { computeReorderTarget, type DragItem, type DropZone } from './drag/dnd';
 import { loadActiveTimer } from './timerStorage';
 import { dueBannerText } from './dueReminders';
 import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
@@ -548,6 +550,56 @@ export default function App() {
     }
   }
 
+  // --- Arrastrar y soltar (pointer events, ver src/drag/) ---
+
+  const canDrop = useCallback(
+    (item: DragItem, zone: DropZone): boolean => {
+      if (!data) return false;
+      if (zone.kind === 'day') {
+        const col = data.days.find((d) => d.day === zone.day);
+        if (!col) return false;
+        // Una tarea del día no se "mueve" a su propio día.
+        return !(item.kind === 'task' && col.day === data.selectedDay);
+      }
+      return true;
+    },
+    [data]
+  );
+
+  const handleDrop = useCallback(
+    (item: DragItem, zone: DropZone) => {
+      if (!data) return;
+      const task = item.task;
+
+      if (zone.kind === 'day') {
+        const col = data.days.find((d) => d.day === zone.day);
+        if (!col) return;
+        if (item.kind === 'task') void handleMoveTask(task, { date: col.date, destLabel: col.day });
+        else void handleScheduleTask(task, col.date);
+        return;
+      }
+
+      if (zone.kind === 'inbox') {
+        if (item.kind === 'task' && task.sessions.length === 0) void handleSendToInbox(task);
+        return;
+      }
+
+      // row | list-end
+      if (item.kind === 'inbox') {
+        void handleScheduleTask(task, data.selectedDate);
+        return;
+      }
+      const fromIndex = data.tasks.findIndex((t) => t.id === task.id);
+      if (fromIndex === -1) return;
+      const targetIndex =
+        zone.kind === 'list-end'
+          ? data.tasks.length - 1
+          : computeReorderTarget(fromIndex, zone.index, zone.after);
+      void handleReorderTask(task, targetIndex);
+    },
+    [data]
+  );
+
   function handleToggleWeekend() {
     const next = !showWeekend;
     toggleWeekend();
@@ -863,6 +915,7 @@ export default function App() {
   }
 
   return (
+    <DragProvider canDrop={canDrop} onDrop={handleDrop}>
     <div className={focusMode ? 'app app--focus' : 'app'}>
       {focusMode && (
         <button
@@ -959,12 +1012,10 @@ export default function App() {
 
           <Inbox
             tasks={data.inbox}
-            days={data.days}
             fileId={selectedFileId}
             onCreated={handleInboxCreated}
             onDeleted={handleInboxDeleted}
             onTextUpdated={handleInboxTextUpdated}
-            onSchedule={(task, date) => void handleScheduleTask(task, date)}
           />
 
           <DayNote
@@ -1024,10 +1075,8 @@ export default function App() {
                 onToggleDone={(task) => void handleToggleDone(task)}
                 togglingIds={togglingIds}
                 onSessionDeleted={handleSessionDeleted}
-                selectedDay={data.selectedDay}
                 selectedDate={data.selectedDate}
                 today={data.today}
-                days={data.days}
                 previousWeekLabel={data.previousWeekLabel}
                 nextWeekLabel={data.nextWeekLabel}
                 fileId={selectedFileId}
@@ -1043,7 +1092,6 @@ export default function App() {
                 onTaskDeleted={handleTaskDeleted}
                 onTaskTextUpdated={handleTaskTextUpdated}
                 onTaskUpdated={handleTaskUpdated}
-                onReorderTask={(task, targetIndex) => void handleReorderTask(task, targetIndex)}
                 onMoveTask={(task, target) => void handleMoveTask(task, target)}
                 onSendToInbox={(task) => void handleSendToInbox(task)}
                 onSessionUpdated={handleSessionUpdated}
@@ -1208,5 +1256,6 @@ export default function App() {
         />
       )}
     </div>
+    </DragProvider>
   );
 }

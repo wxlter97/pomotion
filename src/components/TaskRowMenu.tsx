@@ -23,28 +23,18 @@ type View = 'root' | 'move';
  */
 export default function TaskRowMenu({
   onEdit,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
   onDelete,
   onSendToInbox,
   onStartSelect,
   disabled,
   editDisabled,
   isSet,
-  currentDay,
-  days,
   previousWeekLabel,
   nextWeekLabel,
   fileId,
   onMove,
 }: {
   onEdit: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
   onDelete: () => void;
   /** Sacar la tarea de la agenda (→ inbox). Ausente = no se ofrece
    *  (p. ej. la tarea ya tiene tiempo registrado). */
@@ -57,8 +47,6 @@ export default function TaskRowMenu({
   editDisabled: boolean;
   /** La tarea tiene prioridad/notas/vencimiento → marca el disparador. */
   isSet: boolean;
-  currentDay: string | null;
-  days: DayColumn[];
   previousWeekLabel: string | null;
   nextWeekLabel: string | null;
   fileId: string | null;
@@ -118,8 +106,9 @@ export default function TaskRowMenu({
     close();
   }
 
-  const sameWeekTargets = movableTargets(days, currentDay);
-  const canMove = sameWeekTargets.length > 0 || Boolean(previousWeekLabel) || Boolean(nextWeekLabel);
+  // Dentro de la semana visible se mueve arrastrando a la pestaña del día;
+  // el menú solo cubre lo que el arrastre no puede: saltar a otra semana.
+  const canMove = Boolean(previousWeekLabel) || Boolean(nextWeekLabel);
 
   return (
     <div className="move-menu-wrap" ref={wrapRef}>
@@ -169,19 +158,7 @@ export default function TaskRowMenu({
                 >
                   ‹ Volver
                 </button>
-                <div className="move-menu-heading">Mover a…</div>
-                {sameWeekTargets.map((d) => (
-                  <button
-                    key={d.date}
-                    type="button"
-                    className="move-menu-item"
-                    role="menuitem"
-                    onClick={() => pick(d)}
-                  >
-                    {d.day}
-                  </button>
-                ))}
-                {(previousWeekLabel || nextWeekLabel) && <div className="move-menu-sep" />}
+                <div className="move-menu-heading">Mover a otra semana…</div>
                 {previousWeekLabel && (
                   <button
                     type="button"
@@ -216,24 +193,6 @@ export default function TaskRowMenu({
               >
                 Editar
               </button>
-              <button
-                type="button"
-                className="move-menu-item"
-                role="menuitem"
-                onClick={() => run(onMoveUp)}
-                disabled={disabled || !canMoveUp}
-              >
-                Subir
-              </button>
-              <button
-                type="button"
-                className="move-menu-item"
-                role="menuitem"
-                onClick={() => run(onMoveDown)}
-                disabled={disabled || !canMoveDown}
-              >
-                Bajar
-              </button>
               <div className="move-menu-sep" />
               <button
                 type="button"
@@ -252,7 +211,7 @@ export default function TaskRowMenu({
                   onClick={() => setView('move')}
                   disabled={disabled}
                 >
-                  Mover a otro día…
+                  Mover a otra semana…
                 </button>
               )}
               {onSendToInbox && (
