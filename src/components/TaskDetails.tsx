@@ -1,8 +1,16 @@
 import { useState } from 'react';
 import { updateTaskFields, UnauthorizedError } from '../api';
+import {
+  addChecklistItem,
+  CHECKLIST_MAX_ITEMS,
+  CHECKLIST_TEXT_MAX,
+  checklistLabel,
+  removeChecklistItem,
+  toggleChecklistItem,
+} from '../checklist';
 import { estimateLabel, parseEstimateMinutes, PRIORITY_OPTIONS } from '../taskMeta';
 import { tagColorOf } from '../tags';
-import type { Tag, Task, TaskPriority } from '../types';
+import type { ChecklistItem, Tag, Task, TaskPriority } from '../types';
 
 type Fields = {
   priority?: TaskPriority | null;
@@ -10,6 +18,7 @@ type Fields = {
   due?: string | null;
   estimateMinutes?: number | null;
   tagIds?: string[];
+  checklist?: ChecklistItem[];
 };
 
 /** Panel expandible bajo una tarea: prioridad, estimación, vencimiento,
@@ -29,6 +38,7 @@ export default function TaskDetails({
 }) {
   const [notes, setNotes] = useState(task.notes ?? '');
   const [estimate, setEstimate] = useState(estimateLabel(task.estimateMinutes));
+  const [newStep, setNewStep] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +83,18 @@ export default function TaskDetails({
     else setError(null);
   }
 
+  function commitStep() {
+    const next = addChecklistItem(task.checklist, newStep);
+    if (next === task.checklist) {
+      setNewStep('');
+      return;
+    }
+    setNewStep('');
+    void save({ checklist: next });
+  }
+
+  const checklist = task.checklist;
+  const checklistText = checklistLabel(checklist);
   const busy = disabled || saving;
 
   return (
@@ -180,6 +202,62 @@ export default function TaskDetails({
             Quitar
           </button>
         )}
+      </div>
+
+      <div className="task-details-row task-checklist-row">
+        <span className="task-details-label">
+          Pasos{checklistText ? ` · ${checklistText}` : ''}
+        </span>
+        <div className="task-checklist">
+          {checklist.length > 0 && (
+            <ul className="task-checklist-list">
+              {checklist.map((item) => (
+                <li key={item.id} className={item.done ? 'is-done' : undefined}>
+                  <button
+                    type="button"
+                    className={item.done ? 'task-check checked' : 'task-check'}
+                    onClick={() => void save({ checklist: toggleChecklistItem(checklist, item.id) })}
+                    disabled={busy}
+                    aria-label={item.done ? 'Marcar como pendiente' : 'Marcar como hecho'}
+                  >
+                    {item.done ? '✓' : ''}
+                  </button>
+                  <span className="task-checklist-text">{item.text}</span>
+                  <button
+                    type="button"
+                    className="task-checklist-del"
+                    onClick={() => void save({ checklist: removeChecklistItem(checklist, item.id) })}
+                    disabled={busy}
+                    aria-label="Quitar paso"
+                    title="Quitar paso"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {checklist.length < CHECKLIST_MAX_ITEMS && (
+            <input
+              type="text"
+              className="task-checklist-input"
+              placeholder="Agregar paso…"
+              maxLength={CHECKLIST_TEXT_MAX}
+              value={newStep}
+              onChange={(e) => setNewStep(e.target.value)}
+              onBlur={commitStep}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitStep();
+                } else if (e.key === 'Escape') {
+                  setNewStep('');
+                }
+              }}
+              disabled={busy}
+            />
+          )}
+        </div>
       </div>
 
       <textarea

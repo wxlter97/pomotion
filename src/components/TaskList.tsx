@@ -25,6 +25,7 @@ import {
   taskAgeTitle,
   taskTimeSummary,
 } from '../taskMeta';
+import { checklistLabel } from '../checklist';
 import { resolveTags, tagColorOf } from '../tags';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
@@ -397,6 +398,8 @@ export default function TaskList({
             const total = sumSeconds(task);
             const timeSummary = taskTimeSummary(total, task.estimateMinutes);
             const taskTags = resolveTags(task.tagIds, allTags);
+            const checklistText = checklistLabel(task.checklist);
+            const checklistDone = task.checklist.length > 0 && task.checklist.every((c) => c.done);
             // Chip de "lleva mucho abierta": solo en tareas sin hacer y que no
             // sean de un día futuro (planificar a futuro no es estar estancado).
             const ageLabel =
@@ -530,6 +533,14 @@ export default function TaskList({
 
                   {!isEditingText && (
                     <div className="task-item-trailing">
+                      {checklistText && (
+                        <span
+                          className={checklistDone ? 'task-checklist-chip is-done' : 'task-checklist-chip'}
+                          title="Pasos completados"
+                        >
+                          ☑ {checklistText}
+                        </span>
+                      )}
                       {ageLabel && (
                         <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today)}>
                           {ageLabel}
@@ -577,7 +588,8 @@ export default function TaskList({
                             task.notes ||
                             task.due ||
                             task.estimateMinutes != null ||
-                            task.tagIds.length > 0
+                            task.tagIds.length > 0 ||
+                            task.checklist.length > 0
                         )}
                         currentDay={selectedDay}
                         days={days}

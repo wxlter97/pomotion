@@ -11,6 +11,8 @@
 
 import type { Analytics } from './analytics.js';
 export type { Analytics } from './analytics.js';
+import type { ChecklistItem } from './checklist.js';
+export type { ChecklistItem } from './checklist.js';
 
 export type Session = {
   id: string;
@@ -47,6 +49,8 @@ export type Task = {
   source: TaskSource;
   /** ISO-8601 de cuándo se creó la fila (para el chip de "edad"). */
   createdAt: string;
+  /** Pasos marcables de la tarea (sin tiempo propio). Lista vacía = sin checklist. */
+  checklist: ChecklistItem[];
   sessions: Session[];
 };
 
@@ -275,6 +279,8 @@ export type UpdateTaskInput = {
   estimateMinutes?: number | null;
   /** Reemplaza el conjunto completo de etiquetas de la tarea. */
   tagIds?: string[];
+  /** Reemplaza el checklist completo de la tarea (lista vacía lo borra). */
+  checklist?: unknown;
 };
 
 export type CreateTagInput = { name?: string; color?: string };
@@ -383,6 +389,7 @@ export type UpdateTaskResult = {
   due?: string | null;
   estimateMinutes?: number | null;
   tagIds?: string[];
+  checklist?: ChecklistItem[];
 };
 
 export interface TaskStore {

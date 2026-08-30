@@ -1039,6 +1039,23 @@ h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* Progreso del checklist en la fila: "☑ 2/5". Tenue como el chip de edad. */
+.task-checklist-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-label-secondary);
+  background: var(--color-fill-strong);
+  border-radius: 980px;
+  padding: 0.1rem 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.task-checklist-chip.is-done {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+
 .task-details {
   margin: 0.35rem 0 0.55rem 2.6rem;
   display: flex;
@@ -1125,6 +1142,70 @@ h3 {
 .task-due-input:focus,
 .task-estimate-input:focus,
 .task-notes-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Editor de pasos / checklist dentro de TaskDetails. */
+.task-checklist {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.task-checklist-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.task-checklist-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.task-checklist-list .task-check {
+  width: 1.15rem;
+  height: 1.15rem;
+  font-size: 0.62rem;
+}
+.task-checklist-text {
+  flex: 1;
+  font-size: 0.86rem;
+  color: var(--color-label);
+  word-break: break-word;
+}
+.task-checklist-list li.is-done .task-checklist-text {
+  text-decoration: line-through;
+  color: var(--color-label-secondary);
+}
+.task-checklist-del {
+  border: none;
+  background: none;
+  color: var(--color-label-secondary);
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.2rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.task-checklist-del:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.task-checklist-input {
+  font-family: inherit;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-separator);
+  color: var(--color-label);
+  border-radius: 8px;
+  font-size: 0.84rem;
+  padding: 0.3rem 0.5rem;
+  width: 100%;
+}
+.task-checklist-input:focus {
   outline: none;
   border-color: var(--color-accent);
 }
