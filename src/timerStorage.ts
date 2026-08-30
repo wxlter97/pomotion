@@ -21,6 +21,10 @@ export type PersistedTimer = {
   phase: Exclude<TimerPhase, 'idle'>;
   startedAt: number; // epoch ms
   date: string;
+  /** Pomodoros de foco completados en el ciclo actual (para el descanso largo). */
+  completedPomodoros?: number;
+  /** El descanso en curso es el largo. */
+  breakIsLong?: boolean;
 };
 
 function isSameCalendarDay(a: Date, b: Date): boolean {

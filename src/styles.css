@@ -2572,6 +2572,77 @@ h3 {
   color: var(--color-label);
 }
 
+/* --- Timer settings dialog --- */
+.sheet--timer {
+  max-width: 380px;
+}
+
+.timer-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.timer-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.timer-field-label {
+  font-size: 0.88rem;
+  color: var(--color-label);
+}
+
+.timer-field-hint {
+  color: var(--color-label-secondary);
+  font-size: 0.78rem;
+}
+
+.timer-field input {
+  width: 4.5rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: right;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 8px;
+  padding: 0.3rem 0.5rem;
+}
+
+.timer-field input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.timer-field input:disabled {
+  opacity: 0.5;
+}
+
+.timer-note {
+  margin: -0.4rem 0 1rem;
+  font-size: 0.78rem;
+}
+
+.timer-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--color-label);
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.timer-toggle input {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+  accent-color: var(--color-accent);
+}
+
 /* --- Month view --- */
 .sheet--month {
   max-width: 460px;

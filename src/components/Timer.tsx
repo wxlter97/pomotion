@@ -5,11 +5,10 @@ import { notifyPhaseChange } from '../notify';
 import { playChime, unlockAudio } from '../sound';
 import { clearActiveTimer, loadActiveTimer, saveActiveTimer } from '../timerStorage';
 import { overrunElapsedHours, shouldWarnOverrun } from '../timerOverrun';
+import { isLongBreakDue, type TimerSettings } from '../timerSettings';
 import type { Session, Task, TimerMode, TimerPhase } from '../types';
 import ProgressRing from './ProgressRing';
 
-const WORK_MS = 25 * 60 * 1000;
-const BREAK_MS = 5 * 60 * 1000;
 const MIN_LOGGABLE_MS = 30 * 1000; // ignora arranques accidentales de <30s
 
 function formatClock(ms: number): string {
@@ -29,18 +28,34 @@ const Timer = forwardRef<
   TimerHandle,
   {
     task: Task | null;
+    settings: TimerSettings;
     onSessionLogged: (taskId: string, session: Session) => void;
     onPhaseChange?: (phase: TimerPhase) => void;
     soundsEnabled: boolean;
     notificationsEnabled: boolean;
   }
->(function Timer({ task, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled }, ref) {
+>(function Timer(
+  { task, settings, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled },
+  ref
+) {
   const [mode, setMode] = useState<TimerMode>('pomodoro');
   const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Ciclo pomodoro → descanso largo.
+  const [completedPomodoros, setCompletedPomodoros] = useState(0);
+  const [breakIsLong, setBreakIsLong] = useState(false);
+
+  const WORK_MS = settings.workMinutes * 60 * 1000;
+  const BREAK_MS = (breakIsLong ? settings.longBreakMinutes : settings.shortBreakMinutes) * 60 * 1000;
+
+  // Los callbacks del temporizador leen valores frescos sin re-suscribir efectos.
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const completedRef = useRef(completedPomodoros);
+  completedRef.current = completedPomodoros;
   // Última marca horaria del aviso de "timer olvidado" que el usuario ya
   // ignoró — se resetea al detener o cambiar de tarea.
   const [overrunAckHours, setOverrunAckHours] = useState(0);
@@ -59,6 +74,8 @@ const Timer = forwardRef<
       setMode(persisted.mode);
       setPhase(persisted.phase);
       setStartedAt(persisted.startedAt);
+      setCompletedPomodoros(persisted.completedPomodoros ?? 0);
+      setBreakIsLong(persisted.breakIsLong ?? false);
       setNow(Date.now());
     }
   }, [task]);
@@ -88,11 +105,13 @@ const Timer = forwardRef<
         phase,
         startedAt,
         date: task.date ?? '',
+        completedPomodoros,
+        breakIsLong,
       });
     } else if (phase === 'idle') {
       clearActiveTimer();
     }
-  }, [task, phase, startedAt, mode]);
+  }, [task, phase, startedAt, mode, completedPomodoros, breakIsLong]);
 
   // Título de la pestaña con el countdown, para ver el progreso sin cambiar de tab.
   useEffect(() => {
@@ -154,6 +173,10 @@ const Timer = forwardRef<
     if (mode === 'pomodoro' && natural) {
       if (soundsEnabled) playChime('work-done');
       if (notificationsEnabled) notifyPhaseChange('work-done');
+      const done = completedRef.current + 1;
+      const long = isLongBreakDue(done, settingsRef.current.longBreakEvery);
+      setBreakIsLong(long);
+      setCompletedPomodoros(long ? 0 : done);
       setPhase('break');
       setStartedAt(Date.now());
     } else {
@@ -171,8 +194,15 @@ const Timer = forwardRef<
     } else if (mode === 'pomodoro' && phase === 'break' && elapsed >= BREAK_MS) {
       if (soundsEnabled) playChime('break-done');
       if (notificationsEnabled) notifyPhaseChange('break-done');
-      setPhase('idle');
-      setStartedAt(null);
+      if (settingsRef.current.autoStartNext && taskRef.current) {
+        setBreakIsLong(false);
+        setOverrunAckHours(0);
+        setPhase('work');
+        setStartedAt(Date.now());
+      } else {
+        setPhase('idle');
+        setStartedAt(null);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, phase, mode, startedAt]);
@@ -182,6 +212,8 @@ const Timer = forwardRef<
     unlockAudio(); // gesto real del usuario: deja el audio listo para el chime automático de más tarde
     setError(null);
     setOverrunAckHours(0);
+    setCompletedPomodoros(0);
+    setBreakIsLong(false);
     setPhase('work');
     setStartedAt(Date.now());
     setNow(Date.now());
@@ -245,7 +277,7 @@ const Timer = forwardRef<
       <p className="timer-phase-label">
         {phase === 'idle' && (task ? 'Listo para iniciar' : 'Selecciona una tarea')}
         {phase === 'work' && (task ? task.name : 'Trabajando')}
-        {phase === 'break' && 'Descanso'}
+        {phase === 'break' && (breakIsLong ? 'Descanso largo' : 'Descanso')}
       </p>
 
       {showOverrunWarning && (
