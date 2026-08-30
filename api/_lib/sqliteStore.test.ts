@@ -452,6 +452,94 @@ describe('updateTaskPosition (mover entre días)', () => {
   });
 });
 
+describe('bulkTasks (acciones en lote)', () => {
+  async function three(): Promise<string[]> {
+    return as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'B' });
+      const c = await sqliteStore.createTask({ date: '2026-08-24', text: 'C' });
+      return [a.id, b.id, c.id];
+    });
+  }
+  const lunes = () =>
+    as(USER, () => sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' }));
+
+  it('complete marca todas hechas', async () => {
+    const [a, b] = await three();
+    const res = await as(USER, () => sqliteStore.bulkTasks({ op: 'complete', ids: [a, b] }));
+    expect(res).toEqual({ affected: 2, skipped: 0 });
+    const view = await lunes();
+    expect(view.tasks.filter((t) => t.done).map((t) => t.name).sort()).toEqual(['A', 'B']);
+  });
+
+  it('move manda las tareas a otro día y arrastra sus sesiones', async () => {
+    const [a, b, c] = await three();
+    await as(USER, () =>
+      sqliteStore.logSession({ taskId: a, durationSeconds: 600, start: '09:00', end: '09:10' })
+    );
+    const res = await as(USER, () =>
+      sqliteStore.bulkTasks({ op: 'move', ids: [a, b, c], date: '2026-08-26' })
+    );
+    expect(res.affected).toBe(3);
+    expect((await lunes()).tasks).toHaveLength(0);
+    const miercoles = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(miercoles.tasks.map((t) => t.name)).toEqual(['A', 'B', 'C']);
+    expect(miercoles.tasks[0].sessions[0].durationSeconds).toBe(600);
+  });
+
+  it('add_tag agrega la etiqueta a todas (idempotente)', async () => {
+    const [a, b] = await three();
+    const tag = await as(USER, () => sqliteStore.createTag({ name: 'Proyecto', color: 'blue' }));
+    await as(USER, () => sqliteStore.bulkTasks({ op: 'add_tag', ids: [a, b], tagId: tag.id }));
+    await as(USER, () => sqliteStore.bulkTasks({ op: 'add_tag', ids: [a, b], tagId: tag.id }));
+    const view = await lunes();
+    expect(view.tasks.filter((t) => t.tagIds.includes(tag.id)).map((t) => t.name).sort()).toEqual([
+      'A',
+      'B',
+    ]);
+  });
+
+  it('inbox saltea las que tienen tiempo registrado', async () => {
+    const [a, b, c] = await three();
+    await as(USER, () =>
+      sqliteStore.logSession({ taskId: b, durationSeconds: 600, start: '09:00', end: '09:10' })
+    );
+    const res = await as(USER, () => sqliteStore.bulkTasks({ op: 'inbox', ids: [a, b, c] }));
+    expect(res).toEqual({ affected: 2, skipped: 1 });
+    const view = await lunes();
+    expect(view.tasks.map((t) => t.name)).toEqual(['B']);
+    expect(view.inbox.map((t) => t.name).sort()).toEqual(['A', 'C']);
+  });
+
+  it('delete borra tareas y sesiones', async () => {
+    const [a, b, c] = await three();
+    await as(USER, () =>
+      sqliteStore.logSession({ taskId: a, durationSeconds: 600, start: '09:00', end: '09:10' })
+    );
+    await as(USER, () => sqliteStore.bulkTasks({ op: 'delete', ids: [a, b] }));
+    expect((await lunes()).tasks.map((t) => t.name)).toEqual(['C']);
+    expect((await db.execute('SELECT count(*) c FROM work_sessions')).rows[0].c).toBe(0);
+  });
+
+  it('scopea por usuario e ignora ids ajenos', async () => {
+    const [a] = await three();
+    const mine = await as(OTHER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'ajena' }));
+    const res = await as(USER, () => sqliteStore.bulkTasks({ op: 'complete', ids: [a, mine.id] }));
+    expect(res.affected).toBe(1); // solo la propia
+    const otherView = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(otherView.tasks[0].done).toBe(false);
+  });
+
+  it('rechaza op inválida y lista vacía', async () => {
+    await expect(as(USER, () => sqliteStore.bulkTasks({ op: 'nope', ids: ['x'] }))).rejects.toThrow();
+    await expect(as(USER, () => sqliteStore.bulkTasks({ op: 'complete', ids: [] }))).rejects.toThrow();
+  });
+});
+
 describe('carry-over', () => {
   it('trae a hoy las pendientes sin sesiones de días pasados', async () => {
     vi.useFakeTimers();

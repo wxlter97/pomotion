@@ -46,6 +46,8 @@ import type {
   ApplyDayTemplateInput,
   Backup,
   BackupValue,
+  BulkResult,
+  BulkTasksInput,
   ImportResult,
   ApplyRecurringInput,
   CalendarFeed,
@@ -1106,6 +1108,94 @@ async function updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id:
   return { id: input.taskId };
 }
 
+// --- Acciones en lote ---
+
+const BULK_OPS = new Set(['complete', 'reopen', 'move', 'inbox', 'add_tag', 'delete']);
+const BULK_MAX = 200;
+
+async function bulkTasks(input: BulkTasksInput): Promise<BulkResult> {
+  const userId = currentUserId();
+  const db = getDb();
+
+  if (!input.op || !BULK_OPS.has(input.op)) {
+    throw new BadRequestError('invalid_op', 'op debe ser complete/reopen/move/inbox/add_tag/delete');
+  }
+  const ids = [...new Set((Array.isArray(input.ids) ? input.ids : []).filter((x): x is string => typeof x === 'string'))];
+  if (ids.length === 0) throw new BadRequestError('no_tasks', 'No hay tareas seleccionadas');
+  if (ids.length > BULK_MAX) throw new BadRequestError('too_many', `Máximo ${BULK_MAX} tareas por lote`);
+
+  // Solo las tareas que son del usuario (ids ajenos/desconocidos se ignoran),
+  // en su orden visual — importa para 'move'/'inbox', que reordenan al vuelo.
+  const ph = ids.map(() => '?').join(',');
+  const owned = (
+    await db.execute({
+      sql: `SELECT id FROM tasks WHERE user_id = ? AND id IN (${ph}) ORDER BY "order", created_at`,
+      args: [userId, ...ids],
+    })
+  ).rows.map((r) => String(r.id));
+  if (owned.length === 0) throw new NotFoundError('task_not_found', 'Ninguna tarea encontrada');
+
+  const now = new Date().toISOString();
+  const oph = owned.map(() => '?').join(',');
+
+  if (input.op === 'complete' || input.op === 'reopen') {
+    await db.execute({
+      sql: `UPDATE tasks SET done = ?, updated_at = ? WHERE user_id = ? AND id IN (${oph})`,
+      args: [input.op === 'complete' ? 1 : 0, now, userId, ...owned],
+    });
+    return { affected: owned.length, skipped: 0 };
+  }
+
+  if (input.op === 'delete') {
+    await db.batch(
+      [
+        { sql: `DELETE FROM work_sessions WHERE user_id = ? AND task_id IN (${oph})`, args: [userId, ...owned] },
+        { sql: `DELETE FROM task_tags WHERE task_id IN (${oph})`, args: owned },
+        { sql: `DELETE FROM tasks WHERE user_id = ? AND id IN (${oph})`, args: [userId, ...owned] },
+      ],
+      'write'
+    );
+    return { affected: owned.length, skipped: 0 };
+  }
+
+  if (input.op === 'add_tag') {
+    if (!input.tagId) throw new BadRequestError('invalid_tag_id', 'Falta tag_id');
+    const tag = (
+      await db.execute({ sql: 'SELECT id FROM tags WHERE user_id = ? AND id = ?', args: [userId, input.tagId] })
+    ).rows[0];
+    if (!tag) throw new BadRequestError('unknown_tag', 'La etiqueta no existe');
+    await db.batch(
+      owned.map((id) => ({
+        sql: 'INSERT OR IGNORE INTO task_tags (task_id, tag_id) VALUES (?, ?)',
+        args: [id, input.tagId!],
+      })),
+      'write'
+    );
+    return { affected: owned.length, skipped: 0 };
+  }
+
+  if (input.op === 'move') {
+    if (!input.date || !DATE_RE.test(input.date)) {
+      throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD"');
+    }
+    // Reusa updateTaskPosition (guardas + orden fraccional). N es chico.
+    for (const id of owned) await updateTaskPosition({ taskId: id, date: input.date });
+    return { affected: owned.length, skipped: 0 };
+  }
+
+  // op === 'inbox': las tareas con tiempo registrado no pueden ir al inbox.
+  let skipped = 0;
+  for (const id of owned) {
+    try {
+      await updateTaskPosition({ taskId: id, date: null });
+    } catch (err) {
+      if (err instanceof BadRequestError && err.code === 'task_has_sessions') skipped += 1;
+      else throw err;
+    }
+  }
+  return { affected: owned.length - skipped, skipped };
+}
+
 // --- Sesiones ---
 
 async function logSession(input: LogSessionInput): Promise<Session> {
@@ -2108,6 +2198,7 @@ export const sqliteStore: TaskStore = {
   updateTask,
   deleteTask,
   updateTaskPosition,
+  bulkTasks,
   carryOverToToday,
   logSession,
   updateSession,

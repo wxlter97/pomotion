@@ -29,6 +29,7 @@ export default function TaskRowMenu({
   canMoveDown,
   onDelete,
   onSendToInbox,
+  onStartSelect,
   disabled,
   editDisabled,
   isSet,
@@ -48,6 +49,8 @@ export default function TaskRowMenu({
   /** Sacar la tarea de la agenda (→ inbox). Ausente = no se ofrece
    *  (p. ej. la tarea ya tiene tiempo registrado). */
   onSendToInbox?: () => void;
+  /** Entrar en modo selección con esta fila marcada. */
+  onStartSelect: () => void;
   /** Timer corriendo o fila ocupada → bloquea mover/reordenar/eliminar. */
   disabled: boolean;
   /** Fila ocupada → bloquea también editar. */
@@ -230,6 +233,15 @@ export default function TaskRowMenu({
                 disabled={disabled || !canMoveDown}
               >
                 Bajar
+              </button>
+              <div className="move-menu-sep" />
+              <button
+                type="button"
+                className="move-menu-item"
+                role="menuitem"
+                onClick={() => run(onStartSelect)}
+              >
+                Seleccionar varias
               </button>
               {(canMove || onSendToInbox) && <div className="move-menu-sep" />}
               {canMove && (

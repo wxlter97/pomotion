@@ -87,7 +87,18 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         feed_id?: string;
         force?: boolean;
         backup?: unknown;
+        op?: string;
+        ids?: unknown;
       };
+      if (body.action === 'bulk') {
+        const result = await sqliteStore.bulkTasks({
+          op: body.op,
+          ids: body.ids,
+          date: body.date,
+          tagId: body.tag_id ?? undefined,
+        });
+        return res.status(200).json({ ok: true, ...result });
+      }
       if (body.action === 'import') {
         const result = await sqliteStore.importBackup({ backup: body.backup });
         return res.status(200).json({ ok: true, ...result });
