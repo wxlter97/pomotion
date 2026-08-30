@@ -1495,6 +1495,12 @@ body.is-dragging * {
   margin-top: 0.6rem;
 }
 
+/* Dentro de un diálogo el form de "agregar" va seguido de la fila de
+   acciones (Cerrar / Aplicar) — si no, quedan pegados. */
+.sheet .task-add-form {
+  margin-bottom: 1.5rem;
+}
+
 .task-add-form input {
   flex: 1;
   min-width: 0;
