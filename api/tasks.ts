@@ -91,6 +91,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         op?: string;
         ids?: unknown;
         weekend?: boolean;
+        body_text?: string;
       };
       if (body.action === 'bulk') {
         const result = await sqliteStore.bulkTasks({
@@ -103,6 +104,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (body.action === 'import') {
         const result = await sqliteStore.importBackup({ backup: body.backup });
+        return res.status(200).json({ ok: true, ...result });
+      }
+      if (body.action === 'save_day_note') {
+        const result = await sqliteStore.saveDayNote({ date: body.date, body: body.body_text });
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'carry_over') {

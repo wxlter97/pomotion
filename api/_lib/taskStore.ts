@@ -106,6 +106,8 @@ export type WeekView = {
   carryOverCount: number;
   /** Tareas sin hacer del contexto actual que vencen hoy o ya vencieron, por `due`. */
   dueReminders: DueReminder[];
+  /** Bitácora del día seleccionado (texto libre); '' si no hay nada escrito. */
+  dayNote: string;
 };
 
 /** Resumen de un día en la vista mensual (solo días con actividad). */
@@ -241,6 +243,7 @@ export type GetWeekViewInput = {
   includeWeekend?: boolean;
 };
 export type SearchTasksInput = { query?: string; fileId?: string };
+export type SaveDayNoteInput = { date?: string; body?: string };
 
 /** Valores que sobreviven al round-trip por JSON de una fila de la DB. */
 export type BackupValue = string | number | null;
@@ -430,6 +433,8 @@ export interface TaskStore {
   bulkTasks(input: BulkTasksInput): Promise<BulkResult>;
   /** Trae a hoy las tareas pendientes sin sesiones de días pasados. */
   carryOverToToday(input: { fileId?: string; includeWeekend?: boolean }): Promise<{ moved: number }>;
+  /** Guarda (o borra, si queda vacía) la bitácora de un día. Devuelve el texto final. */
+  saveDayNote(input: SaveDayNoteInput): Promise<{ body: string }>;
 
   logSession(input: LogSessionInput): Promise<Session>;
   updateSession(input: UpdateSessionInput): Promise<Session>;
