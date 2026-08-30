@@ -435,3 +435,85 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
 8. Reporte de un mes → 1 query con JOIN; CSV correcto.
 9. Recurrentes: crear regla, aplicar a la semana, dedup en segundo "Aplicar".
 10. Logout → vuelve al login. Borrar la propia cuenta (si se agrega) → CASCADE limpia todo.
+
+---
+
+## 11. Backlog 2 — nuevas features (post §9)
+
+El §9 quedó cerrado salvo time-blocking. Esta es la segunda tanda. **Una rama/PR por
+ítem, ramificando desde `main`, el usuario mergea entre ítems.** Ordenadas por
+valor/costo dentro de cada tier; nada bloquea a nada.
+
+### Reglas de implementación (heredadas del §9)
+
+- **Nunca agregar una función serverless.** Hay 11/12 (límite Hobby de Vercel). Todo se
+  pliega en los endpoints que ya están: `GET /api/tasks?X=1`, `POST /api/tasks {action}`,
+  `/api/task`, `/api/session`, `/api/report`, `/api/recurring`, `/api/files`,
+  `/api/auth/*`.
+- **Migraciones**: `scripts/migrations/NNN_*.sql` (última: `005`), tracked en
+  `schema_migrations`. No hay auto-run en deploy — el usuario corre `npm run migrate`
+  contra prod después de mergear. Actualizar `scripts/migrate.test.ts` (lista
+  `SCHEMA_TABLES` + `expect(applied).toContain('NNN_…')`).
+- **Ajustes solo-cliente** van en un hook de `localStorage` (patrón `useSoundSetting` /
+  `useNotificationSetting` / `useCarryOverSetting` / `useTheme`), sin tocar el backend.
+- **Store**: interfaz en `api/_lib/taskStore.ts`, impl en `api/_lib/sqliteStore.ts`
+  (toda query scopeada por `currentUserId()`). Lógica pura → su propio módulo con tests.
+- **Verificación** por PR: `npm run typecheck` + `npm test` + `npm run build` en verde,
+  y para UI nueva el harness estático de CSS (`public/_NAME.html` que linkea
+  `/src/styles.css`, screenshot claro/oscuro/mobile, después se borra). No hay E2E real
+  (prod exige login de Google).
+- UI en español. Zona `America/El_Salvador`.
+- Estado actual de `tasks`: `id, user_id, name, date (nullable), done, "order", file,
+  priority, estimate_min, notes, due, recurring_rule_id, source, feed_id, external_uid,
+  external_date, created_at, updated_at`.
+
+### Tier 1 — alto valor, bajo costo
+
+| Feature | Qué | Notas de costo |
+|---|---|---|
+| **Búsqueda de tareas** | Caja de búsqueda (atajo `/` o menú "Ver") que encuentra tareas por texto en todas las semanas + inbox; muestra fecha y contexto, clic para saltar a esa semana/día. | `GET /api/tasks?search=<q>` plegado (1 query `LIKE` scopeada). Sin migración. Componente `SearchDialog`. |
+| **Backup completo (export / import JSON)** | `GET /api/tasks?export=1` devuelve todo el dataset del usuario (tareas, sesiones, tags, plantillas, metas, feeds); `POST {action:'import'}` lo restaura. | Sin migración. Import v1: aditivo con ids nuevos, o solo en cuenta vacía — definir al hacerlo. Descarga vía navegación normal (como el CSV del reporte). |
+| **Pomodoro configurable** | Duración de foco / descanso corto / largo, "descanso largo cada N pomos", auto-arrancar la fase siguiente. | 100% cliente: hook `useTimerSettings` en `localStorage`. El `Timer` ya maneja fases; solo parametrizar. |
+| **Objetivo de pomodoros del día** | "4 pomos hoy" con puntitos de progreso cerca del timer; se deriva de las sesiones de hoy. | Cliente. Target en `localStorage`. Cero backend. |
+| **Notificaciones de vencimiento** | Aviso del navegador cuando una tarea vence hoy / está vencida; empujón opcional a la mañana. | Ya existe `notify.ts` + `useNotificationSetting` + el permiso. Chequeo al cargar la semana + `setInterval`. Casi todo cliente. |
+| **Modo foco** | Vista minimal: solo la tarea corriendo + el timer, el resto oculto. | Puro frontend, estado efímero. |
+| **Edad de la tarea** | Chip "3d" / "2sem" en tareas que llevan mucho abiertas sin cerrarse. | `created_at` ya está en `tasks`; falta exponerlo en `Task` (API + `src/types.ts`) y un helper puro para el label. |
+
+### Tier 2 — UI nueva o migración chica
+
+| Feature | Qué | Notas de costo |
+|---|---|---|
+| **Drag-and-drop** | Reordenar dentro del día, mover entre columnas de día, arrastrar del inbox a un día. Reemplaza los ítems "Subir/Bajar/Mover" del menú (que quedan de fallback). | Sin migración (usa `updateTaskPosition`). **Lo difícil es touch** — el DnD de HTML5 no anda en móvil. Evaluar `@dnd-kit` (dep, soporta pointer/touch/teclado) vs. pointer events a mano. El más pedido. |
+| **Acciones en lote** | Seleccionar varias filas (checkbox) → completar / mover a un día / etiquetar / mandar al inbox / borrar, todas juntas. | Loop sobre los endpoints existentes, o una acción `bulk` en `POST /api/tasks`. UI de selección en `TaskList`. |
+| **Subtareas / checklist** | Una tarea con pasos marcables (sin tiempo propio). Fila muestra "2/5". | Columna `checklist` TEXT (JSON) en `tasks` (migración de 1 línea) o tabla `task_checklist_items`. Editor en `TaskDetails`. |
+| **Revisión semanal** | Panel guiado de fin de semana: qué se hizo, tiempo por contexto/tag, tareas sin terminar → traer o soltar, foco de la semana siguiente. | Se arma con queries que ya existen (`getSessionsInRange`, weekview). UI nueva tipo wizard. Sin migración (salvo que el "foco de la semana" se persista). |
+| **Recurrencia mensual / por fecha** | Hoy `recurring_rules` solo hace días de semana. Agregar "día N del mes", "último día hábil", "cada N semanas". | Migración: `freq` / `interval` / `monthday` en `recurring_rules`. Extender el materializador (`applyRulesToWeek` / `autoApplyRecurring`). UI de la regla en `RecurringTasksDialog`. |
+| **Fin de semana opcional** | Toggle para mostrar Sáb/Dom en la vista. | Sin migración, pero **invasivo**: `weekDates.ts` (`WEEKDAY_NAMES`, `dates[4]`, `weekDates`), carry-over ("finde → lunes"), `getWeekView` (`dates[0..4]`), grid del front. Mecánico. Ajuste solo-cliente que cambia el request. |
+| **Notas del día / bitácora** | Texto libre por día, aparte de las tareas. | Migración chica: tabla `day_notes (user_id, date, body)`. `WeekView` incluye `dayNote` del día seleccionado; `POST {action:'save_day_note'}`. |
+| **Precisión de estimación** | Agregado en el panel de Analítica: "en promedio subestimás un X%", con un factor sugerido. | Los datos ya están (`estimate_min` + sesiones). Cálculo puro en `analytics.ts`. Sin migración. |
+
+### Tier 3 — grande
+
+- **Time-blocking** (arrastrado del §9): hora planeada por tarea (`planned_start` +
+  `planned_minutes`, migración) + vista de **agenda/timeline** del día con las sesiones
+  reales superpuestas. Componente de calendario nuevo, drag para agendar/mover/redimensionar,
+  historia de touch. El estimate podría ser el largo por defecto del bloque. Recomendado
+  hacer primero un v1 "blando" (solo el campo de hora + chip + orden por hora, sin
+  timeline) y decidir después si vale la vista de agenda.
+- **PWA instalable + offline de lectura**: service worker + manifest, cachear el shell +
+  la última semana para ver sin conexión, encolar mutaciones. Casi todo frontend + un SW.
+- **Exportar sesiones como `.ics`**: lo inverso a la suscripción — publicar las sesiones
+  registradas como feed iCal (URL con token secreto) para verlas en el calendario propio.
+  Choca con el presupuesto de funciones (endpoint público sin `withAuth`) — habría que
+  plegarlo en un endpoint existente salteando el wrapper para ese path + validar el token.
+- **(Opcional) Asistente con Claude API**: "estimá esta tarea", "resumí mi semana",
+  "sugerí el foco de mañana". Suma dependencia (`@anthropic-ai/sdk`), costo por request,
+  y una función (o fold en `/api/tasks` con `action:'assist'`). Solo si hay ganas.
+
+### Fuera de alcance (sigue igual que §9)
+
+- Colaboración / contextos compartidos (es personal aunque el backend sea multiusuario).
+- App móvil nativa.
+- Signup 100% abierto, billing, límites de abuso.
+- Dependencias entre tareas ("bloqueada por") — overkill para uso diario personal.
+- Sync de vuelta a Notion.
