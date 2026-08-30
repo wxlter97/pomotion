@@ -459,11 +459,19 @@ export function getRecurringRules() {
 
 export function createRecurringRule(
   name: string,
-  opts?: { freq?: 'weekly' | 'monthly'; weekdays?: string; monthdays?: string }
+  opts?: {
+    freq?: 'weekly' | 'monthly';
+    weekdays?: string;
+    monthdays?: string;
+    defaultPlannedStart?: string | null;
+  }
 ) {
+  const { defaultPlannedStart, ...rest } = opts ?? {};
+  const body: Record<string, unknown> = { action: 'create', name, ...rest };
+  if (defaultPlannedStart !== undefined) body.default_planned_start = defaultPlannedStart;
   return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ action: 'create', name, ...opts }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -475,11 +483,15 @@ export function updateRecurringRule(
     freq?: 'weekly' | 'monthly';
     weekdays?: string;
     monthdays?: string;
+    defaultPlannedStart?: string | null;
   }
 ) {
+  const { defaultPlannedStart, ...rest } = fields;
+  const body: Record<string, unknown> = { action: 'update', id, ...rest };
+  if (defaultPlannedStart !== undefined) body.default_planned_start = defaultPlannedStart;
   return request<{ ok: true; rule: RecurringRule }>('/api/recurring', {
     method: 'POST',
-    body: JSON.stringify({ action: 'update', id, ...fields }),
+    body: JSON.stringify(body),
   });
 }
 

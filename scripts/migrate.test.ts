@@ -42,6 +42,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('009_week_focus.sql');
     expect(applied).toContain('010_time_blocking.sql');
     expect(applied).toContain('011_time_blocking_duration.sql');
+    expect(applied).toContain('012_recurring_default_time.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });

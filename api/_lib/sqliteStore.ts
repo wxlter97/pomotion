@@ -200,6 +200,7 @@ function toRule(r: Row): RecurringRule {
     freq: String(r.freq ?? 'weekly') === 'monthly' ? 'monthly' : 'weekly',
     weekdays: String(r.weekdays),
     monthdays: r.monthdays == null ? '' : String(r.monthdays),
+    defaultPlannedStart: r.default_planned_start == null ? null : String(r.default_planned_start),
   };
 }
 
@@ -1563,6 +1564,19 @@ async function listRecurringRules(): Promise<RecurringRule[]> {
   return rows.map(toRule);
 }
 
+/** `undefined` = no tocar (caller ya filtra); `null` = quitar; string = validar y normalizar. */
+function parseDefaultPlannedStart(value: string | null): string | null {
+  if (value === null) return null;
+  const normalized = normalizeTimeLabel(value);
+  if (normalized === null) {
+    throw new BadRequestError(
+      'invalid_default_planned_start',
+      'default_planned_start debe ser "HH:MM" o null'
+    );
+  }
+  return normalized;
+}
+
 async function createRecurringRule(input: CreateRecurringRuleInput): Promise<RecurringRule> {
   const userId = currentUserId();
   const name = typeof input.name === 'string' ? input.name.trim() : '';
@@ -1580,15 +1594,17 @@ async function createRecurringRule(input: CreateRecurringRuleInput): Promise<Rec
     if (!isValidWeekdays(input.weekdays)) throw new BadRequestError('invalid_weekdays', 'weekdays inválido');
     weekdays = input.weekdays;
   }
+  const defaultPlannedStart =
+    input.defaultPlannedStart === undefined ? null : parseDefaultPlannedStart(input.defaultPlannedStart);
 
   const file = input.fileId ?? null;
   const id = crypto.randomUUID();
   await getDb().execute({
-    sql: `INSERT INTO recurring_rules (id, user_id, name, file, freq, weekdays, monthdays, active, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-    args: [id, userId, name, file, freq, weekdays, monthdays, new Date().toISOString()],
+    sql: `INSERT INTO recurring_rules (id, user_id, name, file, freq, weekdays, monthdays, default_planned_start, active, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    args: [id, userId, name, file, freq, weekdays, monthdays, defaultPlannedStart, new Date().toISOString()],
   });
-  return { id, name, file, active: true, freq, weekdays, monthdays: monthdays ?? '' };
+  return { id, name, file, active: true, freq, weekdays, monthdays: monthdays ?? '', defaultPlannedStart };
 }
 
 async function updateRecurringRule(input: UpdateRecurringRuleInput): Promise<RecurringRule> {
@@ -1625,6 +1641,10 @@ async function updateRecurringRule(input: UpdateRecurringRuleInput): Promise<Rec
   if (input.active !== undefined) {
     sets.push('active = ?');
     args.push(input.active ? 1 : 0);
+  }
+  if (input.defaultPlannedStart !== undefined) {
+    sets.push('default_planned_start = ?');
+    args.push(parseDefaultPlannedStart(input.defaultPlannedStart));
   }
   if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
 
@@ -1752,9 +1772,9 @@ async function applyRulesToWeek(
       have.add(key);
       order += 1;
       inserts.push({
-        sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, recurring_rule_id, created_at, updated_at)
-              VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)`,
-        args: [crypto.randomUUID(), userId, rule.name, date, order, file, rule.id, now, now],
+        sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, recurring_rule_id, planned_start, created_at, updated_at)
+              VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)`,
+        args: [crypto.randomUUID(), userId, rule.name, date, order, file, rule.id, rule.defaultPlannedStart, now, now],
       });
     }
   }

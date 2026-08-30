@@ -535,9 +535,13 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 ### Tier 4 — ideas nuevas (post time-blocking, 2026-08-30)
 
-- **Recurrentes con hora por defecto**: una regla recurrente puede llevar un
-  `default_planned_start` opcional — las tareas que genera nacen con esa hora ya
-  puesta (`planned_start`), sin tener que arrastrarlas al timeline cada semana.
+- ~~**Recurrentes con hora por defecto**~~ ✅ — una regla recurrente puede llevar un
+  `default_planned_start` opcional (`<input type="time">` en "Tareas recurrentes",
+  con "Quitar"); las tareas que genera nacen con esa hora ya puesta (`planned_start`),
+  sin tener que arrastrarlas al timeline cada semana. Migración
+  `012_recurring_default_time.sql`. `applyRulesToWeek` propaga `rule.defaultPlannedStart`
+  al insertar. Reusa `normalizeTimeLabel` para validar/zero-pad. En el backup. Sin
+  función serverless nueva (plegado en `POST /api/recurring {action:'create'|'update'}`).
 - **Aviso al arrancar un bloque planeado**: mismo mecanismo que `dueReminders`
   (banner + notificación del navegador), pero disparando en `planned_start` en vez
   de en `due`. Bajo costo — reusa `notify()` y el patrón de `useDueNotifications`.

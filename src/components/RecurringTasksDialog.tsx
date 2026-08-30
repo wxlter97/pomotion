@@ -349,6 +349,29 @@ export default function RecurringTasksDialog({
                             </button>
                           </div>
                         )}
+
+                        <div className="recurring-time-row">
+                          <span className="recurring-time-label">{t('recurring.defaultTime')}</span>
+                          <input
+                            type="time"
+                            className="task-planned-start-input"
+                            value={rule.defaultPlannedStart ?? ''}
+                            onChange={(e) =>
+                              void patchRule(rule, { defaultPlannedStart: e.target.value || null })
+                            }
+                            disabled={busy}
+                          />
+                          {rule.defaultPlannedStart && (
+                            <button
+                              type="button"
+                              className="btn btn-plain btn-small"
+                              onClick={() => void patchRule(rule, { defaultPlannedStart: null })}
+                              disabled={busy}
+                            >
+                              {t('details.remove')}
+                            </button>
+                          )}
+                        </div>
                       </>
                     )}
                   </li>

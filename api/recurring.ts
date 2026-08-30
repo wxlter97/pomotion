@@ -16,6 +16,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         freq?: string;
         weekdays?: string;
         monthdays?: string;
+        default_planned_start?: string | null;
         active?: boolean;
         week?: string;
         file?: string;
@@ -28,6 +29,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
             freq: body.freq,
             weekdays: body.weekdays,
             monthdays: body.monthdays,
+            defaultPlannedStart: body.default_planned_start,
           });
           return res.status(200).json({ ok: true, rule });
         }
@@ -39,6 +41,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
             freq: body.freq,
             weekdays: body.weekdays,
             monthdays: body.monthdays,
+            defaultPlannedStart: body.default_planned_start,
           });
           return res.status(200).json({ ok: true, rule });
         }

@@ -225,6 +225,8 @@ export type RecurringRule = {
   weekdays: string;
   /** CSV de días del mes 1..31, más `-1` = último día. '' si la regla es weekly. */
   monthdays: string;
+  /** Hora 'HH:MM' con la que nacen las tareas que genera esta regla; null = sin horario. */
+  defaultPlannedStart: string | null;
 };
 
 export type DayTemplateItem = {
