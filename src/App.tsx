@@ -43,9 +43,11 @@ import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
 import { loadActiveTimer } from './timerStorage';
-import type { FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
+import { dueBannerText } from './dueReminders';
+import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
 import { useAccent } from './useAccent';
 import { useCarryOverSetting } from './useCarryOverSetting';
+import { useDueNotifications } from './useDueNotifications';
 import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useSoundSetting } from './useSoundSetting';
@@ -55,6 +57,7 @@ type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
 type PendingSwitch = { message: string; run: () => void };
 
 const FILE_STORAGE_KEY = 'pomotion:file';
+const NO_DUE_REMINDERS: DueReminder[] = [];
 
 function SunIcon() {
   return (
@@ -127,6 +130,7 @@ export default function App() {
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const notifications = useNotificationSetting();
+  useDueNotifications(data?.dueReminders ?? NO_DUE_REMINDERS, data?.today ?? '', notifications.enabled);
   const timerRef = useRef<TimerHandle>(null);
   const carryOverDoneRef = useRef(false);
   const feedSyncDoneRef = useRef(false);
@@ -803,6 +807,13 @@ export default function App() {
       {error && <p className="error banner">{error}</p>}
       {recurringNotice && (
         <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
+      )}
+      {data && data.dueReminders.length > 0 && (
+        <DismissibleBanner
+          key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
+          tone="warning"
+          message={dueBannerText(data.dueReminders, data.today)}
+        />
       )}
       {data && data.carryOverCount > 0 && (
         <CarryOverBanner

@@ -352,6 +352,16 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
 
   const dayTemplates = await listDayTemplatesFor(userId);
 
+  // Aviso de vencimientos: tareas sin hacer del contexto que vencen hoy o antes.
+  const dueReminders = (
+    await db.execute({
+      sql: `SELECT id, name, due FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND done = 0 AND due IS NOT NULL AND due <= ?
+            ORDER BY due LIMIT 20`,
+      args: [userId, ...f.args, today],
+    })
+  ).rows.map((r) => ({ id: String(r.id), name: String(r.name), due: String(r.due) }));
+
   const dayTotalSeconds = sessRows
     .filter((r) => String(r.date) === selectedDate)
     .reduce((sum, r) => sum + Number(r.duration_sec), 0);
@@ -374,6 +384,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     dayTotalSeconds,
     weekTotalSeconds,
     carryOverCount: await countCarryOver(userId, input.fileId),
+    dueReminders,
   };
 }
 

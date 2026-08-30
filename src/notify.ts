@@ -57,3 +57,16 @@ export function notifyPhaseChange(kind: PhaseNotification): void {
     // contexto permitido (ej. ciertos iframes) — se ignora.
   }
 }
+
+/**
+ * Notificación genérica de la app. El llamador decide cuándo (a diferencia
+ * de `notifyPhaseChange`, acá no se chequea `document.hidden`).
+ */
+export function notify(body: string, tag: string): void {
+  if (!notificationsSupported() || Notification.permission !== 'granted') return;
+  try {
+    new Notification('pomotion', { body, tag });
+  } catch {
+    // ver notifyPhaseChange
+  }
+}
