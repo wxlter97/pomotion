@@ -500,8 +500,15 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   historia de touch. El estimate podría ser el largo por defecto del bloque. Recomendado
   hacer primero un v1 "blando" (solo el campo de hora + chip + orden por hora, sin
   timeline) y decidir después si vale la vista de agenda.
-- **PWA instalable + offline de lectura**: service worker + manifest, cachear el shell +
-  la última semana para ver sin conexión, encolar mutaciones. Casi todo frontend + un SW.
+- ~~**PWA instalable + offline de lectura**~~ ✅ — service worker hecho a mano (`public/sw.js`,
+  cero deps): navegación red-primero → cae al `index.html` cacheado; `/assets/*` (con hash)
+  cache-primero; `GET /api/tasks` + `/api/auth/status` red-primero → caen a lo último
+  guardado (el auth cacheado deja entrar offline, al reconectar revalida). No encola
+  mutaciones — offline es solo lectura. `src/pwa.ts` registra el SW (no en dev) y avisa
+  "hay versión nueva" (banner con botón que manda `SKIP_WAITING` + recarga). `useOnlineStatus`
+  + banner "sin conexión". `site.webmanifest` ya estaba (solo se puso al día). `vercel.json`:
+  `Cache-Control: no-cache` para `/sw.js`. Sin migración, sin función serverless. **Encolar
+  mutaciones offline queda para un v2.**
 - **Exportar sesiones como `.ics`**: lo inverso a la suscripción — publicar las sesiones
   registradas como feed iCal (URL con token secreto) para verlas en el calendario propio.
   Choca con el presupuesto de funciones (endpoint público sin `withAuth`) — habría que

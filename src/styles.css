@@ -135,12 +135,17 @@ h3 {
   color: var(--color-label);
 }
 
-.carry-over-banner {
+.carry-over-banner,
+.pwa-update-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.pwa-update-banner .btn {
+  flex-shrink: 0;
 }
 
 .carry-over-actions {

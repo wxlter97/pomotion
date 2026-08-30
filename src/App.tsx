@@ -52,8 +52,10 @@ import { computeReorderTarget, type DragItem, type DropZone } from './drag/dnd';
 import { loadActiveTimer } from './timerStorage';
 import { dueBannerText } from './dueReminders';
 import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
+import { applyUpdate, registerServiceWorker } from './pwa';
 import { useAccent } from './useAccent';
 import { useCarryOverSetting } from './useCarryOverSetting';
+import { useOnlineStatus } from './useOnlineStatus';
 import { useDueNotifications } from './useDueNotifications';
 import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
@@ -137,6 +139,11 @@ export default function App() {
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
   const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
+  const online = useOnlineStatus();
+  const [updateReady, setUpdateReady] = useState(false);
+  useEffect(() => {
+    registerServiceWorker(() => setUpdateReady(true));
+  }, []);
   const [theme, toggleTheme] = useTheme();
   const [accent, chooseAccent] = useAccent();
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
@@ -945,6 +952,20 @@ export default function App() {
         onSelectFile={guardedSelectFile}
         loading={loading}
       />
+
+      {!online && (
+        <div className="warning banner">
+          Sin conexión — estás viendo lo último que se guardó.
+        </div>
+      )}
+      {updateReady && (
+        <div className="info banner pwa-update-banner">
+          <span>Hay una versión nueva de pomotion.</span>
+          <button type="button" className="btn btn-tinted btn-small" onClick={applyUpdate}>
+            Actualizar
+          </button>
+        </div>
+      )}
 
       {error && <p className="error banner">{error}</p>}
       {recurringNotice && (

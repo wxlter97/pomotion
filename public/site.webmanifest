@@ -1,7 +1,10 @@
 {
   "name": "pomotion",
   "short_name": "pomotion",
-  "description": "Timer pomodoro/libre con sincronización a Notion",
+  "description": "Timer pomodoro y agenda diaria con registro de tiempo.",
+  "lang": "es",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f2f2f7",
