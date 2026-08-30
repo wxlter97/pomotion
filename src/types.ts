@@ -53,6 +53,9 @@ export type Tag = { id: string; name: string; color: string };
 /** Un día de la semana visible: su etiqueta ("Lunes") y su fecha. */
 export type DayColumn = { day: string; date: string };
 
+/** Tarea sin hacer que vence hoy o ya venció. */
+export type DueReminder = { id: string; name: string; due: string };
+
 export type FileEntry = {
   id: string;
   label: string;
@@ -83,6 +86,8 @@ export type TasksResponse = {
   weekTotalSeconds: number;
   /** Tareas pendientes de días pasados que se pueden "traer a hoy". */
   carryOverCount: number;
+  /** Tareas sin hacer del contexto que vencen hoy o ya vencieron. */
+  dueReminders: DueReminder[];
 };
 
 /** Una tarea encontrada por la búsqueda de texto. */

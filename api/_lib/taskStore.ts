@@ -71,6 +71,9 @@ export type Tag = { id: string; name: string; color: string };
 /** Un día de la semana visible: su etiqueta ("Lunes") y su fecha. */
 export type DayColumn = { day: string; date: string };
 
+/** Tarea sin hacer que vence hoy o ya venció — para el aviso de vencimientos. */
+export type DueReminder = { id: string; name: string; due: string };
+
 export type WeekView = {
   /** Etiqueta "2026.08.24 - 2026.08.28". */
   week: string;
@@ -97,6 +100,8 @@ export type WeekView = {
   weekTotalSeconds: number;
   /** Tareas pendientes (sin sesiones) de días pasados, candidatas a "traer a hoy". */
   carryOverCount: number;
+  /** Tareas sin hacer del contexto actual que vencen hoy o ya vencieron, por `due`. */
+  dueReminders: DueReminder[];
 };
 
 /** Resumen de un día en la vista mensual (solo días con actividad). */

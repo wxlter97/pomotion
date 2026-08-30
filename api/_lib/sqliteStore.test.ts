@@ -1128,6 +1128,54 @@ describe('backup / restore', () => {
   });
 });
 
+describe('getWeekView.dueReminders (aviso de vencimientos)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('lista las tareas sin hacer que vencen hoy o antes, por fecha', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T18:00:00Z')); // miércoles en El Salvador
+
+    await as(USER, async () => {
+      const overdue = await sqliteStore.createTask({ date: '2026-08-24', text: 'Vencida' });
+      const today = await sqliteStore.createTask({ date: '2026-08-26', text: 'Vence hoy' });
+      const soon = await sqliteStore.createTask({ date: '2026-08-26', text: 'Vence mañana' });
+      const doneOne = await sqliteStore.createTask({ date: '2026-08-24', text: 'Hecha y vencida' });
+      await sqliteStore.updateTask({ taskId: overdue.id, due: '2026-08-20' });
+      await sqliteStore.updateTask({ taskId: today.id, due: '2026-08-26' });
+      await sqliteStore.updateTask({ taskId: soon.id, due: '2026-08-27' });
+      await sqliteStore.updateTask({ taskId: doneOne.id, due: '2026-08-19', done: true });
+    });
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(view.dueReminders.map((r) => r.name)).toEqual(['Vencida', 'Vence hoy']);
+    expect(view.dueReminders[0]).toMatchObject({ due: '2026-08-20' });
+  });
+
+  it('scopea por usuario y por contexto', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T18:00:00Z'));
+
+    await as(USER, async () => {
+      const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Trabajo', fileId: 'Trabajo' });
+      const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'Casa', fileId: 'Casa' });
+      await sqliteStore.updateTask({ taskId: a.id, due: '2026-08-20' });
+      await sqliteStore.updateTask({ taskId: b.id, due: '2026-08-20' });
+    });
+
+    const trabajo = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes', fileId: 'Trabajo' })
+    );
+    expect(trabajo.dueReminders.map((r) => r.name)).toEqual(['Trabajo']);
+
+    const other = await as(OTHER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(other.dueReminders).toEqual([]);
+  });
+});
+
 afterEach(() => {
   resetDb();
 });
