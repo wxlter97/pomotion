@@ -1,7 +1,52 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getAnalytics, UnauthorizedError } from '../api';
 import { formatDurationLabel } from '../duration';
-import type { Analytics as AnalyticsData } from '../types';
+import type { Analytics as AnalyticsData, EstimateAccuracy } from '../types';
+
+/** Bloque "Precisión de estimación": el mensaje + dos barras estimado/registrado. */
+function EstimateAccuracyBlock({ a }: { a: EstimateAccuracy }) {
+  const max = Math.max(a.totalEstimatedSeconds, a.totalLoggedSeconds, 1);
+  const message =
+    a.biasPct >= 5
+      ? `En promedio tardás un ${a.biasPct}% más de lo que estimás.`
+      : a.biasPct <= -5
+        ? `En promedio terminás un ${Math.abs(a.biasPct)}% antes de lo que estimás.`
+        : 'Tus estimaciones vienen bastante justas.';
+
+  return (
+    <div className="an-estimate">
+      <p className="an-estimate-msg">{message}</p>
+      <div className="an-weekday">
+        <div className="an-weekday-row">
+          <span className="an-weekday-name">Estimado</span>
+          <div className="an-weekday-track">
+            <div
+              className="an-weekday-fill"
+              style={{ width: `${Math.round((a.totalEstimatedSeconds / max) * 100)}%` }}
+            />
+          </div>
+          <span className="an-weekday-value">{formatDurationLabel(a.totalEstimatedSeconds)}</span>
+        </div>
+        <div className="an-weekday-row">
+          <span className="an-weekday-name">Registrado</span>
+          <div className="an-weekday-track">
+            <div
+              className={a.biasPct >= 5 ? 'an-weekday-fill is-over' : 'an-weekday-fill'}
+              style={{ width: `${Math.round((a.totalLoggedSeconds / max) * 100)}%` }}
+            />
+          </div>
+          <span className="an-weekday-value">{formatDurationLabel(a.totalLoggedSeconds)}</span>
+        </div>
+      </div>
+      <p className="an-estimate-hint">
+        {Math.abs(a.biasPct) >= 5 && (
+          <>Multiplicá tus estimaciones por ~{a.suggestedFactor}. · </>
+        )}
+        {a.count} {a.count === 1 ? 'tarea completada' : 'tareas completadas'}
+      </p>
+    </div>
+  );
+}
 
 const RANGES = [
   { weeks: 4, label: '4 sem' },
@@ -162,6 +207,13 @@ export default function Analytics({
                 </span>
               </div>
             </section>
+
+            {data.estimateAccuracy && (
+              <section className="an-section">
+                <h3>Precisión de estimación</h3>
+                <EstimateAccuracyBlock a={data.estimateAccuracy} />
+              </section>
+            )}
 
             <section className="an-section">
               <h3>Por día de la semana</h3>

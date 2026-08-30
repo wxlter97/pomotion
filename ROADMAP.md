@@ -490,7 +490,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 | **Recurrencia mensual / por fecha** | Hoy `recurring_rules` solo hace días de semana. Agregar "día N del mes", "último día hábil", "cada N semanas". | Migración: `freq` / `interval` / `monthday` en `recurring_rules`. Extender el materializador (`applyRulesToWeek` / `autoApplyRecurring`). UI de la regla en `RecurringTasksDialog`. |
 | **Fin de semana opcional** | Toggle para mostrar Sáb/Dom en la vista. | Sin migración, pero **invasivo**: `weekDates.ts` (`WEEKDAY_NAMES`, `dates[4]`, `weekDates`), carry-over ("finde → lunes"), `getWeekView` (`dates[0..4]`), grid del front. Mecánico. Ajuste solo-cliente que cambia el request. |
 | **Notas del día / bitácora** | Texto libre por día, aparte de las tareas. | Migración chica: tabla `day_notes (user_id, date, body)`. `WeekView` incluye `dayNote` del día seleccionado; `POST {action:'save_day_note'}`. |
-| **Precisión de estimación** | Agregado en el panel de Analítica: "en promedio subestimás un X%", con un factor sugerido. | Los datos ya están (`estimate_min` + sesiones). Cálculo puro en `analytics.ts`. Sin migración. |
+| ~~**Precisión de estimación**~~ ✅ | Sección "Precisión de estimación" en Analítica: "en promedio tardás un X% más/menos de lo que estimás", factor sugerido + barras estimado vs. registrado. Cuenta solo tareas completadas con estimación y tiempo (mín. 3). | `computeEstimateAccuracy` puro en `analytics.ts`; `getAnalytics` cruza `estimate_min` con el tiempo por tarea (agrega `task_id` a la query de sesiones). `Analytics.estimateAccuracy` nuevo. Sin migración, sin función nueva. |
 
 ### Tier 3 — grande
 

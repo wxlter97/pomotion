@@ -8,6 +8,23 @@ import { mondayOf } from './weekDates.js';
 export type AnalyticsSession = { date: string; start: string; durationSec: number };
 export type AnalyticsTask = { date: string; done: boolean };
 
+/** Una tarea completada con estimación + tiempo registrado, para medir la
+ *  precisión de las estimaciones. */
+export type EstimateComparison = { estimateMinutes: number; loggedSeconds: number };
+
+export type EstimateAccuracy = {
+  /** Tareas de la ventana usadas para el cálculo. */
+  count: number;
+  totalEstimatedSeconds: number;
+  totalLoggedSeconds: number;
+  /** registrado / estimado. >1 = subestimás (tardás más). */
+  ratio: number;
+  /** (ratio − 1) × 100, redondeado. + = subestimás, − = sobreestimás. */
+  biasPct: number;
+  /** Factor sugerido para multiplicar futuras estimaciones (≥ 0.1). */
+  suggestedFactor: number;
+};
+
 export type Analytics = {
   weeks: number;
   /** Lunes de la primera semana de la ventana, 'YYYY-MM-DD'. */
@@ -25,6 +42,8 @@ export type Analytics = {
   byWeek: { weekStart: string; label: string; totalSeconds: number }[];
   completion: { total: number; done: number };
   streak: { current: number; longest: number };
+  /** Precisión de las estimaciones, o null si hay muy pocos datos. */
+  estimateAccuracy: EstimateAccuracy | null;
 };
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -91,10 +110,32 @@ export function computeStreak(
   return { current, longest };
 }
 
+/** Al menos esta cantidad de tareas para que el número signifique algo. */
+export const MIN_ESTIMATE_SAMPLES = 3;
+
+export function computeEstimateAccuracy(rows: EstimateComparison[]): EstimateAccuracy | null {
+  const valid = rows.filter((r) => r.estimateMinutes > 0 && r.loggedSeconds > 0);
+  if (valid.length < MIN_ESTIMATE_SAMPLES) return null;
+
+  const totalEstimatedSeconds = valid.reduce((s, r) => s + r.estimateMinutes * 60, 0);
+  const totalLoggedSeconds = valid.reduce((s, r) => s + r.loggedSeconds, 0);
+  const ratio = totalLoggedSeconds / totalEstimatedSeconds;
+
+  return {
+    count: valid.length,
+    totalEstimatedSeconds,
+    totalLoggedSeconds,
+    ratio,
+    biasPct: Math.round((ratio - 1) * 100),
+    suggestedFactor: Math.max(0.1, Math.round(ratio * 100) / 100),
+  };
+}
+
 export function computeAnalytics(
   sessions: AnalyticsSession[],
   tasks: AnalyticsTask[],
-  opts: { weeks: number; startMonday: string; endDate: string }
+  opts: { weeks: number; startMonday: string; endDate: string },
+  estimates: EstimateComparison[] = []
 ): Analytics {
   const { weeks, startMonday, endDate } = opts;
 
@@ -142,5 +183,6 @@ export function computeAnalytics(
     byWeek,
     completion: { total, done },
     streak: computeStreak(activeDates, startMonday, endDate),
+    estimateAccuracy: computeEstimateAccuracy(estimates),
   };
 }
