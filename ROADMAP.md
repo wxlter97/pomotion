@@ -428,9 +428,9 @@ Cada una su propia rama/PR. Ordenadas por valor/costo. Nada bloquea a la migraci
    revisar la semana actual en la app: tareas, `done`, sesiones y totales correctos.
 4. Contar llamadas en `preview_logs`: **~2 queries por vista** (antes ~45).
 5. Navegar Lun↔Vie y entre semanas (‹ ›) → sin botón "+", instantáneo, sin 429 nunca.
-6. Crear / editar / marcar / borrar tarea; reordenar (↑/↓ y drag); mover a otro día y a
-   la semana siguiente → 1 UPDATE, las sesiones siguen pegadas, su `date` se actualiza
-   al mover.
+6. Crear / editar / marcar / borrar tarea; reordenar y mover a otro día arrastrando;
+   mover a la semana siguiente desde el menú → 1 UPDATE, las sesiones siguen pegadas,
+   su `date` se actualiza al mover.
 7. Timer: registrar sesión; sesión manual; editar/borrar sesión.
 8. Reporte de un mes → 1 query con JOIN; CSV correcto.
 9. Recurrentes: crear regla, aplicar a la semana, dedup en segundo "Aplicar".
@@ -483,7 +483,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 | Feature | Qué | Notas de costo |
 |---|---|---|
-| **Drag-and-drop** | Reordenar dentro del día, mover entre columnas de día, arrastrar del inbox a un día. Reemplaza los ítems "Subir/Bajar/Mover" del menú (que quedan de fallback). | Sin migración (usa `updateTaskPosition`). **Lo difícil es touch** — el DnD de HTML5 no anda en móvil. Evaluar `@dnd-kit` (dep, soporta pointer/touch/teclado) vs. pointer events a mano. El más pedido. |
+| ~~**Drag-and-drop**~~ ✅ | Arrastrar una fila para reordenarla dentro del día, soltarla en la pestaña de otro día de la semana visible, o en el cajón "Sin fecha" (y al revés: una nota del inbox a una pestaña de día). Fantasma que sigue al puntero, resaltado de la zona de destino (rojo si no la acepta, p. ej. tarea con tiempo → inbox), autoscroll cerca de los bordes, `Esc` cancela. Anda con mouse **y** con el dedo (mantener presionado ~240 ms). Menú ⋮: se fueron "Subir/Bajar" y "Mover a otro día" (misma semana); queda "Mover a otra semana…" (lo que el arrastre no puede). | Sin migración, sin función nueva — reusa `moveTask`/`updateTaskPosition` y los handlers `handleReorderTask`/`handleMoveTask`/`handleScheduleTask`. Controlador a mano en `src/drag/` (pointer events, cero dependencias): `dnd.ts` puro (`parseZoneTag`, `computeReorderTarget`, `baseCanDrop`) + `DragProvider.tsx` (gesto, ghost por portal, autoscroll por rAF, hit-test con `elementFromPoint` sobre `[data-drag-zone]`). Umbral 5 px con mouse / hold 240 ms con touch, así el tap y el scroll normal siguen andando. |
 | ~~**Acciones en lote**~~ ✅ | Se entra por ⋮ → "Seleccionar varias"; casilla por fila; barra arriba de la lista → completar / mover a otro día / etiquetar / sacar de la agenda / borrar, todas juntas. `Esc` o ✕ cancela. | `POST /api/tasks {action:'bulk', op, ids, date?, tag_id?}` → `bulkTasks` en el store (scopeado; 'move'/'inbox' reusan `updateTaskPosition`; 'inbox' saltea las que tienen tiempo). `BulkActionBar` nuevo; selección efímera en `App`. Sin migración, sin función nueva. |
 | ~~**Subtareas / checklist**~~ ✅ | Una tarea con pasos marcables (sin tiempo propio). La fila muestra el chip "☑ 2/5" (verde si están todos). Editor en el panel expandible: marcar / agregar / quitar pasos. | Migración `006`: columna `checklist` TEXT (JSON `[{id,text,done}]`) en `tasks`. `api/_lib/checklist.ts` puro (parseo tolerante + validación, tope 50 ítems / 200 car.). `updateTask` acepta `checklist`; se pliega en `PATCH /api/task`. Sin función nueva. |
 | **Revisión semanal** | Panel guiado de fin de semana: qué se hizo, tiempo por contexto/tag, tareas sin terminar → traer o soltar, foco de la semana siguiente. | Se arma con queries que ya existen (`getSessionsInRange`, weekview). UI nueva tipo wizard. Sin migración (salvo que el "foco de la semana" se persista). |

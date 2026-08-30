@@ -1,4 +1,4 @@
-import { useState, type DragEvent, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, type FormEvent, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   createTask,
   deleteSession,
@@ -15,7 +15,7 @@ import {
   nowAsHHMM,
   parseDurationToSeconds,
 } from '../duration';
-import type { DayColumn, Session, Tag, Task } from '../types';
+import type { Session, Tag, Task } from '../types';
 import {
   daysBetween,
   dueChipLabel,
@@ -27,6 +27,7 @@ import {
 } from '../taskMeta';
 import { checklistLabel } from '../checklist';
 import { resolveTags, tagColorOf } from '../tags';
+import { useDrag } from '../drag/DragProvider';
 
 /** El chip de vencimiento en la fila solo aparece si está cerca o vencido;
  *  fechas más lejanas se ven al editar (el botón ✎ queda marcado). */
@@ -89,10 +90,8 @@ export default function TaskList({
   onToggleDone,
   togglingIds,
   onSessionDeleted,
-  selectedDay,
   selectedDate,
   today,
-  days,
   previousWeekLabel,
   nextWeekLabel,
   fileId,
@@ -108,7 +107,6 @@ export default function TaskList({
   onTaskDeleted,
   onTaskTextUpdated,
   onTaskUpdated,
-  onReorderTask,
   onMoveTask,
   onSendToInbox,
   onSessionUpdated,
@@ -120,10 +118,8 @@ export default function TaskList({
   onToggleDone: (task: Task) => void;
   togglingIds: Set<string>;
   onSessionDeleted: (taskId: string, sessionId: string) => void;
-  selectedDay: string;
   selectedDate: string;
   today: string;
-  days: DayColumn[];
   previousWeekLabel: string;
   nextWeekLabel: string;
   fileId: string | null;
@@ -143,7 +139,8 @@ export default function TaskList({
   onTaskDeleted: (id: string) => void;
   onTaskTextUpdated: (id: string, name: string) => void;
   onTaskUpdated: (id: string, patch: Partial<Task>) => void;
-  onReorderTask: (task: Task, targetIndex: number) => void;
+  /** Mover a un día de otra semana (el menú ⋮); dentro de la semana visible
+   *  se hace arrastrando a la pestaña del día. */
   onMoveTask: (task: Task, target: MoveTarget) => void;
   onSendToInbox: (task: Task) => void;
   onSessionUpdated: (taskId: string, session: Session) => void;
@@ -160,8 +157,7 @@ export default function TaskList({
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const { beginDrag, draggingId } = useDrag();
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTaskText, setEditingTaskText] = useState('');
@@ -233,31 +229,17 @@ export default function TaskList({
     }
   }
 
-  function handleDragStart(e: DragEvent<HTMLLIElement>, id: string) {
-    setDragId(id);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', id); // Firefox exige setData para iniciar el drag
-  }
-
-  function handleDragOver(e: DragEvent<HTMLLIElement>, index: number) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (dragOverIndex !== index) setDragOverIndex(index);
-  }
-
-  function handleDrop(e: DragEvent<HTMLLIElement>, index: number) {
-    e.preventDefault();
-    const id = dragId;
-    setDragId(null);
-    setDragOverIndex(null);
-    if (!id) return;
-    const task = tasks.find((t) => t.id === id);
-    if (task) onReorderTask(task, index);
-  }
-
-  function handleDragEnd() {
-    setDragId(null);
-    setDragOverIndex(null);
+  // Arrastre a mano (pointer events): reordenar dentro del día, mover a la
+  // pestaña de otro día o al inbox. El drag real lo arranca el DragProvider
+  // al superar el umbral / mantener presionado, así el tap para seleccionar
+  // la tarea sigue andando.
+  function handleRowPointerDown(e: ReactPointerEvent, task: Task, index: number) {
+    if (!canReorder || selectMode) return;
+    if (busyTaskIds.has(task.id) || lockedTaskId === task.id) return;
+    if (editingTaskId === task.id) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input, textarea, .task-check, .move-menu-wrap, .task-edit-form')) return;
+    beginDrag({ kind: 'task', task, index }, e, task.name);
   }
 
   function startEditTask(task: Task) {
@@ -390,11 +372,13 @@ export default function TaskList({
 
   return (
     <>
-      {tasks.length === 0 ? (
-        <p className="muted">No hay tareas para este día.</p>
-      ) : (
-        <ul className="task-list">
-          {tasks.map((task, i) => {
+      {/* El <ul> entero es zona de drop "al final del día": soltar en el
+          margen (o en un día vacío) manda la tarea al final de la lista. */}
+      <ul className="task-list" data-drag-zone="list-end">
+        {tasks.length === 0 ? (
+          <li className="muted task-list-empty">No hay tareas para este día.</li>
+        ) : (
+          tasks.map((task, i) => {
             const total = sumSeconds(task);
             const timeSummary = taskTimeSummary(total, task.estimateMinutes);
             const taskTags = resolveTags(task.tagIds, allTags);
@@ -421,20 +405,18 @@ export default function TaskList({
             return (
               <li
                 key={task.id}
-                draggable={canReorder && !disableEdit && !isEditingText && !selectMode}
-                onDragStart={(e) => handleDragStart(e, task.id)}
-                onDragOver={(e) => handleDragOver(e, i)}
-                onDrop={(e) => handleDrop(e, i)}
-                onDragEnd={handleDragEnd}
-                className={dragOverIndex === i && dragId && dragId !== task.id ? 'drag-over' : ''}
+                data-drag-zone={`row:${i}`}
+                className={draggingId === task.id ? 'is-drag-src' : undefined}
               >
                 <div
+                  onPointerDown={(e) => handleRowPointerDown(e, task, i)}
                   className={[
                     'task-item',
                     task.id === selectedTaskId && !selectMode ? 'active' : '',
                     isLocked ? 'locked' : '',
                     selectMode ? 'is-selecting' : '',
                     isSelected ? 'is-selected' : '',
+                    canReorder && !disableEdit && !isEditingText && !selectMode ? 'is-draggable' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -572,10 +554,6 @@ export default function TaskList({
                       )}
                       <TaskRowMenu
                         onEdit={() => startEditTask(task)}
-                        onMoveUp={() => onReorderTask(task, i - 1)}
-                        onMoveDown={() => onReorderTask(task, i + 1)}
-                        canMoveUp={canReorder && i > 0}
-                        canMoveDown={canReorder && i < tasks.length - 1}
                         onDelete={() => setPendingTaskDelete(task)}
                         onSendToInbox={
                           task.sessions.length === 0 ? () => onSendToInbox(task) : undefined
@@ -591,8 +569,6 @@ export default function TaskList({
                             task.tagIds.length > 0 ||
                             task.checklist.length > 0
                         )}
-                        currentDay={selectedDay}
-                        days={days}
                         previousWeekLabel={previousWeekLabel}
                         nextWeekLabel={nextWeekLabel}
                         fileId={fileId}
@@ -781,9 +757,9 @@ export default function TaskList({
                 </div>
               </li>
             );
-          })}
-        </ul>
-      )}
+          })
+        )}
+      </ul>
 
       <form className="task-add-form" onSubmit={handleAddSubmit}>
         <input

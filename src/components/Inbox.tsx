@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { createInboxTask, deleteTask, updateTaskText } from '../api';
-import type { DayColumn, Task } from '../types';
+import type { Task } from '../types';
 import ConfirmDialog from './ConfirmDialog';
 import Menu, { MenuItem } from './Menu';
+import { useDrag } from '../drag/DragProvider';
 
 const COLLAPSED_KEY = 'pomotion:inbox-collapsed';
 
@@ -39,21 +47,18 @@ function ChevronIcon() {
  */
 export default function Inbox({
   tasks,
-  days,
   fileId,
   onCreated,
   onDeleted,
   onTextUpdated,
-  onSchedule,
 }: {
   tasks: Task[];
-  days: DayColumn[];
   fileId: string | null;
   onCreated: (task: Task) => void;
   onDeleted: (id: string) => void;
   onTextUpdated: (id: string, name: string) => void;
-  onSchedule: (task: Task, date: string) => void;
 }) {
+  const { beginDrag, draggingId } = useDrag();
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
@@ -125,6 +130,15 @@ export default function Inbox({
     }
   }
 
+  // Arrastrar una nota a la pestaña de un día la programa; el DragProvider
+  // arranca el drag al superar el umbral / mantener presionado.
+  function handleItemPointerDown(e: ReactPointerEvent, task: Task) {
+    if (editingId === task.id) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('.menu-wrap, input')) return;
+    beginDrag({ kind: 'inbox', task }, e, task.name);
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -141,7 +155,10 @@ export default function Inbox({
   }
 
   return (
-    <section className={collapsed ? 'inbox' : 'inbox is-open'}>
+    <section
+      className={collapsed ? 'inbox' : 'inbox is-open'}
+      data-drag-zone="inbox"
+    >
       <button
         type="button"
         className="inbox-header"
@@ -174,7 +191,11 @@ export default function Inbox({
           ) : (
             <ul className="inbox-list">
               {tasks.map((task) => (
-                <li key={task.id} className="inbox-item">
+                <li
+                  key={task.id}
+                  className={draggingId === task.id ? 'inbox-item is-drag-src' : 'inbox-item'}
+                  onPointerDown={(e) => handleItemPointerDown(e, task)}
+                >
                   {editingId === task.id ? (
                     <input
                       type="text"
@@ -197,19 +218,6 @@ export default function Inbox({
                   >
                     {(close) => (
                       <>
-                        <div className="menu-heading">Programar</div>
-                        {days.map((d) => (
-                          <MenuItem
-                            key={d.date}
-                            onClick={() => {
-                              onSchedule(task, d.date);
-                              close();
-                            }}
-                          >
-                            {d.day}
-                          </MenuItem>
-                        ))}
-                        <div className="menu-sep" />
                         <MenuItem
                           onClick={() => {
                             startEdit(task);
