@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  bulkTasks,
   carryOverToToday,
   getAuthStatus,
   getFiles,
@@ -11,6 +12,7 @@ import {
   PendingApprovalError,
   UnauthorizedError,
   updateTaskDone,
+  type BulkOp,
 } from './api';
 import CarryOverBanner from './components/CarryOverBanner';
 import ConfirmDialog from './components/ConfirmDialog';
@@ -26,6 +28,7 @@ import GoalsDialog from './components/GoalsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import BackupDialog from './components/BackupDialog';
+import BulkActionBar from './components/BulkActionBar';
 import Report from './components/Report';
 import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
@@ -118,6 +121,10 @@ export default function App() {
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  // Acciones en lote: selección efímera de tareas. `size > 0` = modo selección.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [pendingBulkDelete, setPendingBulkDelete] = useState(false);
   // Modo foco: oculta todo menos el timer y la tarea en curso. Efímero.
   const [focusMode, setFocusMode] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
@@ -141,6 +148,8 @@ export default function App() {
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const selectedFileIdRef = useRef<string | null>(null);
   const filesLoadedRef = useRef(false);
+
+  const selectMode = selectedIds.size > 0;
 
   // Mientras haya un timer corriendo, la tarea activa queda con sus
   // controles de mover/borrar bloqueados — Timer.tsx detecta "cambié de
@@ -329,6 +338,10 @@ export default function App() {
         target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
       if (isTyping || pendingSwitch || authState !== 'authed' || !data) return;
 
+      if (e.key === 'Escape' && selectMode) {
+        setSelectedIds(new Set());
+        return;
+      }
       if (e.key === ' ') {
         e.preventDefault();
         if (timerPhase === 'idle') timerRef.current?.start();
@@ -355,7 +368,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [timerPhase, data, pendingSwitch, authState, focusMode, toggleTheme, guardedSelectDay, guardedGoToWeek]);
+  }, [timerPhase, data, pendingSwitch, authState, focusMode, selectMode, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(taskId: string, session: Session) {
     setData((prev) =>
@@ -625,6 +638,53 @@ export default function App() {
     }
   }
 
+  // --- Acciones en lote ---
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function startSelect(id: string) {
+    setSelectedIds(new Set([id]));
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  // La selección es del día/contexto visible: al cambiar, se descarta.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [data?.selectedDate, selectedFileId]);
+
+  async function runBulk(op: BulkOp, opts?: { date?: string; tagId?: string }) {
+    if (!data || selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    setBulkBusy(true);
+    setError(null);
+    try {
+      const res = await bulkTasks(op, ids, opts);
+      clearSelection();
+      setPendingBulkDelete(false);
+      void refresh(data.selectedDay, data.week);
+      if (res.skipped > 0) {
+        setRecurringNotice((prev) => ({
+          n: (prev?.n ?? 0) + 1,
+          text: `${res.affected} ${res.affected === 1 ? 'tarea actualizada' : 'tareas actualizadas'}; ${res.skipped} con tiempo registrado se dejaron en su día.`,
+        }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo aplicar la acción en lote');
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function handleLogout() {
     try {
       await logout();
@@ -883,6 +943,21 @@ export default function App() {
 
           <div className="main-grid">
             <section className="tasks-panel card">
+              {selectMode && (
+                <BulkActionBar
+                  count={selectedIds.size}
+                  days={data.days}
+                  currentDay={data.selectedDay}
+                  tags={data.tags}
+                  busy={bulkBusy}
+                  onComplete={() => void runBulk('complete')}
+                  onMove={(date) => void runBulk('move', { date })}
+                  onAddTag={(tagId) => void runBulk('add_tag', { tagId })}
+                  onInbox={() => void runBulk('inbox')}
+                  onDelete={() => setPendingBulkDelete(true)}
+                  onCancel={clearSelection}
+                />
+              )}
               {data.tags.length > 0 && (
                 <div className="tag-filter" role="group" aria-label="Filtrar por etiqueta">
                   <button
@@ -928,6 +1003,9 @@ export default function App() {
                 canReorder={!filterTagId}
                 lockedTaskId={lockedTaskId}
                 busyTaskIds={busyTaskIds}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onStartSelect={startSelect}
                 onTaskCreated={handleTaskCreated}
                 onTaskDeleted={handleTaskDeleted}
                 onTaskTextUpdated={handleTaskTextUpdated}
@@ -1082,6 +1160,18 @@ export default function App() {
           destructive
           onConfirm={confirmPendingSwitch}
           onCancel={() => setPendingSwitch(null)}
+        />
+      )}
+
+      {pendingBulkDelete && (
+        <ConfirmDialog
+          title={`¿Eliminar ${selectedIds.size} ${selectedIds.size === 1 ? 'tarea' : 'tareas'}?`}
+          message="Se borran junto con sus sesiones registradas. No se puede deshacer."
+          confirmLabel="Eliminar"
+          cancelLabel="Cancelar"
+          destructive
+          onConfirm={() => void runBulk('delete')}
+          onCancel={() => setPendingBulkDelete(false)}
         />
       )}
     </div>

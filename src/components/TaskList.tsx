@@ -100,6 +100,9 @@ export default function TaskList({
   canReorder = true,
   lockedTaskId,
   busyTaskIds,
+  selectedIds,
+  onToggleSelect,
+  onStartSelect,
   onTaskCreated,
   onTaskDeleted,
   onTaskTextUpdated,
@@ -130,6 +133,11 @@ export default function TaskList({
   canReorder?: boolean;
   lockedTaskId: string | null;
   busyTaskIds: Set<string>;
+  /** ids marcados para acciones en lote; `size > 0` = modo selección. */
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  /** Entrar en modo selección con esta tarea marcada (desde el menú ⋮). */
+  onStartSelect: (id: string) => void;
   onTaskCreated: (task: Task) => void;
   onTaskDeleted: (id: string) => void;
   onTaskTextUpdated: (id: string, name: string) => void;
@@ -377,6 +385,8 @@ export default function TaskList({
     }
   }
 
+  const selectMode = selectedIds.size > 0;
+
   return (
     <>
       {tasks.length === 0 ? (
@@ -402,11 +412,13 @@ export default function TaskList({
             const isBusy = busyTaskIds.has(task.id);
             const disableEdit = isLocked || isBusy;
             const isEditingText = editingTaskId === task.id;
+            const isSelected = selectedIds.has(task.id);
+            const selectDisabled = selectMode && isLocked;
 
             return (
               <li
                 key={task.id}
-                draggable={canReorder && !disableEdit && !isEditingText}
+                draggable={canReorder && !disableEdit && !isEditingText && !selectMode}
                 onDragStart={(e) => handleDragStart(e, task.id)}
                 onDragOver={(e) => handleDragOver(e, i)}
                 onDrop={(e) => handleDrop(e, i)}
@@ -414,25 +426,45 @@ export default function TaskList({
                 className={dragOverIndex === i && dragId && dragId !== task.id ? 'drag-over' : ''}
               >
                 <div
-                  className={
-                    task.id === selectedTaskId
-                      ? 'task-item active'
-                      : isLocked
-                        ? 'task-item locked'
-                        : 'task-item'
-                  }
+                  className={[
+                    'task-item',
+                    task.id === selectedTaskId && !selectMode ? 'active' : '',
+                    isLocked ? 'locked' : '',
+                    selectMode ? 'is-selecting' : '',
+                    isSelected ? 'is-selected' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                   data-priority={task.priority ?? undefined}
                   title={isLocked ? 'Detén el timer para mover o borrar esta tarea' : undefined}
                 >
                   <button
                     type="button"
-                    className={task.done ? 'task-check checked' : 'task-check'}
-                    onClick={() => onToggleDone(task)}
-                    disabled={isToggling}
-                    aria-label={task.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
-                    title={task.done ? 'Marcar como pendiente' : 'Marcar como hecha'}
+                    className={
+                      (selectMode ? isSelected : task.done) ? 'task-check checked' : 'task-check'
+                    }
+                    onClick={() =>
+                      selectMode ? onToggleSelect(task.id) : onToggleDone(task)
+                    }
+                    disabled={selectMode ? selectDisabled : isToggling}
+                    aria-label={
+                      selectMode
+                        ? isSelected
+                          ? 'Quitar de la selección'
+                          : 'Agregar a la selección'
+                        : task.done
+                          ? 'Marcar como pendiente'
+                          : 'Marcar como hecha'
+                    }
+                    title={
+                      selectMode
+                        ? 'Seleccionar'
+                        : task.done
+                          ? 'Marcar como pendiente'
+                          : 'Marcar como hecha'
+                    }
                   >
-                    {!isToggling && task.done ? '✓' : ''}
+                    {(selectMode ? isSelected : !isToggling && task.done) ? '✓' : ''}
                   </button>
 
                   {isEditingText ? (
@@ -467,7 +499,12 @@ export default function TaskList({
                       </button>
                     </div>
                   ) : (
-                    <button type="button" className="task-select" onClick={() => onSelect(task)}>
+                    <button
+                      type="button"
+                      className="task-select"
+                      onClick={() => (selectMode ? onToggleSelect(task.id) : onSelect(task))}
+                      disabled={selectDisabled}
+                    >
                       {task.source === 'calendar' && (
                         <span className="task-src" title="Del calendario" aria-label="Del calendario">
                           📅
@@ -532,6 +569,7 @@ export default function TaskList({
                         onSendToInbox={
                           task.sessions.length === 0 ? () => onSendToInbox(task) : undefined
                         }
+                        onStartSelect={() => onStartSelect(task.id)}
                         disabled={disableEdit}
                         editDisabled={isBusy}
                         isSet={Boolean(

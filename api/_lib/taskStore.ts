@@ -334,6 +334,20 @@ export type UpdateTaskPositionInput = {
   afterId?: string | null;
 };
 
+/** Operaciones en lote sobre varias tareas seleccionadas. */
+export type BulkOp = 'complete' | 'reopen' | 'move' | 'inbox' | 'add_tag' | 'delete';
+export type BulkTasksInput = {
+  op?: string;
+  ids?: unknown;
+  /** 'move' → 'YYYY-MM-DD' destino. */
+  date?: string;
+  /** 'add_tag' → etiqueta a agregar a todas. */
+  tagId?: string;
+};
+/** `affected` = tareas efectivamente modificadas; `skipped` = descartadas
+ *  (p. ej. mandar al inbox una tarea con tiempo registrado). */
+export type BulkResult = { affected: number; skipped: number };
+
 export type LogSessionInput = {
   taskId?: string;
   durationSeconds?: number;
@@ -399,6 +413,8 @@ export interface TaskStore {
   updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult>;
   deleteTask(taskId?: string): Promise<void>;
   updateTaskPosition(input: UpdateTaskPositionInput): Promise<{ id: string }>;
+  /** Completar / reabrir / mover / etiquetar / borrar varias tareas de una. */
+  bulkTasks(input: BulkTasksInput): Promise<BulkResult>;
   /** Trae a hoy las tareas pendientes sin sesiones de días pasados. */
   carryOverToToday(input: { fileId?: string }): Promise<{ moved: number }>;
 

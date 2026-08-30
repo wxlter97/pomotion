@@ -374,6 +374,18 @@ export function moveTaskToInbox(id: string) {
   return moveTask(id, { date: null });
 }
 
+// --- Acciones en lote ---
+
+export type BulkOp = 'complete' | 'reopen' | 'move' | 'inbox' | 'add_tag' | 'delete';
+
+/** Aplica una acción a varias tareas. `date` para 'move', `tagId` para 'add_tag'. */
+export function bulkTasks(op: BulkOp, ids: string[], opts?: { date?: string; tagId?: string }) {
+  return request<{ ok: true; affected: number; skipped: number }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'bulk', op, ids, date: opts?.date, tag_id: opts?.tagId }),
+  });
+}
+
 // --- Sesiones ---
 
 export function postSession(payload: {
