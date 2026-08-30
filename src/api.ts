@@ -12,6 +12,7 @@ import type {
   Tag,
   Task,
   TaskPriority,
+  TaskSearchResult,
   TasksResponse,
 } from './types';
 
@@ -97,6 +98,13 @@ export function getTasks(day?: string, week?: string, fileId?: string) {
   if (fileId) params.set('file', fileId);
   const query = params.toString();
   return request<TasksResponse>(`/api/tasks${query ? `?${query}` : ''}`);
+}
+
+/** Busca tareas por texto en el nombre (todas las semanas + inbox del contexto). */
+export function searchTasks(query: string, fileId?: string) {
+  const params = new URLSearchParams({ search: query });
+  if (fileId) params.set('file', fileId);
+  return request<{ results: TaskSearchResult[] }>(`/api/tasks?${params.toString()}`);
 }
 
 /** Resumen del mes "YYYY-MM" (tareas + horas por día) para el calendario. */

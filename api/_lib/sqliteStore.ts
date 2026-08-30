@@ -71,9 +71,11 @@ import type {
   Session,
   SessionRow,
   SyncCalendarResult,
+  SearchTasksInput,
   Tag,
   Task,
   TaskPriority,
+  TaskSearchResult,
   TaskStore,
   UpdateCalendarFeedInput,
   UpdateDayTemplateInput,
@@ -622,6 +624,48 @@ async function getSessionsInRange(input: ReportInput): Promise<SessionRow[]> {
       durationSeconds: Number(r.duration_sec),
       start: String(r.start_hhmm),
       end: String(r.end_hhmm),
+    };
+  });
+}
+
+// --- Búsqueda de tareas ---
+
+const SEARCH_LIMIT = 50;
+
+/** Escapa los comodines de LIKE (`%` `_`) y el propio escape (`\`). */
+function escapeLike(text: string): string {
+  return text.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+async function searchTasks(input: SearchTasksInput): Promise<TaskSearchResult[]> {
+  const userId = currentUserId();
+  const query = (input.query ?? '').trim();
+  if (query.length === 0) return [];
+
+  const f = fileFilter(input.fileId);
+  const rows = (
+    await getDb().execute({
+      sql: `SELECT id, name, date, done, file,
+                   EXISTS(SELECT 1 FROM work_sessions ws WHERE ws.task_id = tasks.id) AS has_sessions
+            FROM tasks
+            WHERE user_id = ? AND ${f.clause} AND name LIKE ? ESCAPE '\\'
+            ORDER BY (date IS NULL), date DESC, "order"
+            LIMIT ?`,
+      args: [userId, ...f.args, `%${escapeLike(query)}%`, SEARCH_LIMIT],
+    })
+  ).rows;
+
+  return rows.map((r) => {
+    const date = r.date == null ? null : String(r.date);
+    return {
+      id: String(r.id),
+      name: String(r.name),
+      date,
+      done: Number(r.done) === 1,
+      file: r.file == null ? null : String(r.file),
+      weekLabel: date ? weekLabelOf(mondayOf(date)) : null,
+      day: date ? weekdayNameOf(date) : null,
+      hasSessions: Number(r.has_sessions) === 1,
     };
   });
 }
@@ -1955,6 +1999,7 @@ export const sqliteStore: TaskStore = {
   getFocusHeatmap,
   getAnalytics,
   getSessionsInRange,
+  searchTasks,
   listFiles,
   listTags,
   createTag,

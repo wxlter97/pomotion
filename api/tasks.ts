@@ -28,6 +28,14 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (typeof req.query.goals === 'string') {
         return res.status(200).json({ goals: await sqliteStore.listGoals() });
       }
+      // ?search=<q> → tareas cuyo nombre contiene el texto (todas las semanas + inbox).
+      if (typeof req.query.search === 'string') {
+        const results = await sqliteStore.searchTasks({
+          query: req.query.search,
+          fileId: typeof req.query.file === 'string' ? req.query.file : undefined,
+        });
+        return res.status(200).json({ results });
+      }
       // ?feeds=1 → calendarios iCal suscriptos.
       if (typeof req.query.feeds === 'string') {
         return res.status(200).json({ feeds: await sqliteStore.listCalendarFeeds() });

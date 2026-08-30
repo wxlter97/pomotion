@@ -471,7 +471,7 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 | Feature | Qué | Notas de costo |
 |---|---|---|
-| **Búsqueda de tareas** | Caja de búsqueda (atajo `/` o menú "Ver") que encuentra tareas por texto en todas las semanas + inbox; muestra fecha y contexto, clic para saltar a esa semana/día. | `GET /api/tasks?search=<q>` plegado (1 query `LIKE` scopeada). Sin migración. Componente `SearchDialog`. |
+| ~~**Búsqueda de tareas**~~ ✅ | Caja de búsqueda (atajo `/` o menú "Ver" → "Buscar tareas") que encuentra tareas por texto en todas las semanas + inbox; muestra día/fecha y contexto, ↑↓/Enter o clic para saltar a esa semana/día. | `GET /api/tasks?search=<q>` plegado (1 query `LIKE` escapada, scopeada por user+file, tope 50). Sin migración. `searchTasks` en el store, `SearchDialog` en el front. |
 | **Backup completo (export / import JSON)** | `GET /api/tasks?export=1` devuelve todo el dataset del usuario (tareas, sesiones, tags, plantillas, metas, feeds); `POST {action:'import'}` lo restaura. | Sin migración. Import v1: aditivo con ids nuevos, o solo en cuenta vacía — definir al hacerlo. Descarga vía navegación normal (como el CSV del reporte). |
 | **Pomodoro configurable** | Duración de foco / descanso corto / largo, "descanso largo cada N pomos", auto-arrancar la fase siguiente. | 100% cliente: hook `useTimerSettings` en `localStorage`. El `Timer` ya maneja fases; solo parametrizar. |
 | **Objetivo de pomodoros del día** | "4 pomos hoy" con puntitos de progreso cerca del timer; se deriva de las sesiones de hoy. | Cliente. Target en `localStorage`. Cero backend. |
