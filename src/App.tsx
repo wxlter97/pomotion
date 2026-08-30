@@ -61,6 +61,7 @@ import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
+import { usePomodoroSetting } from './usePomodoroSetting';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
@@ -148,6 +149,7 @@ export default function App() {
   const [accent, chooseAccent] = useAccent();
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
+  const [pomodoroEnabled, togglePomodoro] = usePomodoroSetting();
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const [showWeekend, toggleWeekend] = useWeekendSetting();
   const notifications = useNotificationSetting();
@@ -845,9 +847,14 @@ export default function App() {
           <MenuItem onClick={handleToggleWeekend} state={showWeekend ? 'Sí' : 'No'}>
             Mostrar fin de semana
           </MenuItem>
-          <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
-            Pomodoro
+          <MenuItem onClick={togglePomodoro} state={pomodoroEnabled ? 'Sí' : 'No'}>
+            Usar Pomodoro
           </MenuItem>
+          {pomodoroEnabled && (
+            <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
+              Ajustes de Pomodoro
+            </MenuItem>
+          )}
           <div className="menu-heading">Color de acento</div>
           <div className="accent-row" role="group" aria-label="Color de acento">
             {ACCENTS.map((a) => (
@@ -1137,6 +1144,7 @@ export default function App() {
                 onPhaseChange={setTimerPhase}
                 soundsEnabled={soundsEnabled}
                 notificationsEnabled={notifications.enabled}
+                pomodoroEnabled={pomodoroEnabled}
               />
             </section>
           </div>

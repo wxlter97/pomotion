@@ -33,12 +33,14 @@ const Timer = forwardRef<
     onPhaseChange?: (phase: TimerPhase) => void;
     soundsEnabled: boolean;
     notificationsEnabled: boolean;
+    /** Con `false`, solo el modo "Libre" y sin selector de modo. */
+    pomodoroEnabled: boolean;
   }
 >(function Timer(
-  { task, settings, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled },
+  { task, settings, onSessionLogged, onPhaseChange, soundsEnabled, notificationsEnabled, pomodoroEnabled },
   ref
 ) {
-  const [mode, setMode] = useState<TimerMode>('pomodoro');
+  const [mode, setMode] = useState<TimerMode>(pomodoroEnabled ? 'pomodoro' : 'free');
   const [phase, setPhase] = useState<TimerPhase>('idle');
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState<number>(Date.now());
@@ -71,7 +73,7 @@ const Timer = forwardRef<
     restoredRef.current = true;
     const persisted = loadActiveTimer();
     if (persisted && persisted.taskId === task.id) {
-      setMode(persisted.mode);
+      setMode(pomodoroEnabled ? persisted.mode : 'free');
       setPhase(persisted.phase);
       setStartedAt(persisted.startedAt);
       setCompletedPomodoros(persisted.completedPomodoros ?? 0);
@@ -88,6 +90,12 @@ const Timer = forwardRef<
       setStartedAt(null);
     }
   }, [task, phase]);
+
+  // Si se apaga el Pomodoro mientras el timer está quieto, pasar a "Libre".
+  // Un pomodoro en curso se respeta hasta que termine.
+  useEffect(() => {
+    if (!pomodoroEnabled && phase === 'idle' && mode !== 'free') setMode('free');
+  }, [pomodoroEnabled, phase, mode]);
 
   useEffect(() => {
     if (phase === 'idle') return;
@@ -246,28 +254,30 @@ const Timer = forwardRef<
 
   return (
     <div className="timer">
-      <div className="segmented-control" role="tablist" aria-label="Modo de timer">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'pomodoro'}
-          className={mode === 'pomodoro' ? 'segment active' : 'segment'}
-          disabled={phase !== 'idle'}
-          onClick={() => setMode('pomodoro')}
-        >
-          Pomodoro
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'free'}
-          className={mode === 'free' ? 'segment active' : 'segment'}
-          disabled={phase !== 'idle'}
-          onClick={() => setMode('free')}
-        >
-          Libre
-        </button>
-      </div>
+      {pomodoroEnabled && (
+        <div className="segmented-control" role="tablist" aria-label="Modo de timer">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'pomodoro'}
+            className={mode === 'pomodoro' ? 'segment active' : 'segment'}
+            disabled={phase !== 'idle'}
+            onClick={() => setMode('pomodoro')}
+          >
+            Pomodoro
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'free'}
+            className={mode === 'free' ? 'segment active' : 'segment'}
+            disabled={phase !== 'idle'}
+            onClick={() => setMode('free')}
+          >
+            Libre
+          </button>
+        </div>
+      )}
 
       <div className="timer-dial">
         <ProgressRing progress={ringProgress} pulse={mode === 'free' && phase === 'work'} />
