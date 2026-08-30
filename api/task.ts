@@ -16,6 +16,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         due?: string | null;
         estimate_min?: number | null;
         tag_ids?: string[];
+        checklist?: unknown;
       };
       const result = await sqliteStore.updateTask({
         taskId: body.id,
@@ -26,6 +27,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         due: body.due,
         estimateMinutes: body.estimate_min,
         tagIds: body.tag_ids,
+        checklist: body.checklist,
       });
       return res.status(200).json({ ok: true, ...result });
     }

@@ -167,6 +167,40 @@ describe('updateTask / deleteTask', () => {
     const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
     await expect(as(USER, () => sqliteStore.updateTask({ taskId: t.id }))).rejects.toThrow();
   });
+
+  it('guarda el checklist, lo saneia y lo devuelve en la vista', async () => {
+    const view = await as(USER, async () => {
+      const t = await sqliteStore.createTask({ date: '2026-08-24', text: 'x' });
+      await sqliteStore.updateTask({
+        taskId: t.id,
+        checklist: [
+          { text: '  paso 1  ', done: true },
+          { text: 'paso 2' },
+          { text: '   ' }, // se descarta
+        ],
+      });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    const cl = view.tasks[0].checklist;
+    expect(cl.map((i) => ({ text: i.text, done: i.done }))).toEqual([
+      { text: 'paso 1', done: true },
+      { text: 'paso 2', done: false },
+    ]);
+    expect(cl.every((i) => typeof i.id === 'string' && i.id.length > 0)).toBe(true);
+
+    const cleared = await as(USER, async () => {
+      await sqliteStore.updateTask({ taskId: view.tasks[0].id, checklist: [] });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(cleared.tasks[0].checklist).toEqual([]);
+  });
+
+  it('rechaza un checklist que no es lista', async () => {
+    const t = await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'x' }));
+    await expect(
+      as(USER, () => sqliteStore.updateTask({ taskId: t.id, checklist: { text: 'x' } }))
+    ).rejects.toThrow();
+  });
 });
 
 describe('etiquetas / proyectos', () => {

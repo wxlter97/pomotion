@@ -17,6 +17,7 @@ import {
   todayDateStringInTz,
 } from './parse.js';
 import { computeAnalytics } from './analytics.js';
+import { normalizeChecklistInput, parseChecklist, serializeChecklist } from './checklist.js';
 import { ACCOUNT_NONEMPTY_TABLES, BACKUP_TABLES, buildInserts, parseBackup, remapIds } from './backup.js';
 import {
   desiredTasksFromEvents,
@@ -145,6 +146,7 @@ function toTask(r: Row, sessions: Session[], tagIds: string[] = []): Task {
     tagIds,
     source: String(r.source ?? 'manual') === 'calendar' ? 'calendar' : 'manual',
     createdAt: String(r.created_at),
+    checklist: parseChecklist(r.checklist),
     sessions,
   };
 }
@@ -923,6 +925,7 @@ async function createTask(input: CreateTaskInput): Promise<Task> {
     tagIds: [],
     source: 'manual',
     createdAt: now,
+    checklist: [],
     sessions: [],
   };
 }
@@ -995,6 +998,12 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
     sets.push('estimate_min = ?');
     args.push(value);
     result.estimateMinutes = value;
+  }
+  if (input.checklist !== undefined) {
+    const items = normalizeChecklistInput(input.checklist, () => crypto.randomUUID());
+    sets.push('checklist = ?');
+    args.push(serializeChecklist(items));
+    result.checklist = items;
   }
 
   let nextTagIds: string[] | undefined;

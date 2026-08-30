@@ -1,6 +1,7 @@
 import type {
   Analytics,
   CalendarFeed,
+  ChecklistItem,
   DayTemplate,
   DayTemplateItem,
   FileEntry,
@@ -197,6 +198,7 @@ export function updateTaskFields(
     due?: string | null;
     estimateMinutes?: number | null;
     tagIds?: string[];
+    checklist?: ChecklistItem[];
   }
 ) {
   const { estimateMinutes, tagIds, ...rest } = fields;

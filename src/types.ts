@@ -12,6 +12,9 @@ export type TaskPriority = 'low' | 'med' | 'high';
 /** Procedencia de una tarea: creada a mano o traída de un calendario suscripto. */
 export type TaskSource = 'manual' | 'calendar';
 
+/** Un paso marcable dentro de una tarea (subtarea / checklist), sin tiempo propio. */
+export type ChecklistItem = { id: string; text: string; done: boolean };
+
 export type Task = {
   id: string;
   name: string;
@@ -33,6 +36,8 @@ export type Task = {
   source: TaskSource;
   /** ISO-8601 de cuándo se creó la tarea (para el chip de "edad"). */
   createdAt: string;
+  /** Pasos marcables de la tarea (sin tiempo propio); lista vacía = sin checklist. */
+  checklist: ChecklistItem[];
   sessions: Session[];
 };
 
