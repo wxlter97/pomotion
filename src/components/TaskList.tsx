@@ -137,7 +137,7 @@ export default function TaskList({
   /** Entrar en modo selección con esta tarea marcada (desde el menú ⋮). */
   onStartSelect: (id: string) => void;
   onTaskCreated: (task: Task) => void;
-  onTaskDeleted: (id: string) => void;
+  onTaskDeleted: (task: Task) => void;
   onTaskTextUpdated: (id: string, name: string) => void;
   onTaskUpdated: (id: string, patch: Partial<Task>) => void;
   /** Mover a un día de otra semana (el menú ⋮); dentro de la semana visible
@@ -195,7 +195,7 @@ export default function TaskList({
     setError(null);
     try {
       await deleteTask(pendingTaskDelete.id);
-      onTaskDeleted(pendingTaskDelete.id);
+      onTaskDeleted(pendingTaskDelete);
       setPendingTaskDelete(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('taskList.deleteError'));

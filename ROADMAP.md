@@ -553,8 +553,17 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   la creación manual de ítems (textarea de nombres) sigue sin prioridad/estimación/
   hora, igual que antes; el tooltip de la plantilla ahora muestra la hora si hay.
   Sin función serverless nueva, en el backup.
-- **Deshacer la última acción**: snackbar "Deshacer" (5-10s) para borrar tarea /
-  marcar hecho / mover, para el error más común sin la fricción de confirmar todo.
+- ~~**Deshacer la última acción**~~ ✅ — snackbar "Deshacer" (6s, `useUndo.ts`
+  genérico + `UndoSnackbar`) para tres acciones: **marcar hecho** (solo al marcar,
+  no al desmarcar — sería ruido), **mover** (a otro día/semana, agendar desde el
+  inbox, o mandar al inbox — las tres reversan a `task.date` original o al inbox),
+  y **borrar tarea**. Una sola oferta pendiente a la vez (una nueva reemplaza a la
+  anterior). El borrado no tiene soft-delete en el server, así que "deshacer"
+  reconstruye la tarea a mano (`createTask`/`createInboxTask` + reaplica
+  priority/notes/due/estimate/planned\*/tags/checklist + re-loguea las sesiones) —
+  queda con un id nuevo y al final del día (no en su posición original); mejor
+  esfuerzo, no transaccional. Sin migración, sin función serverless nueva, 100%
+  cliente.
 - **Atajos de teclado en el timeline**: alternativa al arrastre — flechas para
   mover el bloque seleccionado (paso de 15 min), Shift+flecha para redimensionar.
   Accesibilidad para cuando no da el mouse/dedo.

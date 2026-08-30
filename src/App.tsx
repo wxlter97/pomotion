@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   bulkTasks,
   carryOverToToday,
+  createInboxTask,
+  createTask,
   getAuthStatus,
   getFiles,
   getTasks,
@@ -10,8 +12,10 @@ import {
   moveTask,
   moveTaskToInbox,
   PendingApprovalError,
+  postManualSession,
   UnauthorizedError,
   updateTaskDone,
+  updateTaskFields,
   type BulkOp,
 } from './api';
 import CarryOverBanner from './components/CarryOverBanner';
@@ -44,6 +48,7 @@ import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import TimerSettingsDialog from './components/TimerSettingsDialog';
+import UndoSnackbar from './components/UndoSnackbar';
 import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
@@ -63,6 +68,7 @@ import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
+import { useUndo } from './useUndo';
 import { usePomodoroSetting } from './usePomodoroSetting';
 import { readFileOrder, useFileOrder } from './useFileOrder';
 import { orderFiles } from './fileOrder';
@@ -156,6 +162,7 @@ export default function App() {
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [pomodoroEnabled, togglePomodoro] = usePomodoroSetting();
+  const undo = useUndo();
   const t = useT();
   const { lang, setLang } = useLang();
   const tRef = useRef(t);
@@ -453,6 +460,14 @@ export default function App() {
     setTaskDone(task.id, next); // optimista
     try {
       await updateTaskDone(task.id, next);
+      // Deshacer solo al marcar como hecha (des-marcarla ya es "deshacer" en
+      // sí mismo — ofrecerlo también ahí sería ruido).
+      if (next) {
+        undo.offer(
+          tRef.current('undo.taskDone', { name: task.name || tRef.current('taskList.noText') }),
+          () => void undoSetTaskDone(task.id)
+        );
+      }
     } catch (err) {
       setTaskDone(task.id, task.done); // revertir
       setError(err instanceof Error ? err.message : tRef.current('taskList.updateError'));
@@ -465,16 +480,32 @@ export default function App() {
     }
   }
 
+  async function undoSetTaskDone(taskId: string) {
+    setTogglingIds((prev) => new Set(prev).add(taskId));
+    setTaskDone(taskId, false);
+    try {
+      await updateTaskDone(taskId, false);
+    } catch (err) {
+      setTaskDone(taskId, true); // revertir
+      setError(err instanceof Error ? err.message : tRef.current('taskList.updateError'));
+    } finally {
+      setTogglingIds((prev) => {
+        const s = new Set(prev);
+        s.delete(taskId);
+        return s;
+      });
+    }
+  }
+
   function handleTaskCreated(task: Task) {
     setData((prev) => (prev ? { ...prev, tasks: [...prev.tasks, task] } : prev));
   }
 
-  function handleTaskDeleted(id: string) {
+  function handleTaskDeleted(task: Task) {
+    const id = task.id;
     setData((prev) => {
       if (!prev) return prev;
-      const removed = prev.tasks
-        .find((t) => t.id === id)
-        ?.sessions.reduce((s, ses) => s + ses.durationSeconds, 0) ?? 0;
+      const removed = task.sessions.reduce((s, ses) => s + ses.durationSeconds, 0);
       return {
         ...prev,
         tasks: prev.tasks.filter((t) => t.id !== id),
@@ -483,6 +514,41 @@ export default function App() {
       };
     });
     setSelectedTask((prev) => (prev?.id === id ? null : prev));
+    undo.offer(
+      tRef.current('undo.taskDeleted', { name: task.name || tRef.current('taskList.noText') }),
+      () => void undoDeleteTask(task)
+    );
+  }
+
+  // Reconstruye una tarea borrada: no hay soft-delete en el server, así que
+  // "deshacer" recrea la tarea (id nuevo) y reaplica sus campos + sesiones a
+  // mano. Mejor esfuerzo — si algún paso falla, lo que ya se aplicó queda.
+  async function undoDeleteTask(task: Task) {
+    try {
+      const created =
+        task.date == null
+          ? (await createInboxTask(task.name, selectedFileId ?? undefined)).task
+          : (await createTask(task.date, task.name, selectedFileId ?? undefined)).task;
+
+      const fields: Parameters<typeof updateTaskFields>[1] = {};
+      if (task.priority != null) fields.priority = task.priority;
+      if (task.notes) fields.notes = task.notes;
+      if (task.due != null) fields.due = task.due;
+      if (task.estimateMinutes != null) fields.estimateMinutes = task.estimateMinutes;
+      if (task.plannedStart != null) fields.plannedStart = task.plannedStart;
+      if (task.plannedMinutes != null) fields.plannedMinutes = task.plannedMinutes;
+      if (task.tagIds.length > 0) fields.tagIds = task.tagIds;
+      if (task.checklist.length > 0) fields.checklist = task.checklist;
+      if (Object.keys(fields).length > 0) await updateTaskFields(created.id, fields);
+
+      if (task.done) await updateTaskDone(created.id, true);
+      for (const s of task.sessions) {
+        await postManualSession(created.id, s.durationSeconds, s.start, s.end);
+      }
+      void refresh(data?.selectedDay, data?.week);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tRef.current('undo.restoreError'));
+    }
   }
 
   function handleTaskTextUpdated(id: string, name: string) {
@@ -563,6 +629,7 @@ export default function App() {
     try {
       await moveTask(task.id, { date: target.date });
       void refresh(selectedDay, week);
+      offerMoveUndo(task);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
       setError(err instanceof Error ? err.message : tRef.current('drag.moveError', { dest: target.destLabel }));
@@ -572,6 +639,28 @@ export default function App() {
         s.delete(task.id);
         return s;
       });
+    }
+  }
+
+  /** Ofrece deshacer un movimiento: vuelve a `task.date` (o al inbox, si
+   *  `task` venía sin fecha) — sirve para las tres formas de "mover" (a
+   *  otro día/semana, agendar desde el inbox, mandar al inbox). */
+  function offerMoveUndo(task: Task) {
+    undo.offer(
+      tRef.current('undo.taskMoved', { name: task.name || tRef.current('taskList.noText') }),
+      () => void undoMoveTask(task.id, task.date)
+    );
+  }
+
+  async function undoMoveTask(taskId: string, originalDate: string | null) {
+    if (!data) return;
+    const { selectedDay, week } = data;
+    try {
+      if (originalDate === null) await moveTaskToInbox(taskId);
+      else await moveTask(taskId, { date: originalDate });
+      void refresh(selectedDay, week);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tRef.current('undo.moveBackError'));
     }
   }
 
@@ -705,6 +794,7 @@ export default function App() {
     try {
       await moveTask(task.id, { date });
       void refresh(selectedDay, week);
+      offerMoveUndo(task);
     } catch (err) {
       setError(err instanceof Error ? err.message : tRef.current('drag.scheduleError'));
       void refresh(selectedDay, week); // restaura el inbox
@@ -726,6 +816,7 @@ export default function App() {
     try {
       await moveTaskToInbox(task.id);
       void refresh(selectedDay, week);
+      offerMoveUndo(task);
     } catch (err) {
       setError(err instanceof Error ? err.message : tRef.current('drag.toInboxError'));
       void refresh(selectedDay, week);
@@ -1180,6 +1271,16 @@ export default function App() {
       )}
 
       <Footer />
+
+      {undo.pending && (
+        <UndoSnackbar
+          id={undo.pending.id}
+          message={undo.pending.message}
+          windowMs={undo.windowMs}
+          onUndo={undo.trigger}
+          onDismiss={undo.dismiss}
+        />
+      )}
 
       {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
 
