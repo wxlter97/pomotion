@@ -43,6 +43,9 @@ export const es = {
   'app.exitFocus': 'Salir de foco',
   'app.exitFocusTitle': 'Salir del modo foco (Esc)',
   'app.toggleTheme': 'Cambiar tema (T)',
+  'app.viewToggleLabel': 'Vista',
+  'app.viewTasks': 'Tareas',
+  'app.viewAgenda': 'Agenda',
 
   'menu.view': 'Ver',
   'menu.more': 'Más opciones',

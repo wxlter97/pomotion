@@ -567,6 +567,20 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 - **Atajos de teclado en el timeline**: alternativa al arrastre — flechas para
   mover el bloque seleccionado (paso de 15 min), Shift+flecha para redimensionar.
   Accesibilidad para cuando no da el mouse/dedo.
+- ~~**Calendario: el evento importado nace ya agendado**~~ ✅ — la sincronización de
+  calendarios ponía la hora del evento solo en la nota (`📅 09:00–10:30`) sin tocar
+  `planned_start`; el evento quedaba en la cola "Sin horario" de la agenda y había que
+  arrastrarlo a mano, uno por uno. `desiredTasksFromEvents` ahora también manda
+  `plannedStart` (la hora local de inicio, la misma que ya se calculaba para la nota) y
+  `syncCalendarFeeds` lo persiste al crear y al actualizar — con el mismo criterio de
+  "tarea sin tocar" que ya protegía nombre/fecha/estimación de un re-sync. Sin
+  migración (`planned_start` ya existía desde `010_time_blocking.sql`), sin función
+  nueva.
+- ~~**Toggle Tareas/Agenda en la vista principal**~~ ✅ — segmented control junto al
+  selector de día ("Tareas" / "Agenda", mismo estilo que Pomodoro/Libre del timer) para
+  abrir la Agenda del día sin pasar por el menú "Ver"; abre el mismo diálogo
+  `DayTimeline` de siempre (el ítem del menú "Ver" sigue estando, como atajo
+  alternativo). Sin migración, sin función nueva, 100% cliente.
 
 ### Fuera de alcance (sigue igual que §9)
 

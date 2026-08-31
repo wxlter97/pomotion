@@ -607,6 +607,13 @@ h3 {
   flex-wrap: wrap;
 }
 
+.day-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .day-selector {
   display: flex;
   flex-direction: column;

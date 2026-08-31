@@ -1376,6 +1376,22 @@ describe('calendarios iCal', () => {
     expect(feeds[0].lastSyncedAt).not.toBeNull();
   });
 
+  it('agenda el evento en su horario, sin que haya que moverlo a mano', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827'))); // 09:00–10:00 local
+
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ name: 'Trabajo', url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    expect(view.tasks[0]).toMatchObject({ plannedStart: '09:00', estimateMinutes: 60 });
+  });
+
   it('re-sync: agrega nuevos, actualiza los sin tocar, borra los que se fueron', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
