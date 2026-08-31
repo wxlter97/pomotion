@@ -2372,7 +2372,7 @@ async function syncCalendarFeeds(input: {
       const existing: FeedTaskRow[] = (
         await db.execute({
           sql: `SELECT t.id, t.external_uid, t.name, t.date, t.external_date, t.notes, t.estimate_min,
-                       t.done,
+                       t.planned_start, t.done,
                        EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id) AS has_sessions
                 FROM tasks t
                 WHERE t.user_id = ? AND t.feed_id = ?
@@ -2387,6 +2387,7 @@ async function syncCalendarFeeds(input: {
         externalDate: r.external_date == null ? null : String(r.external_date),
         notes: r.notes == null ? null : String(r.notes),
         estimateMin: r.estimate_min == null ? null : Number(r.estimate_min),
+        plannedStart: r.planned_start == null ? null : String(r.planned_start),
         done: Number(r.done) === 1,
         hasSessions: Number(r.has_sessions) === 1,
       }));
@@ -2415,8 +2416,8 @@ async function syncCalendarFeeds(input: {
         writes.push({
           sql: `INSERT INTO tasks
                   (id, user_id, name, date, done, "order", file, source, feed_id, external_uid,
-                   external_date, estimate_min, notes, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 0, ?, ?, 'calendar', ?, ?, ?, ?, ?, ?, ?)`,
+                   external_date, estimate_min, planned_start, notes, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 0, ?, ?, 'calendar', ?, ?, ?, ?, ?, ?, ?, ?)`,
           args: [
             crypto.randomUUID(),
             userId,
@@ -2428,6 +2429,7 @@ async function syncCalendarFeeds(input: {
             d.externalUid,
             d.date,
             d.estimateMin > 0 ? d.estimateMin : null,
+            d.plannedStart,
             d.notes,
             iso,
             iso,
@@ -2436,14 +2438,15 @@ async function syncCalendarFeeds(input: {
       }
       for (const u of plan.update) {
         writes.push({
-          sql: `UPDATE tasks SET name = ?, date = ?, external_date = ?, estimate_min = ?, notes = ?,
-                     updated_at = ?
+          sql: `UPDATE tasks SET name = ?, date = ?, external_date = ?, estimate_min = ?,
+                     planned_start = ?, notes = ?, updated_at = ?
                 WHERE id = ? AND user_id = ?`,
           args: [
             u.name,
             u.date,
             u.date,
             u.estimateMin > 0 ? u.estimateMin : null,
+            u.plannedStart,
             u.notes,
             iso,
             u.id,

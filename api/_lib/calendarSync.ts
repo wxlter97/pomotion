@@ -26,6 +26,8 @@ export type DesiredTask = {
   date: string;
   /** Duración del evento en minutos (0 = no setear estimación). */
   estimateMin: number;
+  /** 'HH:MM' local — así el evento aparece ya agendado en la agenda del día. */
+  plannedStart: string;
   /** "📅 09:00–10:30 · Sala" para las notas. */
   notes: string;
 };
@@ -39,6 +41,7 @@ export type FeedTaskRow = {
   externalDate: string | null;
   notes: string | null;
   estimateMin: number | null;
+  plannedStart: string | null;
   done: boolean;
   hasSessions: boolean;
 };
@@ -79,6 +82,7 @@ export function desiredTasksFromEvents(events: IcalEvent[], timeZone: string): D
       name: ev.summary.slice(0, 500),
       date: s.date,
       estimateMin: durMin > 0 && durMin <= 24 * 60 ? durMin : 0,
+      plannedStart: s.time,
       notes: `📅 ${s.time}–${e.time}${loc}`.slice(0, 500),
     });
   }
@@ -96,7 +100,8 @@ function differs(row: FeedTaskRow, want: DesiredTask): boolean {
     row.date !== want.date ||
     row.externalDate !== want.date ||
     (row.notes ?? '') !== want.notes ||
-    (row.estimateMin ?? 0) !== want.estimateMin
+    (row.estimateMin ?? 0) !== want.estimateMin ||
+    row.plannedStart !== want.plannedStart
   );
 }
 

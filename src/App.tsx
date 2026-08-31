@@ -1122,36 +1122,62 @@ export default function App() {
               onGoToCurrentWeek={() => guardedGoToWeek(undefined)}
               loading={loading}
             />
-            {(data.dayTotalSeconds > 0 ||
-              data.weekTotalSeconds > 0 ||
-              dayEstimateSeconds > 0) && (
-              <div className="total-pill" title={t("total.title")}>
-                {data.dayTotalSeconds > 0 && (
-                  <span className="total-seg">
-                    <span className="total-pill-label">{t("total.day")}</span>
-                    <span className="total-pill-value">
-                      {formatDurationLabel(data.dayTotalSeconds)}
-                    </span>
-                  </span>
-                )}
-                {dayEstimateSeconds > 0 && (
-                  <span className="total-seg">
-                    <span className="total-pill-label">{t("total.estimate")}</span>
-                    <span className="total-pill-value total-pill-est">
-                      {formatDurationLabel(dayEstimateSeconds)}
-                    </span>
-                  </span>
-                )}
-                {data.weekTotalSeconds > 0 && (
-                  <span className="total-seg">
-                    <span className="total-pill-label">{t("total.week")}</span>
-                    <span className="total-pill-value">
-                      {formatDurationLabel(data.weekTotalSeconds)}
-                    </span>
-                  </span>
-                )}
+            <div className="day-row-actions">
+              <div
+                className="segmented-control view-toggle"
+                role="tablist"
+                aria-label={t('app.viewToggleLabel')}
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!showTimeline}
+                  className={!showTimeline ? 'segment active' : 'segment'}
+                  onClick={() => setShowTimeline(false)}
+                >
+                  {t('app.viewTasks')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showTimeline}
+                  className={showTimeline ? 'segment active' : 'segment'}
+                  onClick={() => setShowTimeline(true)}
+                >
+                  {t('app.viewAgenda')}
+                </button>
               </div>
-            )}
+              {(data.dayTotalSeconds > 0 ||
+                data.weekTotalSeconds > 0 ||
+                dayEstimateSeconds > 0) && (
+                <div className="total-pill" title={t("total.title")}>
+                  {data.dayTotalSeconds > 0 && (
+                    <span className="total-seg">
+                      <span className="total-pill-label">{t("total.day")}</span>
+                      <span className="total-pill-value">
+                        {formatDurationLabel(data.dayTotalSeconds)}
+                      </span>
+                    </span>
+                  )}
+                  {dayEstimateSeconds > 0 && (
+                    <span className="total-seg">
+                      <span className="total-pill-label">{t("total.estimate")}</span>
+                      <span className="total-pill-value total-pill-est">
+                        {formatDurationLabel(dayEstimateSeconds)}
+                      </span>
+                    </span>
+                  )}
+                  {data.weekTotalSeconds > 0 && (
+                    <span className="total-seg">
+                      <span className="total-pill-label">{t("total.week")}</span>
+                      <span className="total-pill-value">
+                        {formatDurationLabel(data.weekTotalSeconds)}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <Inbox

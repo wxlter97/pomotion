@@ -40,6 +40,9 @@ export const en: Record<MsgKey, string> = {
   'app.exitFocus': 'Exit focus',
   'app.exitFocusTitle': 'Exit focus mode (Esc)',
   'app.toggleTheme': 'Toggle theme (T)',
+  'app.viewToggleLabel': 'View',
+  'app.viewTasks': 'Tasks',
+  'app.viewAgenda': 'Agenda',
 
   'menu.view': 'View',
   'menu.more': 'More options',

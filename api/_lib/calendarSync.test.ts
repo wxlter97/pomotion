@@ -31,6 +31,7 @@ function row(over: Partial<FeedTaskRow> = {}): FeedTaskRow {
     externalDate: '2026-08-28',
     notes: '📅 14:00–15:00',
     estimateMin: 60,
+    plannedStart: '14:00',
     done: false,
     hasSessions: false,
     ...over,
@@ -45,6 +46,7 @@ describe('desiredTasksFromEvents', () => {
       name: 'Reunión',
       date: '2026-08-28',
       estimateMin: 60,
+      plannedStart: '14:00',
       notes: '📅 14:00–15:00 · Sala 2',
     });
   });
