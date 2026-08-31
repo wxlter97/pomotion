@@ -109,6 +109,8 @@ export const en: Record<MsgKey, string> = {
   'day.prevWeekTitle': 'Previous week ([)',
   'day.nextWeekTitle': 'Next week (])',
   'day.today': 'Today',
+  'day.prevDay': 'Previous day',
+  'day.nextDay': 'Next day',
 
   // --- Total pill ---
   'total.day': 'Day',

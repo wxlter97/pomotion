@@ -112,6 +112,8 @@ export const es = {
   'day.prevWeekTitle': 'Semana anterior ([)',
   'day.nextWeekTitle': 'Semana siguiente (])',
   'day.today': 'Hoy',
+  'day.prevDay': 'Día anterior',
+  'day.nextDay': 'Día siguiente',
 
   // --- Total pill ---
   'total.day': 'Día',

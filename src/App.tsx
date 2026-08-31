@@ -53,6 +53,7 @@ import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
+import { adjacentDayTarget } from './monthGrid';
 import DragProvider from './drag/DragProvider';
 import { computeReorderTarget, type DragItem, type DropZone } from './drag/dnd';
 import { LANGS, useLang, useT, type MsgKey } from './i18n';
@@ -342,6 +343,16 @@ export default function App() {
       );
     },
     [refresh, guardIfRunning]
+  );
+
+  // Desde la Agenda del día: ‹ › al día siguiente/anterior sin cerrar el sheet.
+  const guardedShiftAgendaDay = useCallback(
+    (delta: 1 | -1) => {
+      if (!data) return;
+      const { week, day } = adjacentDayTarget(data.selectedDate, delta, showWeekend);
+      guardIfRunning(tRef.current('guard.switchDay'), () => void refresh(day, week));
+    },
+    [data, showWeekend, refresh, guardIfRunning]
   );
 
   // Desde la búsqueda: saltar a la semana/día de la tarea elegida. Las del
@@ -1345,6 +1356,10 @@ export default function App() {
           onManageTags={() => setShowTags(true)}
           onTaskUpdated={handleTaskUpdated}
           onClose={() => setShowTimeline(false)}
+          onPreviousDay={() => guardedShiftAgendaDay(-1)}
+          onNextDay={() => guardedShiftAgendaDay(1)}
+          onToday={() => guardedGoToWeek(undefined)}
+          loading={loading}
         />
       )}
 

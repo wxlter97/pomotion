@@ -581,6 +581,15 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   abrir la Agenda del día sin pasar por el menú "Ver"; abre el mismo diálogo
   `DayTimeline` de siempre (el ítem del menú "Ver" sigue estando, como atajo
   alternativo). Sin migración, sin función nueva, 100% cliente.
+- ~~**Navegar de día dentro de la Agenda**~~ ✅ — el toggle anterior dejó en evidencia
+  que `DayTimeline` es un sheet (`.sheet-backdrop` a pantalla completa) que tapa el
+  `DaySelector` de la vista principal: una vez adentro no había forma de cambiar de
+  día sin cerrar la Agenda. Se agregaron ‹ › (día anterior/siguiente) + "Hoy" en el
+  header del sheet. `monthGrid.ts` suma `addDays` y `adjacentDayTarget(dateStr, delta,
+  includeWeekend)` — salta el fin de semana entero (viernes→lunes) si no está visible,
+  reusando `weekTargetForDate` (que ahora acepta `includeWeekend` para no aplastar un
+  sábado/domingo a lunes cuando sí está visible). Sin migración, sin función nueva,
+  100% cliente.
 
 ### Fuera de alcance (sigue igual que §9)
 
