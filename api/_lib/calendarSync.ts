@@ -108,8 +108,17 @@ function differs(row: FeedTaskRow, want: DesiredTask): boolean {
 /**
  * Reconciliación. `existing` debe venir ya acotado a la ventana (por
  * `external_date`), si no las tareas viejas se verían como "desaparecidas".
+ *
+ * `deletedUids`: UIDs que el usuario borró a propósito (ver
+ * `calendar_deleted_events`). Borrar una tarea no deja rastro en `existing`,
+ * así que sin esto un evento borrado se ve igual que uno nuevo y se
+ * recrearía solo en el próximo sync.
  */
-export function planSync(desired: DesiredTask[], existing: FeedTaskRow[]): SyncPlan {
+export function planSync(
+  desired: DesiredTask[],
+  existing: FeedTaskRow[],
+  deletedUids: ReadonlySet<string> = new Set()
+): SyncPlan {
   const desiredByUid = new Map(desired.map((d) => [d.externalUid, d]));
   const existingByUid = new Map(existing.map((r) => [r.externalUid, r]));
 
@@ -118,7 +127,7 @@ export function planSync(desired: DesiredTask[], existing: FeedTaskRow[]): SyncP
   for (const want of desired) {
     const row = existingByUid.get(want.externalUid);
     if (!row) {
-      plan.create.push(want);
+      if (!deletedUids.has(want.externalUid)) plan.create.push(want);
     } else if (untouched(row) && differs(row, want)) {
       plan.update.push({ ...want, id: row.id });
     }

@@ -1431,6 +1431,70 @@ describe('calendarios iCal', () => {
     expect(after).toEqual([{ name: 'Reunión', source: 'calendar' }]);
   });
 
+  it('borrar una tarea del calendario no la recrea en el próximo sync', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    expect(view.tasks).toHaveLength(1);
+    await as(USER, () => sqliteStore.deleteTask(view.tasks[0].id));
+    expect(await thursday()).toEqual([]);
+
+    // el evento sigue igual en el feed (Outlook no se enteró del borrado) →
+    // un re-sync no debería traerlo de vuelta.
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id, force: true }));
+    expect(res.added).toBe(0);
+    expect(await thursday()).toEqual([]);
+  });
+
+  it('lo mismo borrando en lote (bulkTasks delete)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    await as(USER, () => sqliteStore.bulkTasks({ op: 'delete', ids: [view.tasks[0].id] }));
+    expect(await thursday()).toEqual([]);
+
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id, force: true }));
+    expect(res.added).toBe(0);
+    expect(await thursday()).toEqual([]);
+  });
+
+  it('borrar el feed limpia sus tombstones: re-suscribirse trae todo de nuevo', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id }));
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Jueves' })
+    );
+    await as(USER, () => sqliteStore.deleteTask(view.tasks[0].id));
+    await as(USER, () => sqliteStore.deleteCalendarFeed(feed.id));
+
+    // mismo feed suscripto de nuevo (id nuevo) → el tombstone viejo no aplica.
+    const feed2 = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ url: 'https://x.test/c.ics' })
+    );
+    const res = await as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed2.id }));
+    expect(res.added).toBe(1);
+    expect(await thursday()).toEqual([{ name: 'Reunión', source: 'calendar' }]);
+  });
+
   it('guarda el error del feed sin tirar la operación', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
