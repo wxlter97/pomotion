@@ -99,6 +99,19 @@ describe('planSync', () => {
     expect(plan.orphan).toEqual(['t1']);
     expect(plan.remove).toHaveLength(0);
   });
+
+  it('no recrea un evento que el usuario borró a propósito', () => {
+    const desired = desiredTasksFromEvents([ev()], TZ);
+    const plan = planSync(desired, [], new Set(['e1']));
+    expect(plan.create).toHaveLength(0);
+  });
+
+  it('un evento borrado que no está en el feed no afecta nada más', () => {
+    // uid distinto al borrado → sigue creándose normal.
+    const desired = desiredTasksFromEvents([ev({ uid: 'otro' })], TZ);
+    const plan = planSync(desired, [], new Set(['e1']));
+    expect(plan.create).toHaveLength(1);
+  });
 });
 
 describe('syncWindow', () => {

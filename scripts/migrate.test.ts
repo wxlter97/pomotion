@@ -18,6 +18,7 @@ const SCHEMA_TABLES = [
   'calendar_feeds',
   'day_notes',
   'week_focus',
+  'calendar_deleted_events',
   'schema_migrations',
 ];
 
@@ -44,6 +45,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('011_time_blocking_duration.sql');
     expect(applied).toContain('012_recurring_default_time.sql');
     expect(applied).toContain('013_day_template_time.sql');
+    expect(applied).toContain('014_calendar_deleted_events.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });

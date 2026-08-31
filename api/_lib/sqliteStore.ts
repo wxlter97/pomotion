@@ -1285,13 +1285,46 @@ async function updateTask(input: UpdateTaskInput): Promise<UpdateTaskResult> {
   return result;
 }
 
+/**
+ * Antes de borrar tareas que todavía están enlazadas a un feed (`feed_id`
+ * no NULL), graba su UID en `calendar_deleted_events`: el borrado en sí no
+ * deja rastro, así que sin esto el próximo sync las vería como "nuevas" y
+ * las recrearía solas (el evento sigue vivo en el calendario de origen).
+ * Devuelve los `writes` a sumar al mismo batch que hace el borrado.
+ */
+async function tombstoneDeletedCalendarTasks(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  taskIds: string[]
+): Promise<{ sql: string; args: InValue[] }[]> {
+  if (taskIds.length === 0) return [];
+  const ph = taskIds.map(() => '?').join(',');
+  const rows = (
+    await db.execute({
+      sql: `SELECT feed_id, external_uid FROM tasks
+            WHERE user_id = ? AND id IN (${ph}) AND feed_id IS NOT NULL AND external_uid IS NOT NULL`,
+      args: [userId, ...taskIds],
+    })
+  ).rows;
+  const iso = new Date().toISOString();
+  return rows.map((r) => ({
+    sql: `INSERT INTO calendar_deleted_events (user_id, feed_id, external_uid, deleted_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT (user_id, feed_id, external_uid) DO UPDATE SET deleted_at = excluded.deleted_at`,
+    args: [userId, String(r.feed_id), String(r.external_uid), iso] as InValue[],
+  }));
+}
+
 async function deleteTask(taskId?: string): Promise<void> {
   const userId = currentUserId();
   if (!taskId) throw new BadRequestError('invalid_task_id', 'Falta task_id');
+  const db = getDb();
+  const tombstones = await tombstoneDeletedCalendarTasks(db, userId, [taskId]);
   // El enforcement de FK ON DELETE CASCADE no es fiable por conexión en
   // Turso → borro las filas dependientes explícitamente.
-  await getDb().batch(
+  await db.batch(
     [
+      ...tombstones,
       { sql: 'DELETE FROM work_sessions WHERE task_id = ? AND user_id = ?', args: [taskId, userId] },
       { sql: 'DELETE FROM task_tags WHERE task_id = ?', args: [taskId] },
       { sql: 'DELETE FROM tasks WHERE id = ? AND user_id = ?', args: [taskId, userId] },
@@ -1400,8 +1433,10 @@ async function bulkTasks(input: BulkTasksInput): Promise<BulkResult> {
   }
 
   if (input.op === 'delete') {
+    const tombstones = await tombstoneDeletedCalendarTasks(db, userId, owned);
     await db.batch(
       [
+        ...tombstones,
         { sql: `DELETE FROM work_sessions WHERE user_id = ? AND task_id IN (${oph})`, args: [userId, ...owned] },
         { sql: `DELETE FROM task_tags WHERE task_id IN (${oph})`, args: owned },
         { sql: `DELETE FROM tasks WHERE user_id = ? AND id IN (${oph})`, args: [userId, ...owned] },
@@ -2308,6 +2343,13 @@ async function deleteCalendarFeed(id?: string): Promise<void> {
     });
   }
   batch.push({ sql: 'DELETE FROM calendar_feeds WHERE id = ? AND user_id = ?', args: [id, userId] });
+  // Los tombstones de este feed ya no sirven: si el usuario lo vuelve a
+  // suscribir, es un feed_id nuevo (createCalendarFeed genera otro id) y
+  // arranca desde cero — se sincroniza todo de nuevo, sin nada bloqueado.
+  batch.push({
+    sql: 'DELETE FROM calendar_deleted_events WHERE user_id = ? AND feed_id = ?',
+    args: [userId, id],
+  });
   await db.batch(batch, 'write');
 }
 
@@ -2392,7 +2434,17 @@ async function syncCalendarFeeds(input: {
         hasSessions: Number(r.has_sessions) === 1,
       }));
 
-      const plan = planSync(desired, existing);
+      // Eventos que el usuario borró a propósito: no se recrean solos.
+      const deletedUids = new Set(
+        (
+          await db.execute({
+            sql: `SELECT external_uid FROM calendar_deleted_events WHERE user_id = ? AND feed_id = ?`,
+            args: [userId, feed.id],
+          })
+        ).rows.map((r) => String(r.external_uid))
+      );
+
+      const plan = planSync(desired, existing, deletedUids);
 
       // Orden: al final de cada día, en el bucket del feed.
       const f = fileFilter(feed.file ?? undefined);

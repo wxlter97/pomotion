@@ -598,6 +598,17 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   siguiendo el mismo patrón `max-height + display:flex;flex-direction:column` que ya
   usan `.sheet--report`/`.sheet--search`; el header y "Cerrar" quedan siempre fijos y
   visibles. Sin migración, sin función nueva, 100% CSS.
+- ~~**Borrar una tarea de calendario la revivía sola en el próximo sync**~~ ✅ — borrar
+  una tarea no dejaba ningún rastro de que existió; si el evento seguía vivo en el
+  feed (Outlook no se entera del borrado en Pomotion), `planSync` la veía como
+  "nueva" y la recreaba. Migración `014_calendar_deleted_events.sql`
+  (`user_id, feed_id, external_uid, deleted_at`). `deleteTask` y `bulkTasks`
+  (`op:'delete'`) graban un tombstone ahí — solo para tareas todavía enlazadas a un
+  feed (`feed_id` no NULL); no aplica al housekeeping automático (`plan.remove`,
+  cuando el evento desaparece del feed solo). `planSync` ahora recibe los UIDs
+  borrados y salta el `create` correspondiente. `deleteCalendarFeed` limpia los
+  tombstones del feed que borra (uno nuevo, si se re-suscribe, arranca de cero: otro
+  `feed_id`). Sin función serverless nueva.
 
 ### Fuera de alcance (sigue igual que §9)
 
