@@ -520,139 +520,141 @@ export default function DayTimeline({
           </div>
         </div>
 
-        <div className="timeline-legend">
-          <span><i className="timeline-swatch timeline-swatch--planned" /> {t('timeline.planned')}</span>
-          <span><i className="timeline-swatch timeline-swatch--actual" /> {t('timeline.actual')}</span>
-        </div>
+        <div className="timeline-content">
+          <div className="timeline-legend">
+            <span><i className="timeline-swatch timeline-swatch--planned" /> {t('timeline.planned')}</span>
+            <span><i className="timeline-swatch timeline-swatch--actual" /> {t('timeline.actual')}</span>
+          </div>
 
-        {unscheduled.length > 0 && (
-          <div className="timeline-unscheduled">
-            <span className="timeline-unscheduled-label">{t('timeline.unscheduled')}</span>
-            <div className="timeline-unscheduled-list">
-              {unscheduled.map((task) => (
+          {unscheduled.length > 0 && (
+            <div className="timeline-unscheduled">
+              <span className="timeline-unscheduled-label">{t('timeline.unscheduled')}</span>
+              <div className="timeline-unscheduled-list">
+                {unscheduled.map((task) => (
+                  <button
+                    type="button"
+                    key={task.id}
+                    className={draggingId === task.id ? 'timeline-chip is-dragging' : 'timeline-chip'}
+                    data-priority={task.priority ?? undefined}
+                    onPointerDown={(e) => ctrl.beginSchedule(e, task.id, task.name)}
+                    onClick={() => setExpandedId((cur) => (cur === task.id ? null : task.id))}
+                  >
+                    {task.name || t('taskList.noText')}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="timeline-scroll" ref={scrollRef}>
+            <div className="timeline-body" style={{ height: MINUTES_PER_DAY * PX_PER_MIN }}>
+              <div className="timeline-hours">
+                {hours.map((h) => (
+                  <span key={h} className="timeline-hour-label" style={{ top: h * HOUR_PX }}>
+                    {String(h).padStart(2, '0')}:00
+                  </span>
+                ))}
+              </div>
+              <div className="timeline-lanes" style={gridBackground}>
+                {isToday && nowMin < MINUTES_PER_DAY && (
+                  <div className="timeline-now-line" style={{ top: nowMin * PX_PER_MIN }}>
+                    <span className="timeline-now-dot" />
+                  </div>
+                )}
+                <div
+                  className={ghost?.overLane ? 'timeline-lane timeline-lane--planned is-drop-hot' : 'timeline-lane timeline-lane--planned'}
+                  ref={laneRef}
+                >
+                  {scheduled.map((task) => {
+                    const range = ranges.get(task.id)!;
+                    const col = layout.get(task.id) ?? { col: 0, cols: 1 };
+                    const widthPct = 100 / col.cols;
+                    return (
+                      <div
+                        key={task.id}
+                        className={[
+                          'timeline-block',
+                          expandedId === task.id ? 'is-expanded' : '',
+                          draggingId === task.id ? 'is-dragging' : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' ')}
+                        data-priority={task.priority ?? undefined}
+                        style={{
+                          top: range.start * PX_PER_MIN,
+                          height: Math.max((range.end - range.start) * PX_PER_MIN, MIN_BLOCK_PX),
+                          left: `calc(${col.col * widthPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                        }}
+                        onPointerDown={(e) => ctrl.beginMove(e, task.id, timeToMinutes(task.plannedStart!))}
+                        onClick={() => setExpandedId((cur) => (cur === task.id ? null : task.id))}
+                        title={task.name || t('taskList.noText')}
+                      >
+                        <span className="timeline-block-time">
+                          {minutesToTime(range.start)}–{minutesToTime(range.end)}
+                        </span>
+                        <span className="timeline-block-name">{task.name || t('taskList.noText')}</span>
+                        <span
+                          className="timeline-resize-handle"
+                          onPointerDown={(e) => {
+                            e.stopPropagation(); // no dispares el "mover" del bloque padre
+                            ctrl.beginResize(e, task.id, range.start, range.end - range.start);
+                          }}
+                          aria-label={t('timeline.resizeHandle')}
+                          title={t('timeline.resizeHandle')}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="timeline-lane timeline-lane--actual">
+                  {sessionBars.map((bar) => {
+                    const col = sessionLayout.get(bar.id) ?? { col: 0, cols: 1 };
+                    const widthPct = 100 / col.cols;
+                    return (
+                      <div
+                        key={bar.id}
+                        className="timeline-session-bar"
+                        style={{
+                          top: bar.range.start * PX_PER_MIN,
+                          height: Math.max((bar.range.end - bar.range.start) * PX_PER_MIN, MIN_BLOCK_PX * 0.6),
+                          left: `calc(${col.col * widthPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                        }}
+                        title={`${bar.taskName || t('taskList.noText')} (${minutesToTime(bar.range.start)}–${minutesToTime(bar.range.end)})`}
+                      >
+                        {bar.taskName}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {expandedTask && (
+            <div className="timeline-details">
+              <div className="timeline-details-header">
+                <strong>{expandedTask.name || t('taskList.noText')}</strong>
                 <button
                   type="button"
-                  key={task.id}
-                  className={draggingId === task.id ? 'timeline-chip is-dragging' : 'timeline-chip'}
-                  data-priority={task.priority ?? undefined}
-                  onPointerDown={(e) => ctrl.beginSchedule(e, task.id, task.name)}
-                  onClick={() => setExpandedId((cur) => (cur === task.id ? null : task.id))}
+                  className="btn btn-icon"
+                  onClick={() => setExpandedId(null)}
+                  aria-label={t('common.close')}
+                  title={t('common.close')}
                 >
-                  {task.name || t('taskList.noText')}
+                  ×
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        <div className="timeline-scroll" ref={scrollRef}>
-          <div className="timeline-body" style={{ height: MINUTES_PER_DAY * PX_PER_MIN }}>
-            <div className="timeline-hours">
-              {hours.map((h) => (
-                <span key={h} className="timeline-hour-label" style={{ top: h * HOUR_PX }}>
-                  {String(h).padStart(2, '0')}:00
-                </span>
-              ))}
-            </div>
-            <div className="timeline-lanes" style={gridBackground}>
-              {isToday && nowMin < MINUTES_PER_DAY && (
-                <div className="timeline-now-line" style={{ top: nowMin * PX_PER_MIN }}>
-                  <span className="timeline-now-dot" />
-                </div>
-              )}
-              <div
-                className={ghost?.overLane ? 'timeline-lane timeline-lane--planned is-drop-hot' : 'timeline-lane timeline-lane--planned'}
-                ref={laneRef}
-              >
-                {scheduled.map((task) => {
-                  const range = ranges.get(task.id)!;
-                  const col = layout.get(task.id) ?? { col: 0, cols: 1 };
-                  const widthPct = 100 / col.cols;
-                  return (
-                    <div
-                      key={task.id}
-                      className={[
-                        'timeline-block',
-                        expandedId === task.id ? 'is-expanded' : '',
-                        draggingId === task.id ? 'is-dragging' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                      data-priority={task.priority ?? undefined}
-                      style={{
-                        top: range.start * PX_PER_MIN,
-                        height: Math.max((range.end - range.start) * PX_PER_MIN, MIN_BLOCK_PX),
-                        left: `calc(${col.col * widthPct}% + 2px)`,
-                        width: `calc(${widthPct}% - 4px)`,
-                      }}
-                      onPointerDown={(e) => ctrl.beginMove(e, task.id, timeToMinutes(task.plannedStart!))}
-                      onClick={() => setExpandedId((cur) => (cur === task.id ? null : task.id))}
-                      title={task.name || t('taskList.noText')}
-                    >
-                      <span className="timeline-block-time">
-                        {minutesToTime(range.start)}–{minutesToTime(range.end)}
-                      </span>
-                      <span className="timeline-block-name">{task.name || t('taskList.noText')}</span>
-                      <span
-                        className="timeline-resize-handle"
-                        onPointerDown={(e) => {
-                          e.stopPropagation(); // no dispares el "mover" del bloque padre
-                          ctrl.beginResize(e, task.id, range.start, range.end - range.start);
-                        }}
-                        aria-label={t('timeline.resizeHandle')}
-                        title={t('timeline.resizeHandle')}
-                      />
-                    </div>
-                  );
-                })}
               </div>
-              <div className="timeline-lane timeline-lane--actual">
-                {sessionBars.map((bar) => {
-                  const col = sessionLayout.get(bar.id) ?? { col: 0, cols: 1 };
-                  const widthPct = 100 / col.cols;
-                  return (
-                    <div
-                      key={bar.id}
-                      className="timeline-session-bar"
-                      style={{
-                        top: bar.range.start * PX_PER_MIN,
-                        height: Math.max((bar.range.end - bar.range.start) * PX_PER_MIN, MIN_BLOCK_PX * 0.6),
-                        left: `calc(${col.col * widthPct}% + 2px)`,
-                        width: `calc(${widthPct}% - 4px)`,
-                      }}
-                      title={`${bar.taskName || t('taskList.noText')} (${minutesToTime(bar.range.start)}–${minutesToTime(bar.range.end)})`}
-                    >
-                      {bar.taskName}
-                    </div>
-                  );
-                })}
-              </div>
+              <TaskDetails
+                task={expandedTask}
+                allTags={allTags}
+                onChange={(patch) => onTaskUpdated(expandedTask.id, patch)}
+                onManageTags={onManageTags}
+              />
             </div>
-          </div>
+          )}
         </div>
-
-        {expandedTask && (
-          <div className="timeline-details">
-            <div className="timeline-details-header">
-              <strong>{expandedTask.name || t('taskList.noText')}</strong>
-              <button
-                type="button"
-                className="btn btn-icon"
-                onClick={() => setExpandedId(null)}
-                aria-label={t('common.close')}
-                title={t('common.close')}
-              >
-                ×
-              </button>
-            </div>
-            <TaskDetails
-              task={expandedTask}
-              allTags={allTags}
-              onChange={(patch) => onTaskUpdated(expandedTask.id, patch)}
-              onManageTags={onManageTags}
-            />
-          </div>
-        )}
 
         {error && <p className="error">{error}</p>}
 

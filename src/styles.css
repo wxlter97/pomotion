@@ -3949,6 +3949,17 @@ kbd {
 /* --- Agenda / timeline del día (time-blocking v2, ROADMAP §11 Tier 3) --- */
 .sheet--timeline {
   max-width: min(94vw, 760px);
+  max-height: min(90vh, 760px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Todo lo variable (leyenda, cola "sin horario", grilla de horas, panel de
+ * detalle de la tarea expandida) vive acá adentro, que es lo que scrollea —
+ * el header (día ‹ ›) y las acciones del final quedan siempre a la vista. */
+.timeline-content {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .timeline-header {
