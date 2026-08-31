@@ -590,6 +590,14 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   reusando `weekTargetForDate` (que ahora acepta `includeWeekend` para no aplastar un
   sábado/domingo a lunes cuando sí está visible). Sin migración, sin función nueva,
   100% cliente.
+- ~~**El panel de detalle de la Agenda se desbordaba del sheet**~~ ✅ — `.sheet--timeline`
+  no tenía `max-height`, así que al expandir una tarea el diálogo podía crecer más
+  alto que el viewport sin ninguna forma de scrollear hasta el botón "Cerrar" (quedaba
+  literalmente inalcanzable). Se envolvió el contenido variable (leyenda, cola "sin
+  horario", grilla de horas, panel de detalle) en `.timeline-content`, que scrollea,
+  siguiendo el mismo patrón `max-height + display:flex;flex-direction:column` que ya
+  usan `.sheet--report`/`.sheet--search`; el header y "Cerrar" quedan siempre fijos y
+  visibles. Sin migración, sin función nueva, 100% CSS.
 
 ### Fuera de alcance (sigue igual que §9)
 
