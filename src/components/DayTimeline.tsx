@@ -299,6 +299,10 @@ export default function DayTimeline({
   onManageTags,
   onTaskUpdated,
   onClose,
+  onPreviousDay,
+  onNextDay,
+  onToday,
+  loading,
 }: {
   tasks: Task[];
   selectedDate: string;
@@ -307,6 +311,11 @@ export default function DayTimeline({
   onManageTags: () => void;
   onTaskUpdated: (id: string, patch: Partial<Task>) => void;
   onClose: () => void;
+  /** Ir al día anterior/siguiente sin cerrar la Agenda. */
+  onPreviousDay: () => void;
+  onNextDay: () => void;
+  onToday: () => void;
+  loading?: boolean;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -474,9 +483,42 @@ export default function DayTimeline({
         aria-labelledby="timeline-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="timeline-title">
-          {t('timeline.title')} · {shortDate(selectedDate, lang)}
-        </h2>
+        <div className="timeline-header">
+          <h2 id="timeline-title">{t('timeline.title')}</h2>
+          <div className="timeline-day-nav">
+            <button
+              type="button"
+              className="btn btn-icon"
+              onClick={onPreviousDay}
+              disabled={loading}
+              aria-label={t('day.prevDay')}
+              title={t('day.prevDay')}
+            >
+              ‹
+            </button>
+            <span className="timeline-day-label">{shortDate(selectedDate, lang)}</span>
+            <button
+              type="button"
+              className="btn btn-icon"
+              onClick={onNextDay}
+              disabled={loading}
+              aria-label={t('day.nextDay')}
+              title={t('day.nextDay')}
+            >
+              ›
+            </button>
+            {selectedDate !== today && (
+              <button
+                type="button"
+                className="btn btn-tinted btn-small"
+                onClick={onToday}
+                disabled={loading}
+              >
+                {t('day.today')}
+              </button>
+            )}
+          </div>
+        </div>
 
         <div className="timeline-legend">
           <span><i className="timeline-swatch timeline-swatch--planned" /> {t('timeline.planned')}</span>

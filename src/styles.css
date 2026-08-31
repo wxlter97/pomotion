@@ -3951,6 +3951,40 @@ kbd {
   max-width: min(94vw, 760px);
 }
 
+.timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.timeline-header h2 {
+  margin: 0;
+}
+
+.timeline-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.timeline-day-nav .btn-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.timeline-day-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-label);
+  min-width: 6.5rem;
+  text-align: center;
+}
+
 .timeline-legend {
   display: flex;
   gap: 1rem;

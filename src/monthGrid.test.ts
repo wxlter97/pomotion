@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addDays,
+  adjacentDayTarget,
   isWeekend,
   mondayIndex,
   mondayOf,
@@ -70,7 +72,7 @@ describe('weekTargetForDate', () => {
       day: 'Miércoles',
     });
   });
-  it('un fin de semana → lunes de esa misma semana', () => {
+  it('un fin de semana → lunes de esa misma semana, si no está visible', () => {
     expect(weekTargetForDate('2026-08-29')).toEqual({
       week: '2026.08.24 - 2026.08.28',
       day: 'Lunes',
@@ -78,6 +80,51 @@ describe('weekTargetForDate', () => {
     expect(weekTargetForDate('2026-08-30')).toEqual({
       week: '2026.08.24 - 2026.08.28',
       day: 'Lunes',
+    });
+  });
+  it('un fin de semana → su propio día si está visible (includeWeekend)', () => {
+    expect(weekTargetForDate('2026-08-29', true)).toEqual({
+      week: '2026.08.24 - 2026.08.28',
+      day: 'Sábado',
+    });
+    expect(weekTargetForDate('2026-08-30', true)).toEqual({
+      week: '2026.08.24 - 2026.08.28',
+      day: 'Domingo',
+    });
+  });
+});
+
+describe('addDays', () => {
+  it('suma y resta días, cruzando mes', () => {
+    expect(addDays('2026-08-28', 1)).toBe('2026-08-29');
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-08-24', -1)).toBe('2026-08-23');
+  });
+});
+
+describe('adjacentDayTarget', () => {
+  it('sin fin de semana visible: viernes → salta al lunes siguiente', () => {
+    expect(adjacentDayTarget('2026-08-28', 1, false)).toEqual({
+      week: '2026.08.31 - 2026.09.04',
+      day: 'Lunes',
+    });
+  });
+  it('sin fin de semana visible: lunes → salta al viernes anterior', () => {
+    expect(adjacentDayTarget('2026-08-24', -1, false)).toEqual({
+      week: '2026.08.17 - 2026.08.21',
+      day: 'Viernes',
+    });
+  });
+  it('con fin de semana visible: viernes → sábado, sin saltar', () => {
+    expect(adjacentDayTarget('2026-08-28', 1, true)).toEqual({
+      week: '2026.08.24 - 2026.08.28',
+      day: 'Sábado',
+    });
+  });
+  it('día laboral a día laboral: un paso simple', () => {
+    expect(adjacentDayTarget('2026-08-26', 1, false)).toEqual({
+      week: '2026.08.24 - 2026.08.28',
+      day: 'Jueves',
     });
   });
 });

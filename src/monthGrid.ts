@@ -35,6 +35,13 @@ export function mondayIndex(dateStr: string): number {
   return (parseYmd(dateStr).getUTCDay() + 6) % 7;
 }
 
+/** `dateStr` desplazada `days` días ("YYYY-MM-DD"; `days` negativo = hacia atrás). */
+export function addDays(dateStr: string, days: number): string {
+  const d = parseYmd(dateStr);
+  d.setUTCDate(d.getUTCDate() + days);
+  return ymd(d);
+}
+
 /** Lunes ("YYYY-MM-DD") de la semana que contiene `dateStr`. */
 export function mondayOf(dateStr: string): string {
   const d = parseYmd(dateStr);
@@ -77,16 +84,34 @@ export function monthTitle(month: string, lang: Lang = 'es'): string {
 
 /**
  * Par (etiqueta de semana, etiqueta de día) para navegar la vista semanal a
- * `dateStr`. Los fines de semana no existen en la vista Lun–Vie → se cae al
- * lunes de esa misma semana.
+ * `dateStr`. Si el fin de semana no está visible (`includeWeekend=false`,
+ * el default), un sábado/domingo cae al lunes de esa misma semana.
  */
-export function weekTargetForDate(dateStr: string): { week: string; day: string } {
+export function weekTargetForDate(
+  dateStr: string,
+  includeWeekend = false
+): { week: string; day: string } {
   const monday = mondayOf(dateStr);
   const friday = ymd(
     new Date(parseYmd(monday).getTime() + 4 * 86400000)
   );
   const week = `${monday.replace(/-/g, '.')} - ${friday.replace(/-/g, '.')}`;
   const idx = mondayIndex(dateStr);
-  const day = idx >= 5 ? WEEKDAY_LABELS[0] : WEEKDAY_LABELS[idx];
+  const day = idx >= 5 && !includeWeekend ? WEEKDAY_LABELS[0] : WEEKDAY_LABELS[idx];
   return { week, day };
+}
+
+/**
+ * Par (semana, día) del día siguiente (`delta=1`) o anterior (`delta=-1`) a
+ * `dateStr` — para "‹ ›" en la Agenda del día. Si el fin de semana no está
+ * visible, lo salta entero (viernes → lunes) en vez de aterrizar en él.
+ */
+export function adjacentDayTarget(
+  dateStr: string,
+  delta: 1 | -1,
+  includeWeekend: boolean
+): { week: string; day: string } {
+  let next = addDays(dateStr, delta);
+  while (!includeWeekend && isWeekend(next)) next = addDays(next, delta);
+  return weekTargetForDate(next, includeWeekend);
 }
