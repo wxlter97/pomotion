@@ -619,6 +619,17 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   la posición en la lista — el chip 🕐 queda como dato informativo (y sigue mandando en
   el layout de la Agenda, que no depende del orden del array). Se quita `(planned_start
   IS NULL), planned_start` del `ORDER BY`. Sin migración, sin función nueva.
+- ~~**Analítica se desbordaba en mobile**~~ ✅ — mismo problema que ya se había arreglado
+  en la Agenda (`.sheet--timeline`, ver arriba): `.sheet--analytics` no tenía
+  `max-height`, así que con suficiente contenido (24 barras de "Por hora del día" +
+  las de "Tendencia semanal") el diálogo crecía más alto que el viewport sin ninguna
+  forma de scrollear — el título y los tabs de rango quedaban tapados por la barra de
+  estado y "Cerrar" inalcanzable. Se envolvió el contenido variable (mensaje de
+  error/vacío + `.an-body`) en `.an-scroll`, que scrollea, con el mismo patrón
+  `max-height + display:flex;flex-direction:column` que ya usan
+  `.sheet--report`/`.sheet--search`/`.sheet--timeline`; el título y los tabs de rango
+  quedan siempre fijos arriba, "Cerrar" siempre fijo abajo. Sin migración, sin función
+  nueva, 100% CSS.
 
 ### Fuera de alcance (sigue igual que §9)
 

@@ -3436,10 +3436,21 @@ body.is-dragging * {
 /* --- Analítica --- */
 .sheet--analytics {
   max-width: min(94vw, 560px);
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
 }
 
 .an-range {
   margin-bottom: 1rem;
+}
+
+/* Todo lo variable (mensaje de error/vacío, stats, gráficos) vive acá
+ * adentro, que es lo que scrollea — el título + los tabs de rango y
+ * "Cerrar" quedan siempre a la vista (mismo patrón que .timeline-content). */
+.an-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .an-body {
