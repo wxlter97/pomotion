@@ -169,101 +169,103 @@ export default function Analytics({
           ))}
         </div>
 
-        {error && <p className="error">{error}</p>}
+        <div className="an-scroll">
+          {error && <p className="error">{error}</p>}
 
-        {data && data.totalSeconds === 0 && !error && (
-          <p className="muted">{t('analytics.empty')}</p>
-        )}
+          {data && data.totalSeconds === 0 && !error && (
+            <p className="muted">{t('analytics.empty')}</p>
+          )}
 
-        {data && data.totalSeconds > 0 && (
-          <div className="an-body" aria-busy={loading}>
-            <div className="an-stats">
-              <div className="an-stat">
-                <span className="an-stat-value">{formatDurationLabel(data.totalSeconds)}</span>
-                <span className="an-stat-label">{t('analytics.logged')}</span>
-              </div>
-              <div className="an-stat">
-                <span className="an-stat-value">{data.activeDays}</span>
-                <span className="an-stat-label">
-                  {plural(data.activeDays, t('analytics.activeDay'), t('analytics.activeDays'))}
-                </span>
-              </div>
-              <div className="an-stat">
-                <span className="an-stat-value">{data.streak.current}</span>
-                <span className="an-stat-label">{t('analytics.currentStreak')}</span>
-              </div>
-              <div className="an-stat">
-                <span className="an-stat-value">{data.streak.longest}</span>
-                <span className="an-stat-label">{t('analytics.bestStreak')}</span>
-              </div>
-            </div>
-
-            <section className="an-section">
-              <h3>{t('analytics.completionRate')}</h3>
-              <div className="an-completion">
-                <div className="an-completion-track">
-                  <div className="an-completion-fill" style={{ width: `${rate}%` }} />
+          {data && data.totalSeconds > 0 && (
+            <div className="an-body" aria-busy={loading}>
+              <div className="an-stats">
+                <div className="an-stat">
+                  <span className="an-stat-value">{formatDurationLabel(data.totalSeconds)}</span>
+                  <span className="an-stat-label">{t('analytics.logged')}</span>
                 </div>
-                <span className="an-completion-text">
-                  {t('analytics.completionText', { pct: rate, done: data.completion.done, total: data.completion.total })}
-                </span>
+                <div className="an-stat">
+                  <span className="an-stat-value">{data.activeDays}</span>
+                  <span className="an-stat-label">
+                    {plural(data.activeDays, t('analytics.activeDay'), t('analytics.activeDays'))}
+                  </span>
+                </div>
+                <div className="an-stat">
+                  <span className="an-stat-value">{data.streak.current}</span>
+                  <span className="an-stat-label">{t('analytics.currentStreak')}</span>
+                </div>
+                <div className="an-stat">
+                  <span className="an-stat-value">{data.streak.longest}</span>
+                  <span className="an-stat-label">{t('analytics.bestStreak')}</span>
+                </div>
               </div>
-            </section>
 
-            {data.estimateAccuracy && (
               <section className="an-section">
-                <h3>{t('analytics.estimateAccuracy')}</h3>
-                <EstimateAccuracyBlock a={data.estimateAccuracy} t={t} />
-              </section>
-            )}
-
-            <section className="an-section">
-              <h3>{t('analytics.byWeekday')}</h3>
-              <div className="an-weekday">
-                {data.byWeekday.map((d, i) => (
-                  <div className="an-weekday-row" key={i}>
-                    <span className="an-weekday-name">{t('analytics.weekdayAbbrs').split(',')[i]}</span>
-                    <div className="an-weekday-track">
-                      <div
-                        className="an-weekday-fill"
-                        style={{ width: `${pct(d.totalSeconds, weekdayMax)}%` }}
-                      />
-                    </div>
-                    <span className="an-weekday-value">
-                      {d.totalSeconds > 0 ? compactHours(d.totalSeconds) : t('analytics.noData')}
-                    </span>
+                <h3>{t('analytics.completionRate')}</h3>
+                <div className="an-completion">
+                  <div className="an-completion-track">
+                    <div className="an-completion-fill" style={{ width: `${rate}%` }} />
                   </div>
-                ))}
-              </div>
-            </section>
+                  <span className="an-completion-text">
+                    {t('analytics.completionText', { pct: rate, done: data.completion.done, total: data.completion.total })}
+                  </span>
+                </div>
+              </section>
 
-            <section className="an-section">
-              <h3>{t('analytics.byHour')}</h3>
-              <BarStrip
-                label={formatDurationLabel}
-                items={data.byHour.map((h) => ({
-                  key: String(h.hour),
-                  label: `${String(h.hour).padStart(2, '0')}h`,
-                  showLabel: h.hour % 6 === 0,
-                  value: h.totalSeconds,
-                }))}
-              />
-            </section>
+              {data.estimateAccuracy && (
+                <section className="an-section">
+                  <h3>{t('analytics.estimateAccuracy')}</h3>
+                  <EstimateAccuracyBlock a={data.estimateAccuracy} t={t} />
+                </section>
+              )}
 
-            <section className="an-section">
-              <h3>{t('analytics.weeklyTrend')}</h3>
-              <BarStrip
-                label={formatDurationLabel}
-                items={data.byWeek.map((w, i) => ({
-                  key: w.weekStart,
-                  label: w.label,
-                  showLabel: data.byWeek.length <= 8 || i % 4 === 0,
-                  value: w.totalSeconds,
-                }))}
-              />
-            </section>
-          </div>
-        )}
+              <section className="an-section">
+                <h3>{t('analytics.byWeekday')}</h3>
+                <div className="an-weekday">
+                  {data.byWeekday.map((d, i) => (
+                    <div className="an-weekday-row" key={i}>
+                      <span className="an-weekday-name">{t('analytics.weekdayAbbrs').split(',')[i]}</span>
+                      <div className="an-weekday-track">
+                        <div
+                          className="an-weekday-fill"
+                          style={{ width: `${pct(d.totalSeconds, weekdayMax)}%` }}
+                        />
+                      </div>
+                      <span className="an-weekday-value">
+                        {d.totalSeconds > 0 ? compactHours(d.totalSeconds) : t('analytics.noData')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="an-section">
+                <h3>{t('analytics.byHour')}</h3>
+                <BarStrip
+                  label={formatDurationLabel}
+                  items={data.byHour.map((h) => ({
+                    key: String(h.hour),
+                    label: `${String(h.hour).padStart(2, '0')}h`,
+                    showLabel: h.hour % 6 === 0,
+                    value: h.totalSeconds,
+                  }))}
+                />
+              </section>
+
+              <section className="an-section">
+                <h3>{t('analytics.weeklyTrend')}</h3>
+                <BarStrip
+                  label={formatDurationLabel}
+                  items={data.byWeek.map((w, i) => ({
+                    key: w.weekStart,
+                    label: w.label,
+                    showLabel: data.byWeek.length <= 8 || i % 4 === 0,
+                    value: w.totalSeconds,
+                  }))}
+                />
+              </section>
+            </div>
+          )}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>

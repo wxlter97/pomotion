@@ -128,27 +128,29 @@ export default function AdminUsersDialog({ onClose }: { onClose: () => void }) {
       >
         <h2 id="admin-title">{t('admin.title')}</h2>
 
-        {loading ? (
-          <p className="muted">{t('common.loading')}</p>
-        ) : (
-          <>
-            {pending.length > 0 && (
-              <>
-                <h3 className="admin-section-title">{t('admin.pendingN', { n: pending.length })}</h3>
-                <ul className="admin-user-list">{pending.map(row)}</ul>
-              </>
-            )}
+        <div className="admin-scroll">
+          {loading ? (
+            <p className="muted">{t('common.loading')}</p>
+          ) : (
+            <>
+              {pending.length > 0 && (
+                <>
+                  <h3 className="admin-section-title">{t('admin.pendingN', { n: pending.length })}</h3>
+                  <ul className="admin-user-list">{pending.map(row)}</ul>
+                </>
+              )}
 
-            <h3 className="admin-section-title">{t('admin.withAccessN', { n: approved.length })}</h3>
-            {approved.length === 0 ? (
-              <p className="muted">{t('admin.none')}</p>
-            ) : (
-              <ul className="admin-user-list">{approved.map(row)}</ul>
-            )}
-          </>
-        )}
+              <h3 className="admin-section-title">{t('admin.withAccessN', { n: approved.length })}</h3>
+              {approved.length === 0 ? (
+                <p className="muted">{t('admin.none')}</p>
+              ) : (
+                <ul className="admin-user-list">{approved.map(row)}</ul>
+              )}
+            </>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>

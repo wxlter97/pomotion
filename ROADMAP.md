@@ -619,6 +619,34 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   la posición en la lista — el chip 🕐 queda como dato informativo (y sigue mandando en
   el layout de la Agenda, que no depende del orden del array). Se quita `(planned_start
   IS NULL), planned_start` del `ORDER BY`. Sin migración, sin función nueva.
+- ~~**Analítica se desbordaba en mobile**~~ ✅ — mismo problema que ya se había arreglado
+  en la Agenda (`.sheet--timeline`, ver arriba): `.sheet--analytics` no tenía
+  `max-height`, así que con suficiente contenido (24 barras de "Por hora del día" +
+  las de "Tendencia semanal") el diálogo crecía más alto que el viewport sin ninguna
+  forma de scrollear — el título y los tabs de rango quedaban tapados por la barra de
+  estado y "Cerrar" inalcanzable. Se envolvió el contenido variable (mensaje de
+  error/vacío + `.an-body`) en `.an-scroll`, que scrollea, con el mismo patrón
+  `max-height + display:flex;flex-direction:column` que ya usan
+  `.sheet--report`/`.sheet--search`/`.sheet--timeline`; el título y los tabs de rango
+  quedan siempre fijos arriba, "Cerrar" siempre fijo abajo. Sin migración, sin función
+  nueva, 100% CSS.
+- ~~**El mismo desborde en el resto de los diálogos**~~ ✅ — auditoría de todos los
+  `.sheet` tras el fix de Analítica: Etiquetas, Plantillas de día, Metas, Admin,
+  Calendarios iCal, Tareas recurrentes, Revisión semanal, Vista de mes y Orden de
+  contextos tenían el mismo problema — una lista que crece con los datos del usuario
+  (etiquetas, plantillas, metas, usuarios, feeds, reglas recurrentes, tareas
+  pendientes, semanas de un mes largo, contextos) sin `max-height` en el diálogo. En
+  vez de repetir el fix en cada `.sheet--*`, se subió la red de seguridad a la clase
+  base `.sheet` (`max-height: min(85vh, 640px); display:flex; flex-direction:column`)
+  — los `.sheet--*` con su propio tamaño (report/search/timeline/analytics) lo siguen
+  pisando igual que antes. Cada diálogo envuelve su parte variable en un
+  `<algo>-scroll` (`tags-scroll`, `dt-scroll`, `goals-scroll`, `admin-scroll`,
+  `feeds-scroll`, `recurring-scroll`, `context-order-scroll`, `month-scroll`, y
+  `an-scroll` reusado en `WeeklyReviewDialog`, que comparte `.sheet--analytics` con
+  Analítica pero tiene su propio JSX). De paso, `WeeklyReviewDialog` tenía un
+  `XXKEEP` literal en vez de `{data.thisFocus}` (paso 3 "Tu foco para esta semana") —
+  typo de la migración a i18n (`8810572`), corregido. Sin migración, sin función
+  nueva, 100% CSS/JSX.
 
 ### Fuera de alcance (sigue igual que §9)
 
