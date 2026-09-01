@@ -630,6 +630,23 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   `.sheet--report`/`.sheet--search`/`.sheet--timeline`; el título y los tabs de rango
   quedan siempre fijos arriba, "Cerrar" siempre fijo abajo. Sin migración, sin función
   nueva, 100% CSS.
+- ~~**El mismo desborde en el resto de los diálogos**~~ ✅ — auditoría de todos los
+  `.sheet` tras el fix de Analítica: Etiquetas, Plantillas de día, Metas, Admin,
+  Calendarios iCal, Tareas recurrentes, Revisión semanal, Vista de mes y Orden de
+  contextos tenían el mismo problema — una lista que crece con los datos del usuario
+  (etiquetas, plantillas, metas, usuarios, feeds, reglas recurrentes, tareas
+  pendientes, semanas de un mes largo, contextos) sin `max-height` en el diálogo. En
+  vez de repetir el fix en cada `.sheet--*`, se subió la red de seguridad a la clase
+  base `.sheet` (`max-height: min(85vh, 640px); display:flex; flex-direction:column`)
+  — los `.sheet--*` con su propio tamaño (report/search/timeline/analytics) lo siguen
+  pisando igual que antes. Cada diálogo envuelve su parte variable en un
+  `<algo>-scroll` (`tags-scroll`, `dt-scroll`, `goals-scroll`, `admin-scroll`,
+  `feeds-scroll`, `recurring-scroll`, `context-order-scroll`, `month-scroll`, y
+  `an-scroll` reusado en `WeeklyReviewDialog`, que comparte `.sheet--analytics` con
+  Analítica pero tiene su propio JSX). De paso, `WeeklyReviewDialog` tenía un
+  `XXKEEP` literal en vez de `{data.thisFocus}` (paso 3 "Tu foco para esta semana") —
+  typo de la migración a i18n (`8810572`), corregido. Sin migración, sin función
+  nueva, 100% CSS/JSX.
 
 ### Fuera de alcance (sigue igual que §9)
 

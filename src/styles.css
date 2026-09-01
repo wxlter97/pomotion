@@ -1464,6 +1464,14 @@ body.is-dragging * {
   color: var(--color-destructive);
 }
 
+/* La lista de reglas recurrentes crece con los datos del usuario — scrollea
+ * sola dentro de su `.sheet` (sin sheet--X propio); el intro y "Cerrar"
+ * quedan siempre a la vista. */
+.recurring-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .recurring-list {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -1471,6 +1479,13 @@ body.is-dragging * {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Lista de contextos — normalmente corta, pero sin límite real. Scrollea
+ * sola dentro de su `.sheet` (sin sheet--X propio). */
+.context-order-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .context-order-list {
@@ -1981,6 +1996,13 @@ body.is-dragging * {
   max-width: min(94vw, 460px);
 }
 
+/* La lista de etiquetas crece con los datos del usuario — scrollea sola,
+ * el form de alta y "Cerrar" quedan siempre a la vista (ver `.sheet`). */
+.tags-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .tag-new-form {
   display: flex;
   flex-wrap: wrap;
@@ -2110,6 +2132,12 @@ body.is-dragging * {
   max-width: min(94vw, 480px);
 }
 
+/* La lista de plantillas crece con los datos del usuario — scrollea sola. */
+.dt-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .dt-create {
   display: flex;
   flex-direction: column;
@@ -2234,6 +2262,12 @@ body.is-dragging * {
 /* --- Metas del mes --- */
 .sheet--goals {
   max-width: min(94vw, 480px);
+}
+
+/* La lista de metas crece con los datos del usuario — scrollea sola. */
+.goals-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .goal-new {
@@ -2373,6 +2407,12 @@ body.is-dragging * {
   max-width: min(94vw, 460px);
 }
 
+/* La lista de usuarios crece con la cuenta — scrollea sola. */
+.admin-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .admin-section-title {
   font-size: 0.7rem;
   font-weight: 700;
@@ -2467,6 +2507,12 @@ body.is-dragging * {
 /* --- Calendarios iCal --- */
 .sheet--feeds {
   max-width: min(94vw, 520px);
+}
+
+/* La lista de calendarios crece con los datos del usuario — scrollea sola. */
+.feeds-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .feeds-intro {
@@ -2856,6 +2902,20 @@ body.is-dragging * {
   width: 100%;
   box-shadow: var(--shadow-sheet);
   animation: sheet-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Red de seguridad: sin esto, un diálogo con contenido largo (una lista
+   * que crece con los datos del usuario) puede quedar más alto que el
+   * viewport — .sheet-backdrop es position:fixed sin scroll propio, así que
+   * lo que se pasa del alto queda inalcanzable (título tapado arriba,
+   * "Cerrar" inalcanzable abajo). Cada diálogo con contenido variable
+   * envuelve esa parte en su propio "-scroll" (overflow-y:auto; min-height:0)
+   * para que sea eso lo que scrollea y no el diálogo entero; el header y las
+   * acciones del final quedan siempre fijos. Los `.sheet--*` con su propio
+   * max-height/max-width (report/search/timeline/analytics) pisan estos
+   * valores default.
+   */
+  max-height: min(85vh, 640px);
+  display: flex;
+  flex-direction: column;
 }
 
 .sheet h2 {
@@ -3168,6 +3228,13 @@ body.is-dragging * {
 /* --- Month view --- */
 .sheet--month {
   max-width: 460px;
+}
+
+/* Un mes de 6 semanas es alto — de sobra en un teléfono chico. Scrollea
+ * solo, el header (‹ mes › + Hoy) y "Cerrar" quedan siempre a la vista. */
+.month-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .month-header {

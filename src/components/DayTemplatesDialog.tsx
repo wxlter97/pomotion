@@ -176,79 +176,81 @@ export default function DayTemplatesDialog({
           </div>
         </form>
 
-        {templates.length === 0 ? (
-          <p className="muted">{t('templates.none')}</p>
-        ) : (
-          <ul className="dt-list">
-            {templates.map((tpl) => (
-              <li key={tpl.id} className="dt-item">
-                <div className="dt-item-main">
-                  {editingId === tpl.id ? (
-                    <input
-                      type="text"
-                      className="dt-rename-input"
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      onBlur={() => void saveName(tpl)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          void saveName(tpl);
-                        } else if (e.key === 'Escape') {
-                          e.preventDefault();
-                          setEditingId(null);
+        <div className="dt-scroll">
+          {templates.length === 0 ? (
+            <p className="muted">{t('templates.none')}</p>
+          ) : (
+            <ul className="dt-list">
+              {templates.map((tpl) => (
+                <li key={tpl.id} className="dt-item">
+                  <div className="dt-item-main">
+                    {editingId === tpl.id ? (
+                      <input
+                        type="text"
+                        className="dt-rename-input"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        onBlur={() => void saveName(tpl)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            void saveName(tpl);
+                          } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setEditingId(null);
+                          }
+                        }}
+                        disabled={busy}
+                        autoFocus
+                        maxLength={60}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="dt-item-name"
+                        onClick={() => {
+                          setEditingId(tpl.id);
+                          setEditingName(tpl.name);
+                        }}
+                        title={
+                          tpl.items.map((i) => (i.plannedStart ? `${i.plannedStart} ${i.name}` : i.name)).join('\n') ||
+                          t('templates.noItems')
                         }
-                      }}
-                      disabled={busy}
-                      autoFocus
-                      maxLength={60}
-                    />
-                  ) : (
+                      >
+                        {tpl.name}
+                      </button>
+                    )}
+                    <span className="dt-item-count">
+                      {tpl.items.length} {plural(tpl.items.length, t('templates.taskCountOne'), t('templates.taskCountMany'))}
+                    </span>
+                  </div>
+                  <div className="dt-item-actions">
                     <button
                       type="button"
-                      className="dt-item-name"
-                      onClick={() => {
-                        setEditingId(tpl.id);
-                        setEditingName(tpl.name);
-                      }}
-                      title={
-                        tpl.items.map((i) => (i.plannedStart ? `${i.plannedStart} ${i.name}` : i.name)).join('\n') ||
-                        t('templates.noItems')
-                      }
+                      className="btn btn-tinted btn-small"
+                      onClick={() => apply(tpl)}
+                      disabled={busy || tpl.items.length === 0}
                     >
-                      {tpl.name}
+                      {t('templates.applyTo', { day: dayName })}
                     </button>
-                  )}
-                  <span className="dt-item-count">
-                    {tpl.items.length} {plural(tpl.items.length, t('templates.taskCountOne'), t('templates.taskCountMany'))}
-                  </span>
-                </div>
-                <div className="dt-item-actions">
-                  <button
-                    type="button"
-                    className="btn btn-tinted btn-small"
-                    onClick={() => apply(tpl)}
-                    disabled={busy || tpl.items.length === 0}
-                  >
-                    {t('templates.applyTo', { day: dayName })}
-                  </button>
-                  <button
-                    type="button"
-                    className="dt-item-delete"
-                    onClick={() => setPendingDelete(tpl)}
-                    disabled={busy}
-                    aria-label={t('templates.deleteAria', { name: tpl.name })}
-                    title={t('templates.deleteTitle')}
-                  >
-                    ×
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                    <button
+                      type="button"
+                      className="dt-item-delete"
+                      onClick={() => setPendingDelete(tpl)}
+                      disabled={busy}
+                      aria-label={t('templates.deleteAria', { name: tpl.name })}
+                      title={t('templates.deleteTitle')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>

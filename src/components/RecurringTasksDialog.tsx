@@ -213,188 +213,190 @@ export default function RecurringTasksDialog({
         <h2 id="recurring-title">{t('recurring.title')}</h2>
         <p className="muted">{t('recurring.intro')}</p>
 
-        {loading ? (
-          <p className="muted">{t('common.loading')}</p>
-        ) : (
-          <>
-            {rules.length === 0 ? (
-              <p className="muted">{t('recurring.none')}</p>
-            ) : (
-              <ul className="recurring-list">
-                {rules.map((rule) => (
-                  <li key={rule.id}>
-                    {editingId === rule.id ? (
-                      <div className="recurring-edit">
-                        <input
-                          type="text"
-                          value={editingText}
-                          onChange={(e) => setEditingText(e.target.value)}
-                          onKeyDown={(e) => onEditKeyDown(e, rule)}
-                          disabled={busy}
-                          autoFocus
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-icon"
-                          onClick={() => void submitEdit(rule)}
-                          disabled={busy}
-                          aria-label={t('common.save')}
-                          title={t('common.save')}
-                        >
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-icon"
-                          onClick={() => setEditingId(null)}
-                          disabled={busy}
-                          aria-label={t('common.cancel')}
-                          title={t('common.cancel')}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="recurring-row-top">
-                          <span className="recurring-text">{rule.name}</span>
-
-                          <div className="segmented recurring-freq">
-                            <button
-                              type="button"
-                              className={rule.freq === 'weekly' ? 'is-active' : undefined}
-                              onClick={() => setFreq(rule, 'weekly')}
-                            >
-                              {t('recurring.weekly')}
-                            </button>
-                            <button
-                              type="button"
-                              className={rule.freq === 'monthly' ? 'is-active' : undefined}
-                              onClick={() => setFreq(rule, 'monthly')}
-                            >
-                              {t('recurring.monthly')}
-                            </button>
-                          </div>
-
-                          <div className="recurring-actions">
-                            <button
-                              type="button"
-                              className="task-move"
-                              onClick={() => startEdit(rule)}
-                              disabled={busy}
-                              aria-label={t('common.edit')}
-                              title={t('common.edit')}
-                            >
-                              ✎
-                            </button>
-                            <button
-                              type="button"
-                              className="task-delete"
-                              onClick={() => setPendingDelete(rule)}
-                              disabled={busy}
-                              aria-label={t('common.delete')}
-                              title={t('common.delete')}
-                            >
-                              ×
-                            </button>
-                          </div>
-                        </div>
-
-                        {rule.freq === 'weekly' ? (
-                          <div className="recurring-days" title={ruleSummary(rule, t)}>
-                            {DAY_NUMS.map((n, i) => (
-                              <button
-                                key={n}
-                                type="button"
-                                className={
-                                  rule.weekdays.split(',').includes(n)
-                                    ? 'recurring-day on'
-                                    : 'recurring-day'
-                                }
-                                onClick={() => toggleDay(rule, n)}
-                                aria-label={t('recurring.weekdayLabel', { label: dayLetters[i] })}
-                              >
-                                {dayLetters[i]}
-                              </button>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="recurring-monthdays" title={ruleSummary(rule, t)}>
-                            {MONTHDAYS.map((n) => (
-                              <button
-                                key={n}
-                                type="button"
-                                className={
-                                  rule.monthdays.split(',').includes(String(n))
-                                    ? 'recurring-monthday on'
-                                    : 'recurring-monthday'
-                                }
-                                onClick={() => toggleMonthday(rule, String(n))}
-                                aria-label={t('recurring.everyMonthDay', { n })}
-                              >
-                                {n}
-                              </button>
-                            ))}
-                            <button
-                              type="button"
-                              className={
-                                rule.monthdays.split(',').includes('-1')
-                                  ? 'recurring-monthday is-last on'
-                                  : 'recurring-monthday is-last'
-                              }
-                              onClick={() => toggleMonthday(rule, '-1')}
-                              title={t('recurring.lastDayTitle')}
-                            >
-                              {t('recurring.lastDay')}
-                            </button>
-                          </div>
-                        )}
-
-                        <div className="recurring-time-row">
-                          <span className="recurring-time-label">{t('recurring.defaultTime')}</span>
+        <div className="recurring-scroll">
+          {loading ? (
+            <p className="muted">{t('common.loading')}</p>
+          ) : (
+            <>
+              {rules.length === 0 ? (
+                <p className="muted">{t('recurring.none')}</p>
+              ) : (
+                <ul className="recurring-list">
+                  {rules.map((rule) => (
+                    <li key={rule.id}>
+                      {editingId === rule.id ? (
+                        <div className="recurring-edit">
                           <input
-                            type="time"
-                            className="task-planned-start-input"
-                            value={rule.defaultPlannedStart ?? ''}
-                            onChange={(e) =>
-                              void patchRule(rule, { defaultPlannedStart: e.target.value || null })
-                            }
+                            type="text"
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => onEditKeyDown(e, rule)}
                             disabled={busy}
+                            autoFocus
                           />
-                          {rule.defaultPlannedStart && (
-                            <button
-                              type="button"
-                              className="btn btn-plain btn-small"
-                              onClick={() => void patchRule(rule, { defaultPlannedStart: null })}
-                              disabled={busy}
-                            >
-                              {t('details.remove')}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="btn btn-icon"
+                            onClick={() => void submitEdit(rule)}
+                            disabled={busy}
+                            aria-label={t('common.save')}
+                            title={t('common.save')}
+                          >
+                            ✓
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-icon"
+                            onClick={() => setEditingId(null)}
+                            disabled={busy}
+                            aria-label={t('common.cancel')}
+                            title={t('common.cancel')}
+                          >
+                            ×
+                          </button>
                         </div>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+                      ) : (
+                        <>
+                          <div className="recurring-row-top">
+                            <span className="recurring-text">{rule.name}</span>
 
-            <form className="task-add-form" onSubmit={submitNew}>
-              <input
-                type="text"
-                value={newText}
-                onChange={(e) => setNewText(e.target.value)}
-                placeholder={t('recurring.addPlaceholder')}
-                disabled={busy}
-              />
-              <button type="submit" className="btn btn-tinted" disabled={busy || !newText.trim()}>
-                Agregar
-              </button>
-            </form>
-          </>
-        )}
+                            <div className="segmented recurring-freq">
+                              <button
+                                type="button"
+                                className={rule.freq === 'weekly' ? 'is-active' : undefined}
+                                onClick={() => setFreq(rule, 'weekly')}
+                              >
+                                {t('recurring.weekly')}
+                              </button>
+                              <button
+                                type="button"
+                                className={rule.freq === 'monthly' ? 'is-active' : undefined}
+                                onClick={() => setFreq(rule, 'monthly')}
+                              >
+                                {t('recurring.monthly')}
+                              </button>
+                            </div>
 
-        {error && <p className="error">{error}</p>}
+                            <div className="recurring-actions">
+                              <button
+                                type="button"
+                                className="task-move"
+                                onClick={() => startEdit(rule)}
+                                disabled={busy}
+                                aria-label={t('common.edit')}
+                                title={t('common.edit')}
+                              >
+                                ✎
+                              </button>
+                              <button
+                                type="button"
+                                className="task-delete"
+                                onClick={() => setPendingDelete(rule)}
+                                disabled={busy}
+                                aria-label={t('common.delete')}
+                                title={t('common.delete')}
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+
+                          {rule.freq === 'weekly' ? (
+                            <div className="recurring-days" title={ruleSummary(rule, t)}>
+                              {DAY_NUMS.map((n, i) => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  className={
+                                    rule.weekdays.split(',').includes(n)
+                                      ? 'recurring-day on'
+                                      : 'recurring-day'
+                                  }
+                                  onClick={() => toggleDay(rule, n)}
+                                  aria-label={t('recurring.weekdayLabel', { label: dayLetters[i] })}
+                                >
+                                  {dayLetters[i]}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="recurring-monthdays" title={ruleSummary(rule, t)}>
+                              {MONTHDAYS.map((n) => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  className={
+                                    rule.monthdays.split(',').includes(String(n))
+                                      ? 'recurring-monthday on'
+                                      : 'recurring-monthday'
+                                  }
+                                  onClick={() => toggleMonthday(rule, String(n))}
+                                  aria-label={t('recurring.everyMonthDay', { n })}
+                                >
+                                  {n}
+                                </button>
+                              ))}
+                              <button
+                                type="button"
+                                className={
+                                  rule.monthdays.split(',').includes('-1')
+                                    ? 'recurring-monthday is-last on'
+                                    : 'recurring-monthday is-last'
+                                }
+                                onClick={() => toggleMonthday(rule, '-1')}
+                                title={t('recurring.lastDayTitle')}
+                              >
+                                {t('recurring.lastDay')}
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="recurring-time-row">
+                            <span className="recurring-time-label">{t('recurring.defaultTime')}</span>
+                            <input
+                              type="time"
+                              className="task-planned-start-input"
+                              value={rule.defaultPlannedStart ?? ''}
+                              onChange={(e) =>
+                                void patchRule(rule, { defaultPlannedStart: e.target.value || null })
+                              }
+                              disabled={busy}
+                            />
+                            {rule.defaultPlannedStart && (
+                              <button
+                                type="button"
+                                className="btn btn-plain btn-small"
+                                onClick={() => void patchRule(rule, { defaultPlannedStart: null })}
+                                disabled={busy}
+                              >
+                                {t('details.remove')}
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <form className="task-add-form" onSubmit={submitNew}>
+                <input
+                  type="text"
+                  value={newText}
+                  onChange={(e) => setNewText(e.target.value)}
+                  placeholder={t('recurring.addPlaceholder')}
+                  disabled={busy}
+                />
+                <button type="submit" className="btn btn-tinted" disabled={busy || !newText.trim()}>
+                  Agregar
+                </button>
+              </form>
+            </>
+          )}
+
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
