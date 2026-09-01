@@ -33,30 +33,24 @@ import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import BackupDialog from './components/BackupDialog';
 import BulkActionBar from './components/BulkActionBar';
-import Report from './components/Report';
 import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
-import FocusHeatmap from './components/FocusHeatmap';
-import Analytics from './components/Analytics';
 import DayTimeline from './components/DayTimeline';
-import WeeklyReviewDialog from './components/WeeklyReviewDialog';
 import Inbox from './components/Inbox';
 import DayNote from './components/DayNote';
-import Menu, { MenuItem } from './components/Menu';
 import TagsDialog from './components/TagsDialog';
 import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import TimerSettingsDialog from './components/TimerSettingsDialog';
 import UndoSnackbar from './components/UndoSnackbar';
-import { ACCENTS } from './accent';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
 import { computeAfterId } from './taskReorder';
 import { adjacentDayTarget } from './monthGrid';
 import DragProvider from './drag/DragProvider';
 import { computeReorderTarget, type DragItem, type DropZone } from './drag/dnd';
-import { LANGS, useLang, useT, type MsgKey } from './i18n';
+import { useLang, useT } from './i18n';
 import { loadActiveTimer } from './timerStorage';
 import { dueBannerText } from './dueReminders';
 import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase } from './types';
@@ -75,47 +69,19 @@ import { readFileOrder, useFileOrder } from './useFileOrder';
 import { orderFiles } from './fileOrder';
 import ContextOrderDialog from './components/ContextOrderDialog';
 import { useTheme } from './useTheme';
+import { SunIcon, MoonIcon, SearchIcon } from './components/icons';
+import BottomNav from './components/BottomNav';
+import SideNav from './components/SideNav';
+import StatsTab from './components/StatsTab';
+import SettingsTab from './components/SettingsTab';
+import QuickAddSheet from './components/QuickAddSheet';
+import type { NavTab } from './components/navItems';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
 type PendingSwitch = { message: string; run: () => void };
 
 const FILE_STORAGE_KEY = 'pomotion:file';
 const NO_DUE_REMINDERS: DueReminder[] = [];
-
-function SunIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <circle cx="12" cy="12" r="4.2" />
-      <path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7" />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
-
-function MoreIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-      <circle cx="12" cy="5" r="1.85" />
-      <circle cx="12" cy="12" r="1.85" />
-      <circle cx="12" cy="19" r="1.85" />
-    </svg>
-  );
-}
 
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
@@ -129,13 +95,10 @@ export default function App() {
   const [pendingSwitch, setPendingSwitch] = useState<PendingSwitch | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
-  const [showReport, setShowReport] = useState(false);
+  const [activeTab, setActiveTab] = useState<NavTab>('today');
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [showMonth, setShowMonth] = useState(false);
-  const [showHeatmap, setShowHeatmap] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
-  const [showTimeline, setShowTimeline] = useState(false);
-  const [showReview, setShowReview] = useState(false);
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
@@ -913,110 +876,9 @@ export default function App() {
     </button>
   );
 
-  const notificationsState =
-    notifications.permission === 'denied'
-      ? t('menu.notificationsBlocked')
-      : notifications.enabled
-        ? t('common.yes')
-        : t('common.no');
-
-  const viewMenu = (
-    <Menu ariaLabel={t('menu.view')} trigger={<>{t('menu.view')}<ChevronDownIcon /></>}>
-      {(close) => (
-        <>
-          <MenuItem onClick={() => { setShowSearch(true); close(); }}>{t('menu.search')}</MenuItem>
-          <MenuItem onClick={() => { setShowMonth(true); close(); }}>{t('menu.monthView')}</MenuItem>
-          <MenuItem onClick={() => { setShowHeatmap(true); close(); }}>{t('menu.heatmap')}</MenuItem>
-          <MenuItem onClick={() => { setShowAnalytics(true); close(); }}>{t('menu.analytics')}</MenuItem>
-          <MenuItem onClick={() => { setShowTimeline(true); close(); }}>{t('menu.timeline')}</MenuItem>
-          <MenuItem onClick={() => { setShowReview(true); close(); }}>{t('menu.weeklyReview')}</MenuItem>
-          <MenuItem onClick={() => { setShowGoals(true); close(); }}>{t('menu.goals')}</MenuItem>
-          <MenuItem onClick={() => { setShowReport(true); close(); }}>{t('menu.report')}</MenuItem>
-          <MenuItem onClick={() => { setShowRecurring(true); close(); }}>{t('menu.recurring')}</MenuItem>
-          <MenuItem onClick={() => { setShowTemplates(true); close(); }}>{t('menu.templates')}</MenuItem>
-          <MenuItem onClick={() => { setShowTags(true); close(); }}>{t('menu.tags')}</MenuItem>
-          <MenuItem onClick={() => { setShowFeeds(true); close(); }}>{t('menu.feeds')}</MenuItem>
-        </>
-      )}
-    </Menu>
-  );
-
-  const moreMenu = (
-    <Menu ariaLabel={t('menu.more')} triggerClassName="btn btn-icon" trigger={<MoreIcon />}>
-      {(close) => (
-        <>
-          <div className="menu-heading">{t('menu.settings')}</div>
-          <MenuItem onClick={toggleSounds} state={soundsEnabled ? t('common.yes') : t('common.no')}>
-            {t('menu.sounds')}
-          </MenuItem>
-          {notifications.permission !== 'unsupported' && (
-            <MenuItem
-              onClick={() => void notifications.toggle()}
-              disabled={notifications.permission === 'denied'}
-              state={notificationsState}
-            >
-              {t('menu.notifications')}
-            </MenuItem>
-          )}
-          <MenuItem onClick={toggleCarryOverAuto} state={carryOverAuto ? t('common.yes') : t('common.no')}>
-            {t('menu.carryOverAuto')}
-          </MenuItem>
-          <MenuItem onClick={handleToggleWeekend} state={showWeekend ? t('common.yes') : t('common.no')}>
-            {t('menu.showWeekend')}
-          </MenuItem>
-          <MenuItem onClick={togglePomodoro} state={pomodoroEnabled ? t('common.yes') : t('common.no')}>
-            {t('menu.usePomodoro')}
-          </MenuItem>
-          {pomodoroEnabled && (
-            <MenuItem onClick={() => { setShowTimerSettings(true); close(); }}>
-              {t('menu.pomodoroSettings')}
-            </MenuItem>
-          )}
-          <MenuItem
-            onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
-            state={LANGS.find((l) => l.code === lang)?.label}
-          >
-            {t('menu.language')}
-          </MenuItem>
-          <div className="menu-heading">{t('menu.accent')}</div>
-          <div className="accent-row" role="group" aria-label={t('menu.accent')}>
-            {ACCENTS.map((a) => (
-              <button
-                key={a.key}
-                type="button"
-                className={accent === a.key ? 'accent-swatch is-on' : 'accent-swatch'}
-                data-accent={a.key}
-                title={t(`accent.${a.key}` as MsgKey)}
-                aria-label={t(`accent.${a.key}` as MsgKey)}
-                aria-pressed={accent === a.key}
-                onClick={() => chooseAccent(a.key)}
-              />
-            ))}
-          </div>
-          <div className="menu-sep" />
-          <MenuItem onClick={() => { setFocusMode(true); close(); }}>{t('menu.focusMode')}</MenuItem>
-          {orderedFiles.length > 1 && (
-            <MenuItem onClick={() => { setShowContextOrder(true); close(); }}>
-              {t('menu.contextOrder')}
-            </MenuItem>
-          )}
-          <MenuItem onClick={() => { setShowBackup(true); close(); }}>{t('menu.backup')}</MenuItem>
-          {authIsAdmin && (
-            <MenuItem onClick={() => { setShowAdmin(true); close(); }}>{t('menu.approveUsers')}</MenuItem>
-          )}
-          <MenuItem
-            onClick={() => { void refresh(data?.selectedDay, data?.week); close(); }}
-            disabled={loading}
-          >
-            {t('app.refresh')}
-          </MenuItem>
-          <MenuItem danger onClick={() => { close(); void handleLogout(); }}>
-            {t('menu.logout')}
-          </MenuItem>
-        </>
-      )}
-    </Menu>
-  );
+  // Visible en Hoy/Agenda (hay un día concreto al que agregarle una tarea);
+  // no en Stats/Ajustes ni en modo foco.
+  const showAdd = Boolean(data) && !focusMode && (activeTab === 'today' || activeTab === 'agenda');
 
   if (authState === 'checking') {
     return (
@@ -1075,51 +937,68 @@ export default function App() {
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
+          <button
+            type="button"
+            className="btn btn-icon"
+            onClick={() => setShowSearch(true)}
+            title={t('menu.search')}
+            aria-label={t('menu.search')}
+          >
+            <SearchIcon />
+          </button>
           {themeToggleButton}
-          {viewMenu}
-          {moreMenu}
         </div>
       </header>
 
-      <FileSelector
-        files={orderedFiles}
-        selectedFileId={selectedFileId}
-        onSelectFile={guardedSelectFile}
-        loading={loading}
+      <SideNav
+        active={activeTab}
+        onSelect={setActiveTab}
+        onAdd={() => setShowQuickAdd(true)}
+        showAdd={showAdd}
+        onSearch={() => setShowSearch(true)}
+        themeToggle={themeToggleButton}
       />
 
-      {!online && <div className="warning banner">{t('app.offline')}</div>}
-      {updateReady && (
-        <div className="info banner pwa-update-banner">
-          <span>{t('app.updateReady')}</span>
-          <button type="button" className="btn btn-tinted btn-small" onClick={applyUpdate}>
-            {t('app.update')}
-          </button>
-        </div>
-      )}
-
-      {error && <p className="error banner">{error}</p>}
-      {recurringNotice && (
-        <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
-      )}
-      {data && data.dueReminders.length > 0 && (
-        <DismissibleBanner
-          key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
-          tone="warning"
-          message={dueBannerText(data.dueReminders, data.today, t)}
+      <div className="app-tab-body">
+        <FileSelector
+          files={orderedFiles}
+          selectedFileId={selectedFileId}
+          onSelectFile={guardedSelectFile}
+          loading={loading}
         />
-      )}
-      {data && data.carryOverCount > 0 && (
-        <CarryOverBanner
-          count={data.carryOverCount}
-          auto={carryOverAuto}
-          onToggleAuto={toggleCarryOverAuto}
-          onCarryOver={() => void handleCarryOver()}
-          busy={carryingOver}
-        />
-      )}
 
-      {data && (
+        {!online && <div className="warning banner">{t('app.offline')}</div>}
+        {updateReady && (
+          <div className="info banner pwa-update-banner">
+            <span>{t('app.updateReady')}</span>
+            <button type="button" className="btn btn-tinted btn-small" onClick={applyUpdate}>
+              {t('app.update')}
+            </button>
+          </div>
+        )}
+
+        {error && <p className="error banner">{error}</p>}
+        {recurringNotice && (
+          <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
+        )}
+        {data && data.dueReminders.length > 0 && (
+          <DismissibleBanner
+            key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
+            tone="warning"
+            message={dueBannerText(data.dueReminders, data.today, t)}
+          />
+        )}
+        {data && data.carryOverCount > 0 && (
+          <CarryOverBanner
+            count={data.carryOverCount}
+            auto={carryOverAuto}
+            onToggleAuto={toggleCarryOverAuto}
+            onCarryOver={() => void handleCarryOver()}
+            busy={carryingOver}
+          />
+        )}
+
+      {data && activeTab === 'today' && (
         <>
           <div className="day-row">
             <DaySelector
@@ -1134,30 +1013,6 @@ export default function App() {
               loading={loading}
             />
             <div className="day-row-actions">
-              <div
-                className="segmented-control view-toggle"
-                role="tablist"
-                aria-label={t('app.viewToggleLabel')}
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={!showTimeline}
-                  className={!showTimeline ? 'segment active' : 'segment'}
-                  onClick={() => setShowTimeline(false)}
-                >
-                  {t('app.viewTasks')}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={showTimeline}
-                  className={showTimeline ? 'segment active' : 'segment'}
-                  onClick={() => setShowTimeline(true)}
-                >
-                  {t('app.viewAgenda')}
-                </button>
-              </div>
               {(data.dayTotalSeconds > 0 ||
                 data.weekTotalSeconds > 0 ||
                 dayEstimateSeconds > 0) && (
@@ -1307,6 +1162,75 @@ export default function App() {
         </>
       )}
 
+      {data && activeTab === 'agenda' && (
+        <DayTimeline
+          tasks={data.tasks}
+          selectedDate={data.selectedDate}
+          today={data.today}
+          allTags={data.tags}
+          onManageTags={() => setShowTags(true)}
+          onTaskUpdated={handleTaskUpdated}
+          onClose={() => {}}
+          onPreviousDay={() => guardedShiftAgendaDay(-1)}
+          onNextDay={() => guardedShiftAgendaDay(1)}
+          onToday={() => guardedGoToWeek(undefined)}
+          loading={loading}
+          embedded
+        />
+      )}
+
+      {data && activeTab === 'stats' && (
+        <StatsTab
+          fileId={selectedFileId}
+          week={data.week}
+          onChanged={() => void refresh(data.selectedDay, data.week)}
+          onOpenGoals={() => setShowGoals(true)}
+        />
+      )}
+
+      {activeTab === 'settings' && (
+        <SettingsTab
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          accent={accent}
+          onChooseAccent={chooseAccent}
+          lang={lang}
+          onSetLang={setLang}
+          soundsEnabled={soundsEnabled}
+          onToggleSounds={toggleSounds}
+          notifications={notifications}
+          carryOverAuto={carryOverAuto}
+          onToggleCarryOverAuto={toggleCarryOverAuto}
+          showWeekend={showWeekend}
+          onToggleWeekend={handleToggleWeekend}
+          pomodoroEnabled={pomodoroEnabled}
+          onTogglePomodoro={togglePomodoro}
+          onOpenTimerSettings={() => setShowTimerSettings(true)}
+          onOpenRecurring={() => setShowRecurring(true)}
+          onOpenTemplates={() => setShowTemplates(true)}
+          onOpenTags={() => setShowTags(true)}
+          onOpenFeeds={() => setShowFeeds(true)}
+          onOpenBackup={() => setShowBackup(true)}
+          multiFile={orderedFiles.length > 1}
+          onOpenContextOrder={() => setShowContextOrder(true)}
+          isAdmin={authIsAdmin}
+          onOpenAdmin={() => setShowAdmin(true)}
+          onRefresh={() => void refresh(data?.selectedDay, data?.week)}
+          refreshing={loading}
+          onFocusMode={() => setFocusMode(true)}
+          authEmail={authEmail}
+          onLogout={() => void handleLogout()}
+        />
+      )}
+      </div>
+
+      <BottomNav
+        active={activeTab}
+        onSelect={setActiveTab}
+        onAdd={() => setShowQuickAdd(true)}
+        showAdd={showAdd}
+      />
+
       <Footer />
 
       {undo.pending && (
@@ -1319,7 +1243,14 @@ export default function App() {
         />
       )}
 
-      {showReport && <Report fileId={selectedFileId} onClose={() => setShowReport(false)} />}
+      {showQuickAdd && data && (
+        <QuickAddSheet
+          date={data.selectedDate}
+          fileId={selectedFileId}
+          onCreated={handleTaskCreated}
+          onClose={() => setShowQuickAdd(false)}
+        />
+      )}
 
       {showSearch && (
         <SearchDialog
@@ -1336,38 +1267,6 @@ export default function App() {
           initialMonth={data?.selectedDate?.slice(0, 7)}
           onPick={guardedGoToDate}
           onClose={() => setShowMonth(false)}
-        />
-      )}
-
-      {showHeatmap && (
-        <FocusHeatmap fileId={selectedFileId} onClose={() => setShowHeatmap(false)} />
-      )}
-
-      {showAnalytics && (
-        <Analytics fileId={selectedFileId} onClose={() => setShowAnalytics(false)} />
-      )}
-
-      {showTimeline && data && (
-        <DayTimeline
-          tasks={data.tasks}
-          selectedDate={data.selectedDate}
-          today={data.today}
-          allTags={data.tags}
-          onManageTags={() => setShowTags(true)}
-          onTaskUpdated={handleTaskUpdated}
-          onClose={() => setShowTimeline(false)}
-          onPreviousDay={() => guardedShiftAgendaDay(-1)}
-          onNextDay={() => guardedShiftAgendaDay(1)}
-          onToday={() => guardedGoToWeek(undefined)}
-          loading={loading}
-        />
-      )}
-
-      {showReview && data && (
-        <WeeklyReviewDialog
-          initialWeek={data.week}
-          onChanged={() => void refresh(data.selectedDay, data.week)}
-          onClose={() => setShowReview(false)}
         />
       )}
 

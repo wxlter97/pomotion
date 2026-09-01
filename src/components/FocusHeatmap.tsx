@@ -13,9 +13,13 @@ const RANGES = [
 export default function FocusHeatmap({
   fileId,
   onClose,
+  embedded = false,
 }: {
   fileId: string | null;
   onClose: () => void;
+  /** Se usa embebida dentro de la pestaña "Stats" (sin backdrop ni botón
+   *  Cerrar) en vez de como diálogo flotante. */
+  embedded?: boolean;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -26,12 +30,13 @@ export default function FocusHeatmap({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (embedded) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const load = useCallback(
     async (w: number) => {
@@ -70,15 +75,19 @@ export default function FocusHeatmap({
   const colStyle = { gridTemplateColumns: `repeat(${columns.length}, var(--hm-size))` };
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={embedded ? 'heatmap-embedded' : 'sheet-backdrop'}
+      onClick={embedded ? undefined : onClose}
+      role={embedded ? undefined : 'presentation'}
+    >
       <div
-        className="sheet sheet--heatmap"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="heatmap-title"
-        onClick={(e) => e.stopPropagation()}
+        className={embedded ? 'heatmap-inner' : 'sheet sheet--heatmap'}
+        role={embedded ? undefined : 'dialog'}
+        aria-modal={embedded ? undefined : true}
+        aria-labelledby={embedded ? undefined : 'heatmap-title'}
+        onClick={embedded ? undefined : (e) => e.stopPropagation()}
       >
-        <h2 id="heatmap-title">{t('heatmap.title')}</h2>
+        {!embedded && <h2 id="heatmap-title">{t('heatmap.title')}</h2>}
 
         <div className="heatmap-controls">
           <div className="segmented">
@@ -157,11 +166,13 @@ export default function FocusHeatmap({
           <span>{t('heatmap.more')}</span>
         </div>
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+        {!embedded && (
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-plain" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -96,9 +96,13 @@ function BarStrip({
 export default function Analytics({
   fileId,
   onClose,
+  embedded = false,
 }: {
   fileId: string | null;
   onClose: () => void;
+  /** Se usa embebida dentro de la pestaña "Stats" (sin backdrop ni botón
+   *  Cerrar) en vez de como diálogo flotante. */
+  embedded?: boolean;
 }) {
   const t = useT();
   const [weeks, setWeeks] = useState(12);
@@ -107,12 +111,13 @@ export default function Analytics({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (embedded) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const load = useCallback(
     async (w: number) => {
@@ -145,15 +150,19 @@ export default function Analytics({
     : 0;
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={embedded ? 'analytics-embedded' : 'sheet-backdrop'}
+      onClick={embedded ? undefined : onClose}
+      role={embedded ? undefined : 'presentation'}
+    >
       <div
-        className="sheet sheet--analytics"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="analytics-title"
-        onClick={(e) => e.stopPropagation()}
+        className={embedded ? 'analytics-inner' : 'sheet sheet--analytics'}
+        role={embedded ? undefined : 'dialog'}
+        aria-modal={embedded ? undefined : true}
+        aria-labelledby={embedded ? undefined : 'analytics-title'}
+        onClick={embedded ? undefined : (e) => e.stopPropagation()}
       >
-        <h2 id="analytics-title">{t('analytics.title')}</h2>
+        {!embedded && <h2 id="analytics-title">{t('analytics.title')}</h2>}
 
         <div className="segmented an-range">
           {RANGES.map((r) => (
@@ -267,11 +276,13 @@ export default function Analytics({
           )}
         </div>
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+        {!embedded && (
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-plain" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
