@@ -56,12 +56,16 @@ export default function WeeklyReviewDialog({
   initialWeek,
   onClose,
   onChanged,
+  embedded = false,
 }: {
   /** Semana a revisar al abrir (label "2026.08.24 - 2026.08.28"). */
   initialWeek: string;
   onClose: () => void;
   /** Se llama tras mover/completar una tarea pendiente (para refrescar la agenda). */
   onChanged: () => void;
+  /** Se usa embebida dentro de la pestaña "Stats" (sin backdrop ni botón
+   *  Cerrar) en vez de como diálogo flotante. */
+  embedded?: boolean;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -76,12 +80,13 @@ export default function WeeklyReviewDialog({
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (embedded) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const load = useCallback(async (w: string) => {
     setLoading(true);
@@ -132,7 +137,8 @@ export default function WeeklyReviewDialog({
     setError(null);
     try {
       await saveWeekFocus(data.nextWeekStart, focusText);
-      onClose();
+      setSavingFocus(false);
+      if (!embedded) onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : t('review.focusError'));
       setSavingFocus(false);
@@ -151,15 +157,19 @@ export default function WeeklyReviewDialog({
       : null;
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={embedded ? 'wr-embedded' : 'sheet-backdrop'}
+      onClick={embedded ? undefined : onClose}
+      role={embedded ? undefined : 'presentation'}
+    >
       <div
-        className="sheet sheet--analytics"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="wr-title"
-        onClick={(e) => e.stopPropagation()}
+        className={embedded ? 'wr-inner' : 'sheet sheet--analytics'}
+        role={embedded ? undefined : 'dialog'}
+        aria-modal={embedded ? undefined : true}
+        aria-labelledby={embedded ? undefined : 'wr-title'}
+        onClick={embedded ? undefined : (e) => e.stopPropagation()}
       >
-        <h2 id="wr-title">{t('review.title')}</h2>
+        {!embedded && <h2 id="wr-title">{t('review.title')}</h2>}
 
         <div className="wr-weeknav">
           <button
@@ -349,9 +359,11 @@ export default function WeeklyReviewDialog({
         </div>
 
         <div className="sheet-actions wr-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
+          {!embedded && (
+            <button type="button" className="btn btn-plain" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          )}
           {step > 0 && (
             <button
               type="button"

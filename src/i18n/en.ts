@@ -40,22 +40,35 @@ export const en: Record<MsgKey, string> = {
   'app.exitFocus': 'Exit focus',
   'app.exitFocusTitle': 'Exit focus mode (Esc)',
   'app.toggleTheme': 'Toggle theme (T)',
-  'app.viewToggleLabel': 'View',
-  'app.viewTasks': 'Tasks',
-  'app.viewAgenda': 'Agenda',
 
-  'menu.view': 'View',
-  'menu.more': 'More options',
-  'menu.settings': 'Settings',
+  // --- Navigation (bottom nav / sidebar) ---
+  'nav.label': 'Main navigation',
+  'nav.today': 'Today',
+  'nav.agenda': 'Agenda',
+  'nav.stats': 'Stats',
+  'nav.settings': 'Settings',
+  'nav.add': 'New task',
+
+  // --- Stats tab (internal segmented control) ---
+  'stats.summary': 'Summary',
+  'stats.reports': 'Reports',
+  'stats.heatmap': 'Heatmap',
+  'stats.review': 'Review',
+
+  // --- Settings tab (sections) ---
+  'settings.appearance': 'Appearance',
+  'settings.behavior': 'Behavior',
+  'settings.data': 'Data',
+  'settings.account': 'Account',
+
+  // --- Quick add (FAB) ---
+  'quickAdd.title': 'New task',
+  'quickAdd.placeholder': "What's next?",
+
   'menu.accent': 'Accent color',
   'menu.search': 'Search tasks',
   'menu.monthView': 'Month view',
-  'menu.heatmap': 'Focus heatmap',
-  'menu.analytics': 'Analytics',
-  'menu.timeline': 'Day agenda',
-  'menu.weeklyReview': 'Weekly review',
   'menu.goals': 'Monthly goals',
-  'menu.report': 'Time report',
   'menu.recurring': 'Recurring tasks',
   'menu.templates': 'Day templates',
   'menu.tags': 'Tags',

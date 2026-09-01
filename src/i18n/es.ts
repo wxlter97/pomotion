@@ -43,22 +43,35 @@ export const es = {
   'app.exitFocus': 'Salir de foco',
   'app.exitFocusTitle': 'Salir del modo foco (Esc)',
   'app.toggleTheme': 'Cambiar tema (T)',
-  'app.viewToggleLabel': 'Vista',
-  'app.viewTasks': 'Tareas',
-  'app.viewAgenda': 'Agenda',
 
-  'menu.view': 'Ver',
-  'menu.more': 'Más opciones',
-  'menu.settings': 'Ajustes',
+  // --- Navegación (bottom nav / sidebar) ---
+  'nav.label': 'Navegación principal',
+  'nav.today': 'Hoy',
+  'nav.agenda': 'Agenda',
+  'nav.stats': 'Stats',
+  'nav.settings': 'Ajustes',
+  'nav.add': 'Nueva tarea',
+
+  // --- Pestaña Stats (segmented control interno) ---
+  'stats.summary': 'Resumen',
+  'stats.reports': 'Reportes',
+  'stats.heatmap': 'Mapa de calor',
+  'stats.review': 'Revisión',
+
+  // --- Pestaña Ajustes (secciones) ---
+  'settings.appearance': 'Apariencia',
+  'settings.behavior': 'Comportamiento',
+  'settings.data': 'Datos',
+  'settings.account': 'Cuenta',
+
+  // --- Alta rápida (FAB) ---
+  'quickAdd.title': 'Nueva tarea',
+  'quickAdd.placeholder': '¿Qué hay que hacer?',
+
   'menu.accent': 'Color de acento',
   'menu.search': 'Buscar tareas',
   'menu.monthView': 'Vista mensual',
-  'menu.heatmap': 'Heatmap de foco',
-  'menu.analytics': 'Analítica',
-  'menu.timeline': 'Agenda del día',
-  'menu.weeklyReview': 'Revisión semanal',
   'menu.goals': 'Metas del mes',
-  'menu.report': 'Reporte de tiempo',
   'menu.recurring': 'Tareas recurrentes',
   'menu.templates': 'Plantillas de día',
   'menu.tags': 'Etiquetas',

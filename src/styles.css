@@ -4300,6 +4300,403 @@ kbd {
   margin-bottom: 0.4rem;
 }
 
+/* =======================================================================
+ * App shell: nav (bottom tab bar + FAB on mobile, sidebar on desktop)
+ * ===================================================================== */
+
+:root {
+  --nav-bp: 860px;
+  --bottom-nav-h: 58px;
+  --side-nav-w: 232px;
+}
+
+/* --- Mobile: every existing dialog becomes a real bottom sheet instead
+ * of a centered card (desktop keeps the .sheet/.sheet-backdrop rules
+ * defined earlier in this file). ------------------------------------- */
+@media (max-width: 860px) {
+  .sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .sheet {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: min(88vh, 760px) !important;
+    border-radius: 20px 20px 0 0;
+    padding: 0.6rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    animation: sheet-slide-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sheet::before {
+    content: '';
+    flex-shrink: 0;
+    width: 36px;
+    height: 4px;
+    margin: 0.15rem auto 0.85rem;
+    border-radius: 999px;
+    background: var(--color-fill-strong);
+  }
+}
+
+@keyframes sheet-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Bottom tab bar + FAB (mobile) ----------------------------------- */
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--color-separator);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: var(--color-label-secondary);
+  cursor: pointer;
+  padding: 0.3rem 0.25rem;
+}
+
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.nav-item span {
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+.nav-item.active {
+  color: var(--color-accent);
+}
+
+.nav-item.active span {
+  font-weight: 700;
+}
+
+.nav-fab-slot {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.fab {
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: var(--shadow-sheet);
+  cursor: pointer;
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
+
+.fab-desktop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  height: auto;
+  margin: 0 1.25rem 0.75rem;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.fab-desktop svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Sidebar (desktop) ------------------------------------------------ */
+
+.side-nav {
+  display: none;
+}
+
+@media (min-width: 861px) {
+  .bottom-nav,
+  .fab {
+    display: none;
+  }
+
+  .side-nav {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--side-nav-w);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    padding: calc(1.1rem + env(safe-area-inset-top)) 0.9rem 1rem;
+    padding-left: calc(0.9rem + env(safe-area-inset-left));
+    border-right: 1px solid var(--color-separator);
+    background: var(--color-bg-elevated);
+  }
+
+  .side-nav-brand {
+    color: var(--color-accent);
+    font-size: 1.2rem;
+    font-weight: 800;
+    padding: 0 0.5rem;
+    margin: 0 0 1.4rem;
+  }
+
+  .side-nav-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .side-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-label-secondary);
+    padding: 0.6rem 0.7rem;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .side-nav-item svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+  }
+
+  .side-nav-item:hover {
+    background: var(--color-fill);
+    color: var(--color-label);
+  }
+
+  .side-nav-item.active {
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .side-nav-footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  /* App shell shifts right to make room for the fixed sidebar; the
+   * centered-column layout used below 861px gives way to a working area
+   * anchored next to the sidebar instead of alone in the middle of a wide
+   * viewport (avoids the "stretched mobile app" look on desktop). */
+  .app {
+    max-width: none;
+    margin: 0;
+    padding-left: calc(var(--side-nav-w) + env(safe-area-inset-left));
+  }
+
+  .app-header {
+    display: none;
+  }
+
+  .app-footer {
+    padding-left: 1.5rem;
+  }
+
+  .app-tab-body {
+    max-width: 900px;
+  }
+}
+
+@media (max-width: 860px) {
+  .app {
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 0.75rem);
+  }
+}
+
+.app--focus .bottom-nav,
+.app--focus .side-nav {
+  display: none;
+}
+
+/* --- Settings tab ------------------------------------------------------ */
+
+.settings-section {
+  margin: 0 0 1.5rem;
+}
+
+.settings-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-label-secondary);
+  padding: 0 1.5rem;
+  margin: 0 0 0.4rem;
+}
+
+.settings-list {
+  margin: 0 1.5rem;
+  background: var(--color-bg-elevated);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.settings-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--color-label);
+  text-align: left;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--color-separator);
+}
+
+.settings-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-row--danger {
+  color: var(--color-destructive);
+}
+
+.settings-row-state {
+  color: var(--color-label-secondary);
+  font-size: 0.86rem;
+}
+
+.settings-user {
+  padding: 0.4rem 1.5rem 1rem;
+  color: var(--color-label-secondary);
+  font-size: 0.82rem;
+}
+
+/* --- Agenda tab (DayTimeline embebido, sin backdrop/sheet) ------------- */
+
+.timeline-embedded {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Stats tab ---------------------------------------------------------- */
+
+.stats-tab {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.stats-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.stats-tab-header h2 {
+  margin: 0;
+}
+
+.stats-tabs {
+  margin: 0 0 1.1rem;
+  overflow-x: auto;
+}
+
+/* Analytics / Report / FocusHeatmap / WeeklyReview, embebidos dentro de
+ * .stats-tab (sin su propio padding — ya lo trae el contenedor). */
+.analytics-embedded,
+.report-embedded,
+.heatmap-embedded,
+.wr-embedded {
+  display: contents;
+}
+
+.analytics-inner,
+.report-inner,
+.heatmap-inner,
+.wr-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Quick add (FAB) sheet ---------------------------------------------- */
+
+.quick-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.quick-add-form input {
+  font-size: 1rem;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
