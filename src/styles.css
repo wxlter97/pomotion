@@ -783,14 +783,20 @@ h3 {
   justify-content: center;
 }
 
-.app--focus > .app-header,
-.app--focus > .file-tabs,
-.app--focus > .day-row,
-.app--focus > .inbox,
-.app--focus > .day-note,
-.app--focus > .shortcuts-hint,
-.app--focus > .app-footer,
-.app--focus > .banner,
+/* Antes usaba el combinador > (hijo directo de .app) para todo, pero
+ * file-tabs/day-row/inbox/day-note/banner viven ahora dentro de
+ * .app-tab-body (ver App.tsx) — con > ya no calzaban con nada y modo foco
+ * los dejaba todos visibles. app-header y app-footer sí siguen siendo
+ * hijos directos de .app, pero el selector normal (sin >) los sigue
+ * encontrando igual. */
+.app--focus .app-header,
+.app--focus .file-tabs,
+.app--focus .day-row,
+.app--focus .inbox,
+.app--focus .day-note,
+.app--focus .shortcuts-hint,
+.app--focus .app-footer,
+.app--focus .banner,
 .app--focus .tasks-panel {
   display: none;
 }
@@ -4360,6 +4366,41 @@ kbd {
     margin: 0.15rem auto 0.85rem;
     border-radius: 999px;
     background: var(--color-fill-strong);
+  }
+
+  /* .app-header ahora es sticky con un borde inferior (ver más arriba) —
+   * sin este aire, Trabajo/Casa quedaban pegados justo debajo de esa
+   * línea. */
+  .file-tabs {
+    padding-top: 0.9rem;
+  }
+
+  /* Los chips de día (Lunes…Viernes) se centran en el día activo y, si no
+   * caben todos, el resto queda recortado a la mitad de una letra contra
+   * el padding de .day-row — se ve como un error más que como "esto
+   * scrollea". Point 1: dejar que ESTA fila (y solo esta) sangre hasta el
+   * borde real de la pantalla en vez de cortar contra el padding del
+   * contenedor, para que el chip cortado se lea como el inicio de una
+   * cinta continua. Point 2 (la mejora extra): un fundido en los bordes
+   * que insinúa que hay más para el lado — mismo patrón que un carrusel
+   * nativo. */
+  .day-tabs {
+    margin: 0 -1.5rem;
+    padding: 0.15rem 1.5rem;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 1.1rem,
+      black calc(100% - 1.1rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 1.1rem,
+      black calc(100% - 1.1rem),
+      transparent
+    );
   }
 }
 
