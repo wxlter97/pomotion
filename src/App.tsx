@@ -26,6 +26,7 @@ import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
 import PendingApproval from './components/PendingApproval';
+import Splash from './components/Splash';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
@@ -881,14 +882,7 @@ export default function App() {
   const showAdd = Boolean(data) && !focusMode && (activeTab === 'today' || activeTab === 'agenda');
 
   if (authState === 'checking') {
-    return (
-      <div className="center-screen">
-        <div className="screen-content">
-          <p className="muted">{t('common.loading')}</p>
-        </div>
-        <Footer />
-      </div>
-    );
+    return <Splash />;
   }
 
   if (authState === 'guest') {
