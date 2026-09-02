@@ -955,9 +955,22 @@ export default function App() {
         onSelect={setActiveTab}
         onAdd={() => setShowQuickAdd(true)}
         showAdd={showAdd}
-        onSearch={() => setShowSearch(true)}
         themeToggle={themeToggleButton}
       />
+
+      {/* Buscar (desktop): flotante arriba del contenido en vez de vivir en
+       * la sidebar — ver .desktop-search-float en styles.css. Oculto en
+       * mobile (el header ya trae su propio botón de búsqueda) y en modo
+       * foco. */}
+      <button
+        type="button"
+        className="btn btn-icon desktop-search-float"
+        onClick={() => setShowSearch(true)}
+        title={t('menu.search')}
+        aria-label={t('menu.search')}
+      >
+        <SearchIcon />
+      </button>
 
       <div className="app-tab-body">
         <FileSelector

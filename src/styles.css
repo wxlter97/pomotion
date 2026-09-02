@@ -4441,7 +4441,10 @@ kbd {
   gap: 0.4rem;
   width: auto;
   height: auto;
-  margin: 0 1.25rem 0.75rem;
+  /* Alineado al borde de los nav-item de arriba (mismo padding del
+   * contenedor, sin margen lateral extra) y con aire propio arriba para
+   * separarse de la lista de navegación en vez de quedar pegado a ella. */
+  margin: 1rem 0 0;
   padding: 0.6rem 1rem;
   border-radius: 12px;
   font: inherit;
@@ -4457,6 +4460,13 @@ kbd {
 /* --- Sidebar (desktop) ------------------------------------------------ */
 
 .side-nav {
+  display: none;
+}
+
+/* Buscar (desktop): botón flotante arriba del contenido — en mobile el
+ * header ya trae su propio botón de búsqueda, así que este se queda
+ * oculto ahí. */
+.desktop-search-float {
   display: none;
 }
 
@@ -4528,17 +4538,20 @@ kbd {
     font-weight: 700;
   }
 
+  /* Antes usaba margin-top:auto para pegarse al fondo del sidebar, lo que
+   * dejaba un hueco enorme y vacío entre "Nueva tarea" y el cambio de tema.
+   * Ahora va justo debajo, con un separador sutil, en vez de flotar solo
+   * al fondo de la pantalla. */
   .side-nav-footer {
-    margin-top: auto;
+    margin-top: 1.5rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--color-separator);
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
   }
 
-  /* App shell shifts right to make room for the fixed sidebar; the
-   * centered-column layout used below 861px gives way to a working area
-   * anchored next to the sidebar instead of alone in the middle of a wide
-   * viewport (avoids the "stretched mobile app" look on desktop). */
+  /* App shell shifts right to make room for the fixed sidebar. */
   .app {
     max-width: none;
     margin: 0;
@@ -4553,8 +4566,27 @@ kbd {
     padding-left: 1.5rem;
   }
 
+  /* Centrado dentro del área libre a la derecha del sidebar (no pegado al
+   * borde izquierdo) y con más aire para aprovechar pantallas anchas, en
+   * vez de quedarse angosto contra el sidebar con todo el resto de la
+   * ventana vacío. padding-top compensa que .app-header (que en mobile le
+   * daba aire arriba) está oculto en desktop — sin esto los chips de
+   * contexto (Trabajo/Casa) quedan pegados al borde superior. */
   .app-tab-body {
-    max-width: 900px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding-top: 1.9rem;
+  }
+
+  /* Buscar flota en esa misma franja superior, a la derecha, en vez de
+   * vivir dentro de la sidebar. */
+  .desktop-search-float {
+    display: inline-flex;
+    position: fixed;
+    top: 1.75rem;
+    right: 1.75rem;
+    z-index: 65;
+    box-shadow: var(--shadow-sheet);
   }
 }
 
@@ -4565,7 +4597,8 @@ kbd {
 }
 
 .app--focus .bottom-nav,
-.app--focus .side-nav {
+.app--focus .side-nav,
+.app--focus .desktop-search-float {
   display: none;
 }
 
