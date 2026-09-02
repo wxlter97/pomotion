@@ -391,10 +391,20 @@ h3 {
 }
 
 .app-header {
+  /* Estático (mobile): se queda fijo arriba en vez de desplazarse con el
+   * contenido — igual que .bottom-nav abajo. En desktop sigue oculto
+   * (ver @media min-width:861px), así que esto no le afecta. */
+  position: sticky;
+  top: 0;
+  z-index: 65;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: calc(1.25rem + env(safe-area-inset-top)) 1.5rem 1.25rem;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .app-header h1 {
@@ -2883,6 +2893,15 @@ body.is-dragging * {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  /* `inset:0` por sí solo ata el alto al viewport "grande" (ignora el
+   * teclado en pantalla en mobile) — con top/left/right ya en 0, fijar
+   * `height` explícito gana sobre el `bottom:0` implícito y hace que el
+   * backdrop encoja de verdad cuando aparece el teclado, en vez de quedar
+   * fijo al alto de layout con el sheet (bottom-aligned) tapado debajo del
+   * teclado. dvh cae a la versión con vh en navegadores que no la conocen
+   * (valor inválido → toda la declaración se ignora). */
+  height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -4323,6 +4342,11 @@ kbd {
     width: 100%;
     max-width: 100% !important;
     max-height: min(88vh, 760px) !important;
+    /* Mismo motivo que el `height` del backdrop: con dvh, el tope de alto
+     * del sheet encoge junto con el teclado en vez de seguir midiéndose
+     * contra el viewport completo (lo que lo empujaba a desbordar por
+     * arriba, con el teclado tapando la mitad de abajo). */
+    max-height: min(88dvh, 760px) !important;
     border-radius: 20px 20px 0 0;
     padding: 0.6rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
     animation: sheet-slide-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -4608,18 +4632,20 @@ kbd {
   margin: 0 0 1.5rem;
 }
 
+/* Sin padding/margin horizontal propio: .stats-tab (el contenedor, ver
+ * más abajo) ya pone 1.5rem a los lados — repetirlo aquí encimaba los
+ * dos, dejando estos bloques ~3rem más angostos que el título "Ajustes" o
+ * "APARIENCIA", que solo llevan el del contenedor. */
 .settings-section-title {
   font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-label-secondary);
-  padding: 0 1.5rem;
   margin: 0 0 0.4rem;
 }
 
 .settings-list {
-  margin: 0 1.5rem;
   background: var(--color-bg-elevated);
   border-radius: 14px;
   overflow: hidden;
@@ -4660,7 +4686,7 @@ kbd {
 }
 
 .settings-user {
-  padding: 0.4rem 1.5rem 1rem;
+  padding: 0.4rem 0 1rem;
   color: var(--color-label-secondary);
   font-size: 0.82rem;
 }
