@@ -1,26 +1,26 @@
 import type { ReactNode } from 'react';
 import { useT } from '../i18n';
-import { PlusIcon, SearchIcon } from './icons';
+import { PlusIcon } from './icons';
 import { NAV_ITEMS, type NavTab } from './navItems';
 
 /**
  * Sidebar fija (desktop): logo, navegación primaria, "+ Nueva tarea" y,
- * abajo, buscar + tema. Oculta en mobile vía CSS (ver .side-nav en
- * styles.css) — en mobile la navegación equivalente es <BottomNav>.
+ * abajo, el cambio de tema. Oculta en mobile vía CSS (ver .side-nav en
+ * styles.css) — en mobile la navegación equivalente es <BottomNav>. Buscar
+ * vive fuera de la sidebar, como botón flotante arriba del contenido (ver
+ * .desktop-search-float en App.tsx).
  */
 export default function SideNav({
   active,
   onSelect,
   onAdd,
   showAdd,
-  onSearch,
   themeToggle,
 }: {
   active: NavTab;
   onSelect: (tab: NavTab) => void;
   onAdd: () => void;
   showAdd: boolean;
-  onSearch: () => void;
   themeToggle: ReactNode;
 }) {
   const t = useT();
@@ -51,13 +51,7 @@ export default function SideNav({
           {t('nav.add')}
         </button>
       )}
-      <div className="side-nav-footer">
-        <button type="button" className="side-nav-item" onClick={onSearch}>
-          <SearchIcon />
-          {t('menu.search')}
-        </button>
-        {themeToggle}
-      </div>
+      <div className="side-nav-footer">{themeToggle}</div>
     </nav>
   );
 }

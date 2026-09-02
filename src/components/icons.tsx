@@ -67,11 +67,13 @@ export function StatsIcon({ active }: { active?: boolean } = {}) {
   );
 }
 
+/* Engranaje real (dientes + orificio central) — deliberadamente distinto del
+ * ícono de sol/luna del cambio de tema, con el que antes se confundía. */
 export function SettingsIcon({ active }: { active?: boolean } = {}) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.1 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 1.9 : 1.6} strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="10.2,2.9 13.8,2.9 13.3,5.5 15.7,6.5 17.2,4.3 19.7,6.8 17.5,8.3 18.5,10.7 21.1,10.2 21.1,13.8 18.5,13.3 17.5,15.7 19.7,17.2 17.2,19.7 15.7,17.5 13.3,18.5 13.8,21.1 10.2,21.1 10.7,18.5 8.3,17.5 6.8,19.7 4.3,17.2 6.5,15.7 5.5,13.3 2.9,13.8 2.9,10.2 5.5,10.7 6.5,8.3 4.3,6.8 6.8,4.3 8.3,6.5 10.7,5.5" />
       <circle cx="12" cy="12" r="3.1" />
-      <path d="M12 5V3M12 21v-2M5 12H3M21 12h-2M6.3 6.3 4.9 4.9M19.1 19.1l-1.4-1.4M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4" />
     </svg>
   );
 }
