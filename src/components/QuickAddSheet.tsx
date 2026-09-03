@@ -51,13 +51,18 @@ export default function QuickAddSheet({
         aria-modal="true"
         aria-labelledby="quick-add-title"
         onClick={(e) => e.stopPropagation()}
+        // El input arranca fuera de pantalla (el sheet mobile hace
+        // slide-up con transform) — pedirle foco antes de que termine la
+        // animación hace que iOS/Android descarten el teclado en vez de
+        // mostrarlo. Esperamos a que la animación de entrada del propio
+        // .sheet termine para recién ahí enfocar.
+        onAnimationEnd={() => inputRef.current?.focus()}
       >
         <h2 id="quick-add-title">{t('quickAdd.title')}</h2>
         <form className="quick-add-form" onSubmit={(e) => void submit(e)}>
           <input
             ref={inputRef}
             type="text"
-            autoFocus
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={t('quickAdd.placeholder')}
