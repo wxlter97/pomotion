@@ -34,10 +34,6 @@ export default function SearchDialog({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
   const trimmed = query.trim();
 
   useEffect(() => {
@@ -110,6 +106,11 @@ export default function SearchDialog({
         aria-labelledby="search-title"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}
+        // Igual que QuickAddSheet: enfocar recién al terminar la animación
+        // de entrada del .sheet, no en el mount — si el input se enfoca
+        // mientras el sheet todavía está fuera de pantalla (slide-up en
+        // mobile), el teclado no aparece.
+        onAnimationEnd={() => inputRef.current?.focus()}
       >
         <h2 id="search-title">{t('search.title')}</h2>
 

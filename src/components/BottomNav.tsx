@@ -40,13 +40,19 @@ export default function BottomNav({
     <nav className="bottom-nav" aria-label={t('nav.label')}>
       {renderItem(first)}
       {renderItem(second)}
-      <div className="nav-fab-slot">
-        {showAdd && (
+      {showAdd && (
+        // Ocupa su propio flex:1 solo cuando existe: si lo dejáramos
+        // montado y vacío (mostrar/ocultar el botón adentro), el resto de
+        // los tabs quedaría con un hueco muerto en el medio — sin este
+        // slot, `justify-content: space-around` + flex:1 en `.nav-item`
+        // reparten los 4 tabs restantes de forma pareja, como si el FAB
+        // nunca hubiera existido.
+        <div className="nav-fab-slot">
           <button type="button" className="fab" onClick={onAdd} aria-label={t('nav.add')} title={t('nav.add')}>
             <PlusIcon />
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {rest.map(renderItem)}
     </nav>
   );
