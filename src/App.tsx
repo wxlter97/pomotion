@@ -34,6 +34,7 @@ import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import BackupDialog from './components/BackupDialog';
 import BulkActionBar from './components/BulkActionBar';
+import BusinessHoursDialog from './components/BusinessHoursDialog';
 import SearchDialog from './components/SearchDialog';
 import MonthView from './components/MonthView';
 import DayTimeline from './components/DayTimeline';
@@ -70,7 +71,9 @@ import { readFileOrder, useFileOrder } from './useFileOrder';
 import { orderFiles } from './fileOrder';
 import ContextOrderDialog from './components/ContextOrderDialog';
 import { useTheme } from './useTheme';
-import { SunIcon, MoonIcon, SearchIcon } from './components/icons';
+import { useTimerEnabledSetting } from './useTimerEnabledSetting';
+import { useBusinessHoursSetting } from './useBusinessHoursSetting';
+import { SunIcon, MoonIcon, SearchIcon, FocusIcon } from './components/icons';
 import BottomNav from './components/BottomNav';
 import SideNav from './components/SideNav';
 import StatsTab from './components/StatsTab';
@@ -107,6 +110,7 @@ export default function App() {
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
   const [showBackup, setShowBackup] = useState(false);
+  const [showBusinessHours, setShowBusinessHours] = useState(false);
   // Acciones en lote: selección efímera de tareas. `size > 0` = modo selección.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -123,10 +127,16 @@ export default function App() {
     registerServiceWorker(() => setUpdateReady(true));
   }, []);
   const [theme, toggleTheme] = useTheme();
-  const [accent, chooseAccent] = useAccent();
+  const [accent, chooseAccent, customAccentColor, chooseCustomAccentColor] = useAccent();
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
+  const [timerEnabled, toggleTimerEnabled] = useTimerEnabledSetting();
   const [pomodoroEnabled, togglePomodoro] = usePomodoroSetting();
+  const [businessHours, setBusinessHours] = useBusinessHoursSetting();
+  // Nada que enfocar sin timer — si se apaga el timer estando en modo foco, salir.
+  useEffect(() => {
+    if (!timerEnabled) setFocusMode(false);
+  }, [timerEnabled]);
   const undo = useUndo();
   const t = useT();
   const { lang, setLang } = useLang();
@@ -367,7 +377,7 @@ export default function App() {
         e.preventDefault();
         if (timerPhase === 'idle') timerRef.current?.start();
         else timerRef.current?.stop();
-      } else if (e.key === 'f' || e.key === 'F') {
+      } else if ((e.key === 'f' || e.key === 'F') && timerEnabled) {
         setFocusMode((v) => !v);
       } else if (e.key === 'Escape' && focusMode) {
         setFocusMode(false);
@@ -389,7 +399,7 @@ export default function App() {
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [timerPhase, data, pendingSwitch, authState, focusMode, selectMode, toggleTheme, guardedSelectDay, guardedGoToWeek]);
+  }, [timerPhase, data, pendingSwitch, authState, focusMode, timerEnabled, selectMode, toggleTheme, guardedSelectDay, guardedGoToWeek]);
 
   function handleSessionLogged(taskId: string, session: Session) {
     setData((prev) =>
@@ -877,6 +887,21 @@ export default function App() {
     </button>
   );
 
+  // Modo foco: se activa desde la pantalla de la tarea (Hoy), no desde
+  // Ajustes — sin timer no hay nada que enfocar, así que tampoco se ofrece.
+  const focusModeButton =
+    timerEnabled && activeTab === 'today' ? (
+      <button
+        type="button"
+        className="btn btn-icon"
+        onClick={() => setFocusMode(true)}
+        title={t('menu.focusMode')}
+        aria-label={t('menu.focusMode')}
+      >
+        <FocusIcon />
+      </button>
+    ) : null;
+
   // Visible en Hoy/Agenda (hay un día concreto al que agregarle una tarea);
   // no en Stats/Ajustes ni en modo foco.
   const showAdd = Boolean(data) && !focusMode && (activeTab === 'today' || activeTab === 'agenda');
@@ -931,6 +956,7 @@ export default function App() {
       <header className="app-header">
         <h1>pomotion</h1>
         <div className="header-actions">
+          {focusModeButton}
           <button
             type="button"
             className="btn btn-icon"
@@ -950,6 +976,7 @@ export default function App() {
         onAdd={() => setShowQuickAdd(true)}
         showAdd={showAdd}
         themeToggle={themeToggleButton}
+        focusModeToggle={focusModeButton}
       />
 
       {/* Buscar (desktop): flotante arriba del contenido en vez de vivir en
@@ -1068,7 +1095,7 @@ export default function App() {
             onSaved={handleDayNoteSaved}
           />
 
-          <div className="main-grid">
+          <div className={timerEnabled ? 'main-grid' : 'main-grid main-grid--no-timer'}>
             <section className="tasks-panel card">
               {selectMode && (
                 <BulkActionBar
@@ -1139,30 +1166,38 @@ export default function App() {
                 onSendToInbox={(task) => void handleSendToInbox(task)}
                 onSessionUpdated={handleSessionUpdated}
                 onManualSessionAdded={handleSessionLogged}
+                businessHours={businessHours}
               />
             </section>
 
-            <section className="timer-panel card">
-              {focusMode && timerPhase !== 'work' && (
-                <p className="focus-task">
-                  {selectedTask?.name ?? t("app.noTaskSelected")}
-                </p>
-              )}
-              <Timer
-                ref={timerRef}
-                task={selectedTask}
-                settings={timerSettings}
-                onSessionLogged={handleSessionLogged}
-                onPhaseChange={setTimerPhase}
-                soundsEnabled={soundsEnabled}
-                notificationsEnabled={notifications.enabled}
-                pomodoroEnabled={pomodoroEnabled}
-              />
-            </section>
+            {timerEnabled && (
+              <section className="timer-panel card">
+                {focusMode && timerPhase !== 'work' && (
+                  <p className="focus-task">
+                    {selectedTask?.name ?? t("app.noTaskSelected")}
+                  </p>
+                )}
+                <Timer
+                  ref={timerRef}
+                  task={selectedTask}
+                  settings={timerSettings}
+                  onSessionLogged={handleSessionLogged}
+                  onPhaseChange={setTimerPhase}
+                  soundsEnabled={soundsEnabled}
+                  notificationsEnabled={notifications.enabled}
+                  pomodoroEnabled={pomodoroEnabled}
+                />
+              </section>
+            )}
           </div>
 
           <footer className="shortcuts-hint">
-            <kbd>{t('shortcut.space')}</kbd> {t('shortcut.startStop')} · <kbd>1</kbd>–<kbd>5</kbd>{' '}
+            {timerEnabled && (
+              <>
+                <kbd>{t('shortcut.space')}</kbd> {t('shortcut.startStop')} ·{' '}
+              </>
+            )}
+            <kbd>1</kbd>–<kbd>5</kbd>{' '}
             {t('shortcut.switchDay')} · <kbd>[</kbd>/<kbd>]</kbd> {t('shortcut.switchWeek')} ·{' '}
             <kbd>/</kbd> {t('shortcut.search')} · <kbd>T</kbd> {t('shortcut.toggleTheme')}
           </footer>
@@ -1201,6 +1236,8 @@ export default function App() {
           onToggleTheme={toggleTheme}
           accent={accent}
           onChooseAccent={chooseAccent}
+          customAccentColor={customAccentColor}
+          onChooseCustomAccentColor={chooseCustomAccentColor}
           lang={lang}
           onSetLang={setLang}
           soundsEnabled={soundsEnabled}
@@ -1210,9 +1247,12 @@ export default function App() {
           onToggleCarryOverAuto={toggleCarryOverAuto}
           showWeekend={showWeekend}
           onToggleWeekend={handleToggleWeekend}
+          timerEnabled={timerEnabled}
+          onToggleTimerEnabled={toggleTimerEnabled}
           pomodoroEnabled={pomodoroEnabled}
           onTogglePomodoro={togglePomodoro}
           onOpenTimerSettings={() => setShowTimerSettings(true)}
+          onOpenBusinessHours={() => setShowBusinessHours(true)}
           onOpenRecurring={() => setShowRecurring(true)}
           onOpenTemplates={() => setShowTemplates(true)}
           onOpenTags={() => setShowTags(true)}
@@ -1224,7 +1264,6 @@ export default function App() {
           onOpenAdmin={() => setShowAdmin(true)}
           onRefresh={() => void refresh(data?.selectedDay, data?.week)}
           refreshing={loading}
-          onFocusMode={() => setFocusMode(true)}
           authEmail={authEmail}
           onLogout={() => void handleLogout()}
         />
@@ -1313,6 +1352,14 @@ export default function App() {
           onReset={resetTimerSettings}
           disabled={timerPhase !== 'idle'}
           onClose={() => setShowTimerSettings(false)}
+        />
+      )}
+
+      {showBusinessHours && (
+        <BusinessHoursDialog
+          settings={businessHours}
+          onChange={setBusinessHours}
+          onClose={() => setShowBusinessHours(false)}
         />
       )}
 

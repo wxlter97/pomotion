@@ -137,10 +137,17 @@ describe('TIME_RE / isValidTimeLabel', () => {
     expect(isValidTimeLabel('ab:cd')).toBe(false);
   });
 
-  it('es un chequeo de FORMATO, no de rango (no valida horas/minutos reales)', () => {
-    // Limitación conocida: "25:99" pasa el formato. La validación de rango,
-    // si algún día hace falta, va en otro lado.
+  it('TIME_RE es puro FORMATO: "25:99" matchea aunque no sea una hora real', () => {
     expect(TIME_RE.test('25:99')).toBe(true);
+  });
+
+  it('isValidTimeLabel además valida el RANGO (00:00..23:59)', () => {
+    expect(isValidTimeLabel('25:99')).toBe(false);
+    expect(isValidTimeLabel('7:99')).toBe(false);
+    expect(isValidTimeLabel('24:00')).toBe(false);
+    expect(isValidTimeLabel('12:60')).toBe(false);
+    expect(isValidTimeLabel('23:59')).toBe(true);
+    expect(isValidTimeLabel('00:00')).toBe(true);
   });
 });
 
@@ -158,5 +165,10 @@ describe('normalizeTimeLabel', () => {
   it('devuelve null si no matchea TIME_RE', () => {
     expect(normalizeTimeLabel('9am')).toBeNull();
     expect(normalizeTimeLabel('')).toBeNull();
+  });
+
+  it('devuelve null si el formato matchea pero el rango no es real', () => {
+    expect(normalizeTimeLabel('25:99')).toBeNull();
+    expect(normalizeTimeLabel('7:99')).toBeNull();
   });
 });

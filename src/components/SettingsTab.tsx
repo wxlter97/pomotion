@@ -8,12 +8,17 @@ import { MoonIcon, SunIcon } from './icons';
  * menús desplegables "Ver" (ítems de datos: recurrentes/plantillas/
  * etiquetas/calendarios) y "⋮" (todo lo demás) en el header. Mismos
  * handlers/estado que ya vivían en App.tsx — esto es solo presentación.
+ *
+ * El modo foco NO vive acá — se activa desde el header, en la pantalla de
+ * la tarea (ver app-header en App.tsx), porque es ahí donde hace falta.
  */
 export default function SettingsTab({
   theme,
   onToggleTheme,
   accent,
   onChooseAccent,
+  customAccentColor,
+  onChooseCustomAccentColor,
   lang,
   onSetLang,
   soundsEnabled,
@@ -23,9 +28,12 @@ export default function SettingsTab({
   onToggleCarryOverAuto,
   showWeekend,
   onToggleWeekend,
+  timerEnabled,
+  onToggleTimerEnabled,
   pomodoroEnabled,
   onTogglePomodoro,
   onOpenTimerSettings,
+  onOpenBusinessHours,
   onOpenRecurring,
   onOpenTemplates,
   onOpenTags,
@@ -37,7 +45,6 @@ export default function SettingsTab({
   onOpenAdmin,
   onRefresh,
   refreshing,
-  onFocusMode,
   authEmail,
   onLogout,
 }: {
@@ -45,6 +52,8 @@ export default function SettingsTab({
   onToggleTheme: () => void;
   accent: Accent;
   onChooseAccent: (a: Accent) => void;
+  customAccentColor: string;
+  onChooseCustomAccentColor: (hex: string) => void;
   lang: Lang;
   onSetLang: (l: Lang) => void;
   soundsEnabled: boolean;
@@ -54,9 +63,13 @@ export default function SettingsTab({
   onToggleCarryOverAuto: () => void;
   showWeekend: boolean;
   onToggleWeekend: () => void;
+  /** Con `false` no hay timer (ni Pomodoro ni Libre) — solo carga manual de sesiones. */
+  timerEnabled: boolean;
+  onToggleTimerEnabled: () => void;
   pomodoroEnabled: boolean;
   onTogglePomodoro: () => void;
   onOpenTimerSettings: () => void;
+  onOpenBusinessHours: () => void;
   onOpenRecurring: () => void;
   onOpenTemplates: () => void;
   onOpenTags: () => void;
@@ -68,7 +81,6 @@ export default function SettingsTab({
   onOpenAdmin: () => void;
   onRefresh: () => void;
   refreshing: boolean;
-  onFocusMode: () => void;
   authEmail: string | null;
   onLogout: () => void;
 }) {
@@ -111,6 +123,24 @@ export default function SettingsTab({
               onClick={() => onChooseAccent(a.key)}
             />
           ))}
+          <label
+            className={accent === 'custom' ? 'accent-swatch accent-swatch--custom is-on' : 'accent-swatch accent-swatch--custom'}
+            style={{ background: customAccentColor }}
+            title={t('accent.custom')}
+          >
+            <input
+              type="color"
+              value={customAccentColor}
+              aria-label={t('accent.customPick')}
+              onChange={(e) => {
+                onChooseCustomAccentColor(e.target.value);
+                if (accent !== 'custom') onChooseAccent('custom');
+              }}
+              onClick={() => {
+                if (accent !== 'custom') onChooseAccent('custom');
+              }}
+            />
+          </label>
         </div>
       </div>
 
@@ -126,9 +156,14 @@ export default function SettingsTab({
         )}
         <Row label={t('menu.carryOverAuto')} onClick={onToggleCarryOverAuto} state={carryOverAuto ? t('common.yes') : t('common.no')} />
         <Row label={t('menu.showWeekend')} onClick={onToggleWeekend} state={showWeekend ? t('common.yes') : t('common.no')} />
-        <Row label={t('menu.usePomodoro')} onClick={onTogglePomodoro} state={pomodoroEnabled ? t('common.yes') : t('common.no')} />
-        {pomodoroEnabled && <Row label={t('menu.pomodoroSettings')} onClick={onOpenTimerSettings} />}
-        <Row label={t('menu.focusMode')} onClick={onFocusMode} />
+        <Row label={t('menu.useTimer')} onClick={onToggleTimerEnabled} state={timerEnabled ? t('common.yes') : t('common.no')} />
+        {timerEnabled && (
+          <>
+            <Row label={t('menu.usePomodoro')} onClick={onTogglePomodoro} state={pomodoroEnabled ? t('common.yes') : t('common.no')} />
+            {pomodoroEnabled && <Row label={t('menu.pomodoroSettings')} onClick={onOpenTimerSettings} />}
+          </>
+        )}
+        <Row label={t('menu.businessHours')} onClick={onOpenBusinessHours} />
       </Section>
 
       <Section title={t('settings.data')}>

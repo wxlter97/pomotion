@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ACCENTS, DEFAULT_ACCENT, isAccent } from './accent';
+import { ACCENTS, contrastColorFor, DEFAULT_ACCENT, isAccent, isHexColor } from './accent';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -37,5 +37,38 @@ describe('accent', () => {
     expect(match).not.toBeNull();
     const inHtml = match![1].split(',').map((s) => s.trim().replace(/['"]/g, ''));
     expect(inHtml.sort()).toEqual(ACCENTS.map((a) => a.key).sort());
+  });
+
+  it('"custom" no es un preset de ACCENTS (tiene su propio picker) pero sí es una clave válida', () => {
+    expect(ACCENTS.some((a) => a.key === 'custom')).toBe(false);
+    expect(isAccent('custom')).toBe(true);
+  });
+});
+
+describe('isHexColor', () => {
+  it('acepta "#rrggbb"', () => {
+    expect(isHexColor('#ff5f3d')).toBe(true);
+    expect(isHexColor('#FFFFFF')).toBe(true);
+  });
+
+  it('rechaza cualquier otra cosa', () => {
+    expect(isHexColor('ff5f3d')).toBe(false);
+    expect(isHexColor('#fff')).toBe(false);
+    expect(isHexColor('#gggggg')).toBe(false);
+    expect(isHexColor(null)).toBe(false);
+  });
+});
+
+describe('contrastColorFor', () => {
+  it('blanco encima de un color oscuro', () => {
+    expect(contrastColorFor('#1c1c1e')).toBe('#ffffff');
+  });
+
+  it('negro encima de un color claro', () => {
+    expect(contrastColorFor('#ffeb3b')).toBe('#000000');
+  });
+
+  it('color inválido cae a blanco', () => {
+    expect(contrastColorFor('not-a-color')).toBe('#ffffff');
   });
 });

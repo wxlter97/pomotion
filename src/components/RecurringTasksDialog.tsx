@@ -204,7 +204,7 @@ export default function RecurringTasksDialog({
   return (
     <div className="sheet-backdrop" onClick={onClose} role="presentation">
       <div
-        className="sheet"
+        className="sheet sheet--recurring"
         role="dialog"
         aria-modal="true"
         aria-labelledby="recurring-title"
