@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ACCENTS, contrastColorFor, DEFAULT_ACCENT, isAccent, isHexColor } from './accent';
+import { ACCENTS, accentColorForTheme, contrastColorFor, DEFAULT_ACCENT, isAccent, isHexColor } from './accent';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -70,5 +70,38 @@ describe('contrastColorFor', () => {
 
   it('color inválido cae a blanco', () => {
     expect(contrastColorFor('not-a-color')).toBe('#ffffff');
+  });
+});
+
+describe('accentColorForTheme', () => {
+  it('oscurece un color pastel para que se lea como texto en tema claro', () => {
+    // #fffacd (amarillo pálido, L≈90%) queda casi invisible como texto
+    // sobre el fondo claro — se acota a la misma luminosidad que usan los
+    // presets (≤55%), conservando el matiz.
+    expect(accentColorForTheme('#fffacd', 'light')).toBe('#ffe81a');
+  });
+
+  it('aclara un color oscuro para que se lea como texto en tema oscuro', () => {
+    // #00008b (azul muy oscuro, L≈27%) se pierde sobre el fondo casi negro.
+    expect(accentColorForTheme('#00008b', 'dark')).toBe('#1a1aff');
+  });
+
+  it('no toca un color que ya está en el rango legible de ese tema', () => {
+    expect(accentColorForTheme('#00008b', 'light')).toBe('#00008b'); // oscuro: perfecto en claro
+    expect(accentColorForTheme('#fffacd', 'dark')).toBe('#fffacd'); // pálido: perfecto en oscuro
+  });
+
+  it('el color ajustado sigue teniendo un contraste válido calculable encima', () => {
+    // #00008b clampeado a L=55% en oscuro pasa de necesitar blanco (muy
+    // oscuro) a necesitar blanco igual pero ya no tan cerca del negro —
+    // lo que importa es que el contraste se recalcula sobre el color
+    // aplicado, no sobre el original.
+    const applied = accentColorForTheme('#00008b', 'dark');
+    expect(applied).not.toBe('#00008b');
+    expect(contrastColorFor(applied)).toBe('#ffffff');
+  });
+
+  it('color inválido se devuelve tal cual', () => {
+    expect(accentColorForTheme('not-a-color', 'light')).toBe('not-a-color');
   });
 });

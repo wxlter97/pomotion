@@ -127,7 +127,7 @@ export default function App() {
     registerServiceWorker(() => setUpdateReady(true));
   }, []);
   const [theme, toggleTheme] = useTheme();
-  const [accent, chooseAccent, customAccentColor, chooseCustomAccentColor] = useAccent();
+  const [accent, chooseAccent, customAccentColor, chooseCustomAccentColor] = useAccent(theme);
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
   const [soundsEnabled, toggleSounds] = useSoundSetting();
   const [timerEnabled, toggleTimerEnabled] = useTimerEnabledSetting();

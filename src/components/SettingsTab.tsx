@@ -1,4 +1,4 @@
-import { ACCENTS, type Accent } from '../accent';
+import { ACCENTS, accentColorForTheme, type Accent } from '../accent';
 import { LANGS, useT, type Lang, type MsgKey } from '../i18n';
 import type { NotificationSetting } from '../useNotificationSetting';
 import { MoonIcon, SunIcon } from './icons';
@@ -125,7 +125,10 @@ export default function SettingsTab({
           ))}
           <label
             className={accent === 'custom' ? 'accent-swatch accent-swatch--custom is-on' : 'accent-swatch accent-swatch--custom'}
-            style={{ background: customAccentColor }}
+            // Muestra el color realmente aplicado (ajustado para que
+            // resalte en este tema — ver accentColorForTheme), no el hex
+            // crudo elegido en el picker.
+            style={{ background: accentColorForTheme(customAccentColor, theme) }}
             title={t('accent.custom')}
           >
             <input
