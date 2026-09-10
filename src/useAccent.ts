@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  accentColorForTheme,
   contrastColorFor,
   DEFAULT_ACCENT,
   DEFAULT_CUSTOM_COLOR,
@@ -7,6 +8,7 @@ import {
   isHexColor,
   type Accent,
 } from './accent';
+import type { Theme } from './types';
 
 const KEY = 'pomotion:accent';
 const CUSTOM_KEY = 'pomotion:accent-custom-color';
@@ -32,10 +34,13 @@ function readStoredCustomColor(): string {
 /**
  * Acento de color activo + setter (persiste en localStorage y en
  * `data-accent`). Con accent === 'custom', el color elegido con el picker
- * (`customColor`) se aplica como `--color-accent`/`--color-accent-contrast`
- * inline sobre <html> — los bloques CSS de los presets no aplican ahí.
+ * (`customColor`, guardado tal cual lo eligió el usuario) se ajusta con
+ * `accentColorForTheme` para el tema activo — igual que los presets, que
+ * tienen una variante más oscura en claro y más clara en oscuro — y esa
+ * variante ajustada se aplica como `--color-accent`/`--color-accent-contrast`
+ * inline sobre <html>; los bloques CSS de los presets no aplican ahí.
  */
-export function useAccent(): [Accent, (next: Accent) => void, string, (hex: string) => void] {
+export function useAccent(theme: Theme): [Accent, (next: Accent) => void, string, (hex: string) => void] {
   const [accent, setAccent] = useState<Accent>(readStored);
   const [customColor, setCustomColorState] = useState<string>(readStoredCustomColor);
 
@@ -43,13 +48,14 @@ export function useAccent(): [Accent, (next: Accent) => void, string, (hex: stri
     document.documentElement.dataset.accent = accent;
     const style = document.documentElement.style;
     if (accent === 'custom') {
-      style.setProperty('--color-accent', customColor);
-      style.setProperty('--color-accent-contrast', contrastColorFor(customColor));
+      const applied = accentColorForTheme(customColor, theme);
+      style.setProperty('--color-accent', applied);
+      style.setProperty('--color-accent-contrast', contrastColorFor(applied));
     } else {
       style.removeProperty('--color-accent');
       style.removeProperty('--color-accent-contrast');
     }
-  }, [accent, customColor]);
+  }, [accent, customColor, theme]);
 
   const choose = useCallback((next: Accent) => {
     setAccent(next);

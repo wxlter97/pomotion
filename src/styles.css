@@ -1553,7 +1553,7 @@ body.is-dragging * {
  * default (340px) quedaba apretado como si fuera mobile aun en desktop,
  * donde sobra espacio horizontal. */
 .sheet--recurring {
-  max-width: min(94vw, 560px);
+  max-width: min(94vw, 640px);
 }
 
 /* La lista de reglas recurrentes crece con los datos del usuario — scrollea
@@ -1746,7 +1746,7 @@ body.is-dragging * {
 
 /* --- Horas hábiles (BusinessHoursDialog) --- */
 .sheet--business-hours {
-  max-width: min(94vw, 620px);
+  max-width: min(94vw, 680px);
 }
 
 .bh-master-toggle {
@@ -2154,7 +2154,7 @@ body.is-dragging * {
 
 /* Diálogo de gestión */
 .sheet--tags {
-  max-width: min(94vw, 460px);
+  max-width: min(94vw, 520px);
 }
 
 /* La lista de etiquetas crece con los datos del usuario — scrollea sola,
@@ -2290,7 +2290,7 @@ body.is-dragging * {
 
 /* --- Plantillas de día --- */
 .sheet--templates {
-  max-width: min(94vw, 480px);
+  max-width: min(94vw, 560px);
 }
 
 /* La lista de plantillas crece con los datos del usuario — scrollea sola. */
@@ -2422,7 +2422,7 @@ body.is-dragging * {
 
 /* --- Metas del mes --- */
 .sheet--goals {
-  max-width: min(94vw, 480px);
+  max-width: min(94vw, 540px);
 }
 
 /* La lista de metas crece con los datos del usuario — scrollea sola. */
@@ -2565,7 +2565,7 @@ body.is-dragging * {
 
 /* --- Admin: aprobación de usuarios --- */
 .sheet--admin {
-  max-width: min(94vw, 460px);
+  max-width: min(94vw, 560px);
 }
 
 /* La lista de usuarios crece con la cuenta — scrollea sola. */
@@ -2667,7 +2667,7 @@ body.is-dragging * {
 
 /* --- Calendarios iCal --- */
 .sheet--feeds {
-  max-width: min(94vw, 520px);
+  max-width: min(94vw, 600px);
 }
 
 /* La lista de calendarios crece con los datos del usuario — scrollea sola. */
@@ -3068,7 +3068,11 @@ body.is-dragging * {
   background: var(--color-bg-elevated);
   border-radius: 20px;
   padding: 1.5rem;
-  max-width: 340px;
+  /* 340px leía como una hoja mobile aun en desktop, donde sobra ancho —
+   * este es el piso; los diálogos con contenido más denso (listas,
+   * formularios de varias columnas) lo suben más todavía vía su propio
+   * `.sheet--X` (ver más abajo). */
+  max-width: min(92vw, 420px);
   width: 100%;
   box-shadow: var(--shadow-sheet);
   animation: sheet-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -3209,7 +3213,7 @@ body.is-dragging * {
 
 /* --- Search dialog --- */
 .sheet--search {
-  max-width: 440px;
+  max-width: min(94vw, 540px);
   max-height: min(80vh, 620px);
   display: flex;
   flex-direction: column;
@@ -3282,7 +3286,7 @@ body.is-dragging * {
 
 /* --- Backup dialog --- */
 .sheet--backup {
-  max-width: 420px;
+  max-width: min(94vw, 480px);
 }
 
 .backup-section {
@@ -3326,7 +3330,7 @@ body.is-dragging * {
 
 /* --- Timer settings dialog --- */
 .sheet--timer {
-  max-width: 380px;
+  max-width: min(94vw, 440px);
 }
 
 .timer-fields {
@@ -3397,7 +3401,7 @@ body.is-dragging * {
 
 /* --- Month view --- */
 .sheet--month {
-  max-width: 460px;
+  max-width: min(94vw, 540px);
 }
 
 /* Un mes de 6 semanas es alto — de sobra en un teléfono chico. Scrollea
