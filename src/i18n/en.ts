@@ -78,8 +78,10 @@ export const en: Record<MsgKey, string> = {
   'menu.notificationsBlocked': 'Blocked',
   'menu.carryOverAuto': 'Carry over on open',
   'menu.showWeekend': 'Show weekend',
+  'menu.useTimer': 'Use timer',
   'menu.usePomodoro': 'Use Pomodoro',
   'menu.pomodoroSettings': 'Pomodoro settings',
+  'menu.businessHours': 'Business hours',
   'menu.focusMode': 'Focus mode',
   'menu.contextOrder': 'Context order',
   'menu.backup': 'Backup',
@@ -590,6 +592,8 @@ export const en: Record<MsgKey, string> = {
   'accent.indigo': 'Indigo',
   'accent.pink': 'Pink',
   'accent.graphite': 'Graphite',
+  'accent.custom': 'Custom',
+  'accent.customPick': 'Pick a custom accent color',
 
   'time.hoursShort': '{n}h',
   'time.minutesShort': '{n}m',
@@ -601,6 +605,17 @@ export const en: Record<MsgKey, string> = {
   'timeline.unscheduled': 'Unscheduled — drag a task onto the timeline to schedule it',
   'timeline.resizeHandle': 'Drag to change the duration',
   'timeline.saveError': 'Could not save the schedule',
+
+  // --- Business hours (suggest the start time when logging a manual session) ---
+  'businessHours.title': 'Business hours',
+  'businessHours.intro':
+    'Set your usual schedule to suggest a start time when adding a manual session with no planned time. Several blocks per day let you model a break (e.g. lunch); a single short block models a shorter day (e.g. Fridays until noon only).',
+  'businessHours.enable': 'Suggest a start time from business hours',
+  'businessHours.copyToWeekdays': 'Copy to Mon–Fri',
+  'businessHours.copyToWeekdaysTitle': 'Copy this schedule to the other weekdays',
+  'businessHours.noBlocks': 'No hours this day',
+  'businessHours.addBlock': '+ Add block',
+  'businessHours.removeBlock': 'Remove block',
 
   // --- Undo ---
   'undo.action': 'Undo',

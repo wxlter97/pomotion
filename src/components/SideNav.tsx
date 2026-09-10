@@ -16,12 +16,15 @@ export default function SideNav({
   onAdd,
   showAdd,
   themeToggle,
+  focusModeToggle,
 }: {
   active: NavTab;
   onSelect: (tab: NavTab) => void;
   onAdd: () => void;
   showAdd: boolean;
   themeToggle: ReactNode;
+  /** Botón de modo foco — `null` cuando no corresponde mostrarlo (ver App.tsx). */
+  focusModeToggle?: ReactNode;
 }) {
   const t = useT();
 
@@ -51,7 +54,10 @@ export default function SideNav({
           {t('nav.add')}
         </button>
       )}
-      <div className="side-nav-footer">{themeToggle}</div>
+      <div className="side-nav-footer">
+        {focusModeToggle}
+        {themeToggle}
+      </div>
     </nav>
   );
 }

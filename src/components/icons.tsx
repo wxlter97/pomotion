@@ -95,6 +95,17 @@ export function SearchIcon() {
   );
 }
 
+/** Modo foco: mira/blanco de tiro — "concentrate en un solo punto". */
+export function FocusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <circle cx="12" cy="12" r="8.2" />
+      <circle cx="12" cy="12" r="3.2" />
+      <path d="M12 2.2v3.2M12 18.6v3.2M2.2 12h3.2M18.6 12h3.2" />
+    </svg>
+  );
+}
+
 export function CalendarIcon() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
