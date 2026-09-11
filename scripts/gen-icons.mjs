@@ -164,50 +164,43 @@ function downsample(buf, bigSize, factor) {
   return out;
 }
 
-// --- El ícono: cuadrado redondeado con gradiente + carátula de cronómetro --
+// --- El ícono: marca wxlter. — fondo tinta plano (sin gradiente, sin
+// esquinas redondeadas: el propio SO aplica su máscara al ícono) con una
+// carátula de cronómetro en amarillo faro. -------------------------------
 
 function drawIcon(size) {
   const w = size;
   const h = size;
   const buf = makeCanvas(w, h);
-  const r = w * 0.22;
 
-  const top = [255, 138, 92]; // #ff8a5c
-  const bottom = [255, 95, 61]; // #ff5f3d
-  for (let y = 0; y < h; y++) {
-    const t = y / h;
-    const cr = Math.round(top[0] + (bottom[0] - top[0]) * t);
-    const cg = Math.round(top[1] + (bottom[1] - top[1]) * t);
-    const cb = Math.round(top[2] + (bottom[2] - top[2]) * t);
-    for (let x = 0; x < w; x++) {
-      if (insideRoundedRect(x, y, w, h, r)) setPixel(buf, w, x, y, cr, cg, cb, 255);
-    }
-  }
+  const ink = [17, 17, 17, 255]; // #111111
+  fillRoundedRect(buf, w, h, 0, 0, w, h, 0, ink);
 
   const cx = w * 0.5;
   const cy = h * 0.54;
   const faceR = w * 0.29;
-  const white = [255, 255, 255, 255];
-  fillCircle(buf, w, h, cx, cy, faceR, white);
+  const faro = [255, 219, 0, 255]; // #ffdb00
+  const ringT = w * 0.045;
+  fillCircle(buf, w, h, cx, cy, faceR, faro);
+  fillCircle(buf, w, h, cx, cy, faceR - ringT, ink);
 
-  const crownW = w * 0.11;
-  const crownH = h * 0.09;
+  const crownW = w * 0.1;
+  const crownH = h * 0.08;
   fillRoundedRect(
     buf,
     w,
     h,
     cx - crownW / 2,
-    cy - faceR - crownH * 0.55,
+    cy - faceR - crownH * 0.5,
     cx + crownW / 2,
-    cy - faceR - crownH * 0.55 + crownH,
-    crownH * 0.4,
-    white
+    cy - faceR - crownH * 0.5 + crownH,
+    0,
+    faro
   );
 
-  const hand = [199, 62, 34, 255];
-  drawLine(buf, w, h, cx, cy, cx, cy - faceR * 0.58, w * 0.024, hand);
-  drawLine(buf, w, h, cx, cy, cx + faceR * 0.42, cy + faceR * 0.22, w * 0.024, hand);
-  fillCircle(buf, w, h, cx, cy, w * 0.028, hand);
+  drawLine(buf, w, h, cx, cy, cx, cy - faceR * 0.55, w * 0.026, faro);
+  drawLine(buf, w, h, cx, cy, cx + faceR * 0.4, cy + faceR * 0.2, w * 0.026, faro);
+  fillCircle(buf, w, h, cx, cy, w * 0.03, faro);
 
   return buf;
 }
