@@ -196,6 +196,59 @@ h3 {
   opacity: 1;
 }
 
+/* --- Toasts: notificaciones fijas en pantalla (ver useToasts.ts) — cada
+   fila es un DismissibleBanner, solo que flotando en vez de empujar el
+   documento, así se ven sin importar dónde estés scrolleado. --- */
+.toast-stack {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(92vw, 420px);
+  pointer-events: none;
+}
+
+.toast-stack .banner {
+  margin: 0;
+  pointer-events: auto;
+  border: 1px solid var(--color-separator);
+  border-left-width: 3px;
+  box-shadow: var(--shadow-sheet);
+  animation: toast-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.toast-stack .error.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-destructive);
+}
+.toast-stack .warning.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-warning-fg);
+}
+.toast-stack .success.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-success);
+}
+.toast-stack .info.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-accent);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------------------------------------------------------------------
  * Botones — estilos "filled / tinted / plain / destructive / icon",
  * como los button styles de HIG. Pill-shaped (border-radius 980px).
@@ -815,6 +868,15 @@ h3 {
 @media (max-width: 720px) {
   .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Safari en iOS hace zoom automático al enfocar un campo con
+     font-size < 16px. Lo forzamos acá para todo campo de texto/número/
+     selector — el tamaño visual en desktop no cambia. */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
   }
 }
 

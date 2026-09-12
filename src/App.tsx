@@ -21,7 +21,6 @@ import {
 import CarryOverBanner from './components/CarryOverBanner';
 import ConfirmDialog from './components/ConfirmDialog';
 import DaySelector from './components/DaySelector';
-import DismissibleBanner from './components/DismissibleBanner';
 import FileSelector from './components/FileSelector';
 import Footer from './components/Footer';
 import Login from './components/Login';
@@ -45,6 +44,7 @@ import type { MoveTarget } from './components/TaskRowMenu';
 import TaskList from './components/TaskList';
 import Timer, { type TimerHandle } from './components/Timer';
 import TimerSettingsDialog from './components/TimerSettingsDialog';
+import ToastStack from './components/ToastStack';
 import UndoSnackbar from './components/UndoSnackbar';
 import { formatDurationLabel } from './duration';
 import { tagColorOf } from './tags';
@@ -65,6 +65,7 @@ import { useTimerSettings } from './useTimerSettings';
 import { useNotificationSetting } from './useNotificationSetting';
 import { useWeekendSetting } from './useWeekendSetting';
 import { useSoundSetting } from './useSoundSetting';
+import { useToasts } from './useToasts';
 import { useUndo } from './useUndo';
 import { usePomodoroSetting } from './usePomodoroSetting';
 import { readFileOrder, useFileOrder } from './useFileOrder';
@@ -119,7 +120,6 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
-  const [recurringNotice, setRecurringNotice] = useState<{ text: string; n: number } | null>(null);
   const [carryingOver, setCarryingOver] = useState(false);
   const online = useOnlineStatus();
   const [updateReady, setUpdateReady] = useState(false);
@@ -138,14 +138,30 @@ export default function App() {
     if (!timerEnabled) setFocusMode(false);
   }, [timerEnabled]);
   const undo = useUndo();
+  const toast = useToasts();
   const t = useT();
   const { lang, setLang } = useLang();
   const tRef = useRef(t);
   tRef.current = t;
+  const authStateRef = useRef(authState);
+  useEffect(() => {
+    authStateRef.current = authState;
+  }, [authState]);
   const [carryOverAuto, toggleCarryOverAuto] = useCarryOverSetting();
   const [showWeekend, toggleWeekend] = useWeekendSetting();
   const notifications = useNotificationSetting();
   useDueNotifications(data?.dueReminders ?? NO_DUE_REMINDERS, data?.today ?? '', notifications.enabled);
+  // Aviso de vencimientos como toast — una vez por combinación de día +
+  // tareas vencidas (no en cada re-render; `shownDueKeyRef` recuerda la
+  // última que ya se mostró).
+  const shownDueKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || data.dueReminders.length === 0) return;
+    const key = `${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`;
+    if (shownDueKeyRef.current === key) return;
+    shownDueKeyRef.current = key;
+    toast.push(dueBannerText(data.dueReminders, data.today, tRef.current), 'warning');
+  }, [data, toast]);
   const timerRef = useRef<TimerHandle>(null);
   const carryOverDoneRef = useRef(false);
   const feedSyncDoneRef = useRef(false);
@@ -236,8 +252,16 @@ export default function App() {
         setData(null);
         setSelectedTask(null);
       } else {
-        setError(err instanceof Error ? err.message : tRef.current('app.loadTasksError'));
-        setAuthState((prev) => (prev === 'checking' ? 'error' : prev));
+        const message = err instanceof Error ? err.message : tRef.current('app.loadTasksError');
+        // Sin datos todavía (carga inicial o reintento tras error) →
+        // pantalla de error bloqueante. Una recarga posterior (ya con la
+        // app en uso y datos en pantalla) → toast, sin taparla.
+        if (authStateRef.current === 'checking' || authStateRef.current === 'error') {
+          setError(message);
+          setAuthState('error');
+        } else {
+          toast.push(message, 'error');
+        }
       }
     } finally {
       setLoading(false);
@@ -455,7 +479,7 @@ export default function App() {
       }
     } catch (err) {
       setTaskDone(task.id, task.done); // revertir
-      setError(err instanceof Error ? err.message : tRef.current('taskList.updateError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('taskList.updateError'), 'error');
     } finally {
       setTogglingIds((prev) => {
         const s = new Set(prev);
@@ -472,7 +496,7 @@ export default function App() {
       await updateTaskDone(taskId, false);
     } catch (err) {
       setTaskDone(taskId, true); // revertir
-      setError(err instanceof Error ? err.message : tRef.current('taskList.updateError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('taskList.updateError'), 'error');
     } finally {
       setTogglingIds((prev) => {
         const s = new Set(prev);
@@ -532,7 +556,7 @@ export default function App() {
       }
       void refresh(data?.selectedDay, data?.week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('undo.restoreError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('undo.restoreError'), 'error');
     }
   }
 
@@ -592,7 +616,7 @@ export default function App() {
       void refresh(data.selectedDay, data.week);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
-      setError(err instanceof Error ? err.message : tRef.current('drag.reorderError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('drag.reorderError'), 'error');
     } finally {
       setBusyTaskIds((prev) => {
         const s = new Set(prev);
@@ -617,7 +641,10 @@ export default function App() {
       offerMoveUndo(task);
     } catch (err) {
       setData((prev) => (prev ? { ...prev, tasks: originalTasks } : prev));
-      setError(err instanceof Error ? err.message : tRef.current('drag.moveError', { dest: target.destLabel }));
+      toast.push(
+        err instanceof Error ? err.message : tRef.current('drag.moveError', { dest: target.destLabel }),
+        'error'
+      );
     } finally {
       setBusyTaskIds((prev) => {
         const s = new Set(prev);
@@ -645,7 +672,7 @@ export default function App() {
       else await moveTask(taskId, { date: originalDate });
       void refresh(selectedDay, week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('undo.moveBackError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('undo.moveBackError'), 'error');
     }
   }
 
@@ -708,12 +735,11 @@ export default function App() {
   async function handleCarryOver() {
     if (!data) return;
     setCarryingOver(true);
-    setError(null);
     try {
       const res = await carryOverToToday(selectedFileId ?? undefined, showWeekend);
       if (res.moved > 0) void refresh(data.selectedDay, data.week);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('carryOver.error'));
+      toast.push(err instanceof Error ? err.message : tRef.current('carryOver.error'), 'error');
     } finally {
       setCarryingOver(false);
     }
@@ -781,7 +807,7 @@ export default function App() {
       void refresh(selectedDay, week);
       offerMoveUndo(task);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('drag.scheduleError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('drag.scheduleError'), 'error');
       void refresh(selectedDay, week); // restaura el inbox
     } finally {
       setBusyTaskIds((prev) => {
@@ -803,7 +829,7 @@ export default function App() {
       void refresh(selectedDay, week);
       offerMoveUndo(task);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('drag.toInboxError'));
+      toast.push(err instanceof Error ? err.message : tRef.current('drag.toInboxError'), 'error');
       void refresh(selectedDay, week);
     } finally {
       setBusyTaskIds((prev) => {
@@ -842,20 +868,19 @@ export default function App() {
     if (!data || selectedIds.size === 0) return;
     const ids = [...selectedIds];
     setBulkBusy(true);
-    setError(null);
     try {
       const res = await bulkTasks(op, ids, opts);
       clearSelection();
       setPendingBulkDelete(false);
       void refresh(data.selectedDay, data.week);
       if (res.skipped > 0) {
-        setRecurringNotice((prev) => ({
-          n: (prev?.n ?? 0) + 1,
-          text: `${res.affected} ${res.affected === 1 ? 'tarea actualizada' : 'tareas actualizadas'}; ${res.skipped} con tiempo registrado se dejaron en su día.`,
-        }));
+        toast.push(
+          `${res.affected} ${res.affected === 1 ? 'tarea actualizada' : 'tareas actualizadas'}; ${res.skipped} con tiempo registrado se dejaron en su día.`,
+          'success'
+        );
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : tRef.current('bulk.error'));
+      toast.push(err instanceof Error ? err.message : tRef.current('bulk.error'), 'error');
     } finally {
       setBulkBusy(false);
     }
@@ -943,6 +968,7 @@ export default function App() {
   return (
     <DragProvider canDrop={canDrop} onDrop={handleDrop}>
     <div className={focusMode ? 'app app--focus' : 'app'}>
+      <ToastStack toasts={toast.toasts} onDismiss={toast.dismiss} />
       {focusMode && (
         <button
           type="button"
@@ -1012,16 +1038,6 @@ export default function App() {
         )}
 
         {error && <p className="error banner">{error}</p>}
-        {recurringNotice && (
-          <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
-        )}
-        {data && data.dueReminders.length > 0 && (
-          <DismissibleBanner
-            key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
-            tone="warning"
-            message={dueBannerText(data.dueReminders, data.today, t)}
-          />
-        )}
         {data && data.carryOverCount > 0 && (
           <CarryOverBanner
             count={data.carryOverCount}
@@ -1377,16 +1393,15 @@ export default function App() {
           currentWeek={data.week}
           onClose={() => setShowRecurring(false)}
           onApplied={(added) => {
-            setRecurringNotice((prev) => ({
-              n: (prev?.n ?? 0) + 1,
-              text:
-                added === 0
-                  ? t('recurring.notice.none')
-                  : t('recurring.notice.added', {
-                      count: added,
-                      taskWord: t(added === 1 ? 'recurring.taskAddedOne' : 'recurring.taskAddedMany'),
-                    }),
-            }));
+            toast.push(
+              added === 0
+                ? t('recurring.notice.none')
+                : t('recurring.notice.added', {
+                    count: added,
+                    taskWord: t(added === 1 ? 'recurring.taskAddedOne' : 'recurring.taskAddedMany'),
+                  }),
+              'success'
+            );
             void refresh(data.selectedDay, data.week);
           }}
         />
@@ -1401,16 +1416,15 @@ export default function App() {
           fileId={selectedFileId}
           onChanged={() => void refresh(data.selectedDay, data.week)}
           onApplied={(added) => {
-            setRecurringNotice((prev) => ({
-              n: (prev?.n ?? 0) + 1,
-              text:
-                added === 0
-                  ? t('templates.notice.none')
-                  : t('templates.notice.added', {
-                      count: added,
-                      word: t(added === 1 ? 'templates.taskAddedOne' : 'templates.taskAddedMany'),
-                    }),
-            }));
+            toast.push(
+              added === 0
+                ? t('templates.notice.none')
+                : t('templates.notice.added', {
+                    count: added,
+                    word: t(added === 1 ? 'templates.taskAddedOne' : 'templates.taskAddedMany'),
+                  }),
+              'success'
+            );
             void refresh(data.selectedDay, data.week);
           }}
           onClose={() => setShowTemplates(false)}
