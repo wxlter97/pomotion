@@ -23,7 +23,17 @@ function aggregate(rows: ReportRow[], key: (r: ReportRow) => string): [string, n
   return [...totals].sort((a, b) => b[1] - a[1]);
 }
 
-export default function Report({ fileId, onClose }: { fileId: string | null; onClose: () => void }) {
+export default function Report({
+  fileId,
+  onClose,
+  embedded = false,
+}: {
+  fileId: string | null;
+  onClose: () => void;
+  /** Se usa embebida dentro de la pestaña "Stats" (sin backdrop ni botón
+   *  Cerrar) en vez de como diálogo flotante. */
+  embedded?: boolean;
+}) {
   const t = useT();
   const [from, setFrom] = useState(firstOfMonthLocal);
   const [to, setTo] = useState(todayLocal);
@@ -37,12 +47,13 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
   } | null>(null);
 
   useEffect(() => {
+    if (embedded) return;
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const rangeValid = from <= to;
 
@@ -83,15 +94,19 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
   const hasTaggedRows = byTag.some(([k]) => k !== NO_TAG);
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={embedded ? 'report-embedded' : 'sheet-backdrop'}
+      onClick={embedded ? undefined : onClose}
+      role={embedded ? undefined : 'presentation'}
+    >
       <div
-        className="sheet sheet--report"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="report-title"
-        onClick={(e) => e.stopPropagation()}
+        className={embedded ? 'report-inner' : 'sheet sheet--report'}
+        role={embedded ? undefined : 'dialog'}
+        aria-modal={embedded ? undefined : true}
+        aria-labelledby={embedded ? undefined : 'report-title'}
+        onClick={embedded ? undefined : (e) => e.stopPropagation()}
       >
-        <h2 id="report-title">{t('report.title')}</h2>
+        {!embedded && <h2 id="report-title">{t('report.title')}</h2>}
 
         <div className="report-range">
           <label>
@@ -198,11 +213,13 @@ export default function Report({ fileId, onClose }: { fileId: string | null; onC
           </div>
         )}
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+        {!embedded && (
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-plain" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

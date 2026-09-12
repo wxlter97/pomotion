@@ -117,61 +117,63 @@ export default function MonthView({
           )}
         </div>
 
-        {error && <p className="error">{error}</p>}
+        <div className="month-scroll">
+          {error && <p className="error">{error}</p>}
 
-        <div className="month-grid" aria-busy={loading}>
-          <div className="month-weekdays">
-            {t('month.weekdayHeaders').split(',').map((h, i) => (
-              <span key={i}>{h}</span>
+          <div className="month-grid" aria-busy={loading}>
+            <div className="month-weekdays">
+              {t('month.weekdayHeaders').split(',').map((h, i) => (
+                <span key={i}>{h}</span>
+              ))}
+            </div>
+            {weeks.map((week, wi) => (
+              <div className="month-week" key={wi}>
+                {week.map((date, di) => {
+                  if (!date) return <div className="month-cell month-cell--pad" key={di} />;
+                  const s = byDate.get(date);
+                  const weekend = isWeekend(date);
+                  const dayNum = Number(date.slice(8, 10));
+                  const isToday = data?.today === date;
+                  const body = (
+                    <>
+                      <span className={`month-cell-num${isToday ? ' is-today' : ''}`}>{dayNum}</span>
+                      {s && (
+                        <span className="month-cell-meta">
+                          {s.taskCount > 0 && (
+                            <span className={s.doneCount === s.taskCount ? 'all-done' : undefined}>
+                              {s.doneCount}/{s.taskCount}
+                            </span>
+                          )}
+                          {s.totalSeconds > 0 && (
+                            <span className="month-cell-hrs">{shortDuration(s.totalSeconds)}</span>
+                          )}
+                        </span>
+                      )}
+                    </>
+                  );
+                  if (weekend) {
+                    return (
+                      <div className="month-cell month-cell--weekend" key={di}>
+                        {body}
+                      </div>
+                    );
+                  }
+                  const target = weekTargetForDate(date);
+                  return (
+                    <button
+                      type="button"
+                      className="month-cell month-cell--day"
+                      key={di}
+                      onClick={() => onPick(target.week, target.day)}
+                      title={t('month.goTo', { date })}
+                    >
+                      {body}
+                    </button>
+                  );
+                })}
+              </div>
             ))}
           </div>
-          {weeks.map((week, wi) => (
-            <div className="month-week" key={wi}>
-              {week.map((date, di) => {
-                if (!date) return <div className="month-cell month-cell--pad" key={di} />;
-                const s = byDate.get(date);
-                const weekend = isWeekend(date);
-                const dayNum = Number(date.slice(8, 10));
-                const isToday = data?.today === date;
-                const body = (
-                  <>
-                    <span className={`month-cell-num${isToday ? ' is-today' : ''}`}>{dayNum}</span>
-                    {s && (
-                      <span className="month-cell-meta">
-                        {s.taskCount > 0 && (
-                          <span className={s.doneCount === s.taskCount ? 'all-done' : undefined}>
-                            {s.doneCount}/{s.taskCount}
-                          </span>
-                        )}
-                        {s.totalSeconds > 0 && (
-                          <span className="month-cell-hrs">{shortDuration(s.totalSeconds)}</span>
-                        )}
-                      </span>
-                    )}
-                  </>
-                );
-                if (weekend) {
-                  return (
-                    <div className="month-cell month-cell--weekend" key={di}>
-                      {body}
-                    </div>
-                  );
-                }
-                const target = weekTargetForDate(date);
-                return (
-                  <button
-                    type="button"
-                    className="month-cell month-cell--day"
-                    key={di}
-                    onClick={() => onPick(target.week, target.day)}
-                    title={t('month.goTo', { date })}
-                  >
-                    {body}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
         </div>
 
         <div className="sheet-actions">

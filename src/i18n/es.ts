@@ -43,22 +43,35 @@ export const es = {
   'app.exitFocus': 'Salir de foco',
   'app.exitFocusTitle': 'Salir del modo foco (Esc)',
   'app.toggleTheme': 'Cambiar tema (T)',
-  'app.viewToggleLabel': 'Vista',
-  'app.viewTasks': 'Tareas',
-  'app.viewAgenda': 'Agenda',
 
-  'menu.view': 'Ver',
-  'menu.more': 'Más opciones',
-  'menu.settings': 'Ajustes',
+  // --- Navegación (bottom nav / sidebar) ---
+  'nav.label': 'Navegación principal',
+  'nav.today': 'Hoy',
+  'nav.agenda': 'Agenda',
+  'nav.stats': 'Stats',
+  'nav.settings': 'Ajustes',
+  'nav.add': 'Nueva tarea',
+
+  // --- Pestaña Stats (segmented control interno) ---
+  'stats.summary': 'Resumen',
+  'stats.reports': 'Reportes',
+  'stats.heatmap': 'Mapa de calor',
+  'stats.review': 'Revisión',
+
+  // --- Pestaña Ajustes (secciones) ---
+  'settings.appearance': 'Apariencia',
+  'settings.behavior': 'Comportamiento',
+  'settings.data': 'Datos',
+  'settings.account': 'Cuenta',
+
+  // --- Alta rápida (FAB) ---
+  'quickAdd.title': 'Nueva tarea',
+  'quickAdd.placeholder': '¿Qué hay que hacer?',
+
   'menu.accent': 'Color de acento',
   'menu.search': 'Buscar tareas',
   'menu.monthView': 'Vista mensual',
-  'menu.heatmap': 'Heatmap de foco',
-  'menu.analytics': 'Analítica',
-  'menu.timeline': 'Agenda del día',
-  'menu.weeklyReview': 'Revisión semanal',
   'menu.goals': 'Metas del mes',
-  'menu.report': 'Reporte de tiempo',
   'menu.recurring': 'Tareas recurrentes',
   'menu.templates': 'Plantillas de día',
   'menu.tags': 'Etiquetas',
@@ -68,8 +81,10 @@ export const es = {
   'menu.notificationsBlocked': 'Bloqueadas',
   'menu.carryOverAuto': 'Traer pendientes al abrir',
   'menu.showWeekend': 'Mostrar fin de semana',
+  'menu.useTimer': 'Usar timer',
   'menu.usePomodoro': 'Usar Pomodoro',
   'menu.pomodoroSettings': 'Ajustes de Pomodoro',
+  'menu.businessHours': 'Horas hábiles',
   'menu.focusMode': 'Modo foco',
   'menu.contextOrder': 'Orden de contextos',
   'menu.manageContexts': 'Gestionar contextos',
@@ -609,6 +624,8 @@ export const es = {
   'accent.indigo': 'Índigo',
   'accent.pink': 'Rosa',
   'accent.graphite': 'Grafito',
+  'accent.custom': 'Personalizado',
+  'accent.customPick': 'Elegir un color de acento personalizado',
 
   'time.hoursShort': '{n}h',
   'time.minutesShort': '{n}m',
@@ -620,6 +637,17 @@ export const es = {
   'timeline.unscheduled': 'Sin horario — arrastrá una tarea al timeline para agendarla',
   'timeline.resizeHandle': 'Arrastrar para cambiar la duración',
   'timeline.saveError': 'No se pudo guardar el horario',
+
+  // --- Horas hábiles (sugieren la hora de inicio al cargar una sesión manual) ---
+  'businessHours.title': 'Horas hábiles',
+  'businessHours.intro':
+    'Definí tu horario habitual para sugerir la hora de inicio al agregar una sesión manual sin horario planeado. Varios bloques por día permiten modelar una pausa (ej. almuerzo); un día con un solo bloque corto modela una jornada reducida (ej. viernes solo hasta el mediodía).',
+  'businessHours.enable': 'Sugerir hora de inicio según horas hábiles',
+  'businessHours.copyToWeekdays': 'Copiar a Lun–Vie',
+  'businessHours.copyToWeekdaysTitle': 'Copiar este horario a los demás días laborales',
+  'businessHours.noBlocks': 'Sin horario este día',
+  'businessHours.addBlock': '+ Agregar bloque',
+  'businessHours.removeBlock': 'Quitar bloque',
 
   // --- Deshacer ---
   'undo.action': 'Deshacer',
