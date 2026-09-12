@@ -48,35 +48,37 @@ export default function ContextOrderDialog({
         <h2 id="context-order-title">{t('contextOrder.title')}</h2>
         <p>{t('contextOrder.body')}</p>
 
-        <ul className="context-order-list">
-          {items.map((file, i) => (
-            <li key={file.id}>
-              <span className="context-order-name">{file.label}</span>
-              <div className="context-order-actions">
-                <button
-                  type="button"
-                  className="btn btn-icon"
-                  onClick={() => move(i, i - 1)}
-                  disabled={i === 0}
-                  aria-label={t('contextOrder.up', { name: file.label })}
-                  title={t('contextOrder.up', { name: file.label })}
-                >
-                  ↑
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-icon"
-                  onClick={() => move(i, i + 1)}
-                  disabled={i === items.length - 1}
-                  aria-label={t('contextOrder.down', { name: file.label })}
-                  title={t('contextOrder.down', { name: file.label })}
-                >
-                  ↓
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="context-order-scroll">
+          <ul className="context-order-list">
+            {items.map((file, i) => (
+              <li key={file.id}>
+                <span className="context-order-name">{file.label}</span>
+                <div className="context-order-actions">
+                  <button
+                    type="button"
+                    className="btn btn-icon"
+                    onClick={() => move(i, i - 1)}
+                    disabled={i === 0}
+                    aria-label={t('contextOrder.up', { name: file.label })}
+                    title={t('contextOrder.up', { name: file.label })}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-icon"
+                    onClick={() => move(i, i + 1)}
+                    disabled={i === items.length - 1}
+                    aria-label={t('contextOrder.down', { name: file.label })}
+                    title={t('contextOrder.down', { name: file.label })}
+                  >
+                    ↓
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-filled" onClick={onClose}>

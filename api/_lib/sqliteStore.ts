@@ -331,7 +331,7 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
     await db.execute({
       sql: `SELECT * FROM tasks
             WHERE user_id = ? AND ${f.clause} AND date >= ? AND date <= ?
-            ORDER BY date, (planned_start IS NULL), planned_start, "order", created_at`,
+            ORDER BY date, "order", created_at`,
       args: [userId, ...f.args, dates[0], lastDate],
     })
   ).rows;

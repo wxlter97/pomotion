@@ -303,6 +303,7 @@ export default function DayTimeline({
   onNextDay,
   onToday,
   loading,
+  embedded = false,
 }: {
   tasks: Task[];
   selectedDate: string;
@@ -316,6 +317,9 @@ export default function DayTimeline({
   onNextDay: () => void;
   onToday: () => void;
   loading?: boolean;
+  /** Se usa embebida como pestaña "Agenda" (sin backdrop ni botón Cerrar)
+   *  en vez de como diálogo flotante. */
+  embedded?: boolean;
 }) {
   const t = useT();
   const { lang } = useLang();
@@ -408,11 +412,11 @@ export default function DayTimeline({
   // frena con stopPropagation) mientras hay un gesto en curso.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !embedded) onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose]);
+  }, [onClose, embedded]);
 
   const scheduled = useMemo(() => tasks.filter((task) => task.plannedStart != null), [tasks]);
   const unscheduled = useMemo(() => tasks.filter((task) => task.plannedStart == null), [tasks]);
@@ -475,13 +479,17 @@ export default function DayTimeline({
   };
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+    <div
+      className={embedded ? 'timeline-embedded' : 'sheet-backdrop'}
+      onClick={embedded ? undefined : onClose}
+      role={embedded ? undefined : 'presentation'}
+    >
       <div
-        className="sheet sheet--timeline"
-        role="dialog"
-        aria-modal="true"
+        className={embedded ? 'timeline-inner' : 'sheet sheet--timeline'}
+        role={embedded ? undefined : 'dialog'}
+        aria-modal={embedded ? undefined : true}
         aria-labelledby="timeline-title"
-        onClick={(e) => e.stopPropagation()}
+        onClick={embedded ? undefined : (e) => e.stopPropagation()}
       >
         <div className="timeline-header">
           <h2 id="timeline-title">{t('timeline.title')}</h2>
@@ -658,11 +666,13 @@ export default function DayTimeline({
 
         {error && <p className="error">{error}</p>}
 
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+        {!embedded && (
+          <div className="sheet-actions">
+            <button type="button" className="btn btn-plain" onClick={onClose}>
+              {t('common.close')}
+            </button>
+          </div>
+        )}
       </div>
 
       {ghost &&

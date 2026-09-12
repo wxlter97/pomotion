@@ -138,49 +138,51 @@ export default function GoalsDialog({
           </button>
         </form>
 
-        {loading ? (
-          <p className="muted">{t('common.loading')}</p>
-        ) : goals.length === 0 ? (
-          <p className="muted">{t('goals.none')}</p>
-        ) : (
-          <ul className="goal-list">
-            {goals.map((g) => {
-              const s = goalStatus(g);
-              return (
-                <li key={g.id} className="goal-item" data-state={s.state}>
-                  <div className="goal-item-head">
-                    <span className="goal-item-name">{goalLabel(g, allTasks)}</span>
-                    <button
-                      type="button"
-                      className="goal-item-delete"
-                      onClick={() => setPendingDelete(g)}
-                      disabled={busy}
-                      aria-label={t('goals.deleteAria', { name: goalLabel(g, allTasks) })}
-                      title={t('goals.deleteTitle')}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  <div className="goal-bar" title={t('goals.expectedPace', { value: formatDurationLabel(s.expectedSeconds) })}>
-                    <div className="goal-bar-fill" style={{ width: `${s.progressPct}%` }} />
-                    <div
-                      className="goal-bar-pace"
-                      style={{ left: `${Math.min(100, Math.round((s.expectedSeconds / s.targetSeconds) * 100)) || 0}%` }}
-                    />
-                  </div>
-                  <p className="goal-item-meta">
-                    <strong>{formatDurationLabel(g.loggedSeconds)}</strong> / {formatDurationLabel(s.targetSeconds)}
-                    {s.state !== 'done' && <>{t('goals.remaining', { value: formatDurationLabel(s.remainingSeconds) })}</>}
-                    {' · '}
-                    <span className="goal-item-pace">{paceText(g, t)}</span>
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <div className="goals-scroll">
+          {loading ? (
+            <p className="muted">{t('common.loading')}</p>
+          ) : goals.length === 0 ? (
+            <p className="muted">{t('goals.none')}</p>
+          ) : (
+            <ul className="goal-list">
+              {goals.map((g) => {
+                const s = goalStatus(g);
+                return (
+                  <li key={g.id} className="goal-item" data-state={s.state}>
+                    <div className="goal-item-head">
+                      <span className="goal-item-name">{goalLabel(g, allTasks)}</span>
+                      <button
+                        type="button"
+                        className="goal-item-delete"
+                        onClick={() => setPendingDelete(g)}
+                        disabled={busy}
+                        aria-label={t('goals.deleteAria', { name: goalLabel(g, allTasks) })}
+                        title={t('goals.deleteTitle')}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <div className="goal-bar" title={t('goals.expectedPace', { value: formatDurationLabel(s.expectedSeconds) })}>
+                      <div className="goal-bar-fill" style={{ width: `${s.progressPct}%` }} />
+                      <div
+                        className="goal-bar-pace"
+                        style={{ left: `${Math.min(100, Math.round((s.expectedSeconds / s.targetSeconds) * 100)) || 0}%` }}
+                      />
+                    </div>
+                    <p className="goal-item-meta">
+                      <strong>{formatDurationLabel(g.loggedSeconds)}</strong> / {formatDurationLabel(s.targetSeconds)}
+                      {s.state !== 'done' && <>{t('goals.remaining', { value: formatDurationLabel(s.remainingSeconds) })}</>}
+                      {' · '}
+                      <span className="goal-item-pace">{paceText(g, t)}</span>
+                    </p>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
