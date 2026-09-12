@@ -1038,16 +1038,6 @@ export default function App() {
         )}
 
         {error && <p className="error banner">{error}</p>}
-        {recurringNotice && (
-          <DismissibleBanner key={recurringNotice.n} tone="success" message={recurringNotice.text} />
-        )}
-        {data && data.dueReminders.length > 0 && (
-          <DismissibleBanner
-            key={`due:${data.today}:${data.dueReminders.map((r) => r.id).join(',')}`}
-            tone="warning"
-            message={dueBannerText(data.dueReminders, data.today, t)}
-          />
-        )}
         {data && data.carryOverCount > 0 && (
           <CarryOverBanner
             count={data.carryOverCount}
