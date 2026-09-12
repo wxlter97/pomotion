@@ -15,10 +15,14 @@ export default function DismissibleBanner({
   message,
   tone = 'warning',
   durationMs = DEFAULT_DURATION_MS,
+  onDismissed,
 }: {
   message: string;
-  tone?: 'warning' | 'error' | 'success';
+  tone?: 'warning' | 'error' | 'success' | 'info';
   durationMs?: number;
+  /** Se llama cuando termina de desvanecerse (por tiempo o al cerrarla a
+   *  mano) — para que quien la muestra en una lista pueda sacarla. */
+  onDismissed?: () => void;
 }) {
   const t = useT();
   const [state, setState] = useState<'visible' | 'fading' | 'hidden'>('visible');
@@ -33,6 +37,10 @@ export default function DismissibleBanner({
     const id = setTimeout(() => setState('hidden'), FADE_MS);
     return () => clearTimeout(id);
   }, [state]);
+
+  useEffect(() => {
+    if (state === 'hidden') onDismissed?.();
+  }, [state, onDismissed]);
 
   if (state === 'hidden') return null;
 
