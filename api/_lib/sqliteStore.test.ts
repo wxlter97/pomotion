@@ -1072,6 +1072,162 @@ describe('listFiles', () => {
     const files = await as(USER, () => sqliteStore.listFiles());
     expect(files.map((f) => f.id).sort()).toEqual(['Casa', 'Trabajo']);
   });
+
+  it('los contextos implícitos (solo por tareas) son de tipo "task"', async () => {
+    await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Trabajo' }));
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files).toEqual([{ id: 'Trabajo', label: 'Trabajo', type: 'task' }]);
+  });
+
+  it('incluye contextos explícitos sin tareas todavía (ej. uno de hábitos recién creado)', async () => {
+    await as(USER, () => sqliteStore.createContext({ label: 'Hábitos', type: 'habit' }));
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files).toEqual([{ id: 'Hábitos', label: 'Hábitos', type: 'habit' }]);
+  });
+});
+
+describe('contextos (crear / renombrar / tipo / borrar)', () => {
+  it('createContext falla con nombre vacío y con uno repetido', async () => {
+    await as(USER, () => sqliteStore.createContext({ label: 'Casa', type: 'task' }));
+    await expect(as(USER, () => sqliteStore.createContext({ label: '  ', type: 'task' }))).rejects.toThrow();
+    await expect(as(USER, () => sqliteStore.createContext({ label: 'Casa', type: 'habit' }))).rejects.toThrow();
+  });
+
+  it('updateContext cambia el tipo sin tocar las tareas existentes', async () => {
+    await as(USER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' }));
+    const updated = await as(USER, () =>
+      sqliteStore.updateContext({ id: 'Casa', type: 'habit' })
+    );
+    expect(updated).toEqual({ id: 'Casa', label: 'Casa', type: 'habit' });
+    const view = await as(USER, () => sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', fileId: 'Casa' }));
+    expect(view.tasks.map((t) => t.name)).toEqual(['a']);
+  });
+
+  it('updateContext con label cambia el file en cascada (tareas, sesiones, hábitos)', async () => {
+    await as(USER, async () => {
+      const task = await sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' });
+      await sqliteStore.logSession({ taskId: task.id, durationSeconds: 60, start: '10:00', end: '10:01' });
+      await sqliteStore.createHabit({ contextId: 'Casa', name: 'Meditar' });
+    });
+
+    const renamed = await as(USER, () => sqliteStore.updateContext({ id: 'Casa', label: 'Hogar' }));
+    expect(renamed.id).toBe('Hogar');
+
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files.map((f) => f.id)).toEqual(['Hogar']);
+
+    const view = await as(USER, () => sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', fileId: 'Hogar' }));
+    expect(view.tasks.map((t) => t.name)).toEqual(['a']);
+
+    const habits = await as(USER, () => sqliteStore.listHabits({ contextId: 'Hogar' }));
+    expect(habits.map((h) => h.name)).toEqual(['Meditar']);
+  });
+
+  it('updateContext rechaza renombrar a un nombre que ya existe', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' });
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'b', fileId: 'Trabajo' });
+    });
+    await expect(
+      as(USER, () => sqliteStore.updateContext({ id: 'Casa', label: 'Trabajo' }))
+    ).rejects.toThrow();
+  });
+
+  it('deleteContext deja las tareas sin contexto y borra sus hábitos', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' });
+      await sqliteStore.createHabit({ contextId: 'Casa', name: 'Meditar' });
+    });
+
+    await as(USER, () => sqliteStore.deleteContext('Casa'));
+
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files).toEqual([]);
+    const view = await as(USER, () => sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28' }));
+    expect(view.tasks.map((t) => t.name)).toEqual(['a']);
+    expect(view.tasks[0].file).toBeNull();
+  });
+
+  it('scopea por usuario: no se puede renombrar/borrar el contexto de otro', async () => {
+    await as(OTHER, () => sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' }));
+    await as(USER, () => sqliteStore.deleteContext('Casa'));
+    const otherFiles = await as(OTHER, () => sqliteStore.listFiles());
+    expect(otherFiles.map((f) => f.id)).toEqual(['Casa']);
+  });
+});
+
+describe('hábitos', () => {
+  it('createHabit crea el contexto como habit si todavía era implícito', async () => {
+    const habit = await as(USER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar' }));
+    expect(habit.name).toBe('Meditar');
+    expect(habit.archived).toBe(false);
+    const files = await as(USER, () => sqliteStore.listFiles());
+    expect(files).toEqual([{ id: 'Hábitos', label: 'Hábitos', type: 'habit' }]);
+  });
+
+  it('createHabit valida el nombre y usa el color por defecto si viene inválido', async () => {
+    await expect(
+      as(USER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: '  ' }))
+    ).rejects.toThrow();
+    const habit = await as(USER, () =>
+      sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Correr', color: 'no-existe' })
+    );
+    expect(habit.color).toBe('slate');
+  });
+
+  it('listHabits ordena por creación y calcula racha actual / mejor racha', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-08-20T12:00:00Z'));
+      const habit = await as(USER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar' }));
+
+      // Racha de 3 días hasta ayer (2026-08-24 es hoy), con un hueco antes.
+      await as(USER, async () => {
+        await sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-20' });
+        await sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-22' });
+        await sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-23' });
+        await sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24' });
+      });
+
+      vi.setSystemTime(new Date('2026-08-25T12:00:00Z')); // "hoy" para el cálculo de racha
+      const [stats] = await as(USER, () => sqliteStore.listHabits({ contextId: 'Hábitos' }));
+      expect(stats.currentStreak).toBe(3); // 22, 23, 24 — hoy (25) todavía no se marcó, cuenta con gracia
+      expect(stats.bestStreak).toBe(3);
+      expect(stats.doneDates[0]).toBe('2026-08-24');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('toggleHabitLog con done:false desmarca el día', async () => {
+    const habit = await as(USER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar' }));
+    await as(USER, () => sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24', done: true }));
+    await as(USER, () => sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24', done: false }));
+    const [stats] = await as(USER, () => sqliteStore.listHabits({ contextId: 'Hábitos' }));
+    expect(stats.doneDates).toEqual([]);
+  });
+
+  it('updateHabit archiva y deleteHabit borra (con su historial)', async () => {
+    const habit = await as(USER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar' }));
+    await as(USER, () => sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24' }));
+
+    const archived = await as(USER, () => sqliteStore.updateHabit({ id: habit.id, archived: true }));
+    expect(archived.archived).toBe(true);
+
+    await as(USER, () => sqliteStore.deleteHabit(habit.id));
+    const habits = await as(USER, () => sqliteStore.listHabits({ contextId: 'Hábitos' }));
+    expect(habits).toEqual([]);
+  });
+
+  it('scopea por usuario: no ve ni puede tocar los hábitos de otro', async () => {
+    const habit = await as(OTHER, () => sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar' }));
+    const mine = await as(USER, () => sqliteStore.listHabits({ contextId: 'Hábitos' }));
+    expect(mine).toEqual([]);
+    await expect(
+      as(USER, () => sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24' }))
+    ).rejects.toThrow();
+    await expect(as(USER, () => sqliteStore.updateHabit({ id: habit.id, name: 'x' }))).rejects.toThrow();
+  });
 });
 
 describe('recurrentes', () => {
@@ -1637,6 +1793,8 @@ describe('backup / restore', () => {
       });
       await sqliteStore.createGoal({ tagId: tag.id, targetMinutes: 1200 });
       await sqliteStore.createCalendarFeed({ name: 'Trabajo', url: 'https://x.test/c.ics', fileId: 'Trabajo' });
+      const habit = await sqliteStore.createHabit({ contextId: 'Hábitos', name: 'Meditar', color: 'green' });
+      await sqliteStore.toggleHabitLog({ habitId: habit.id, date: '2026-08-24' });
     });
   }
 
@@ -1655,6 +1813,9 @@ describe('backup / restore', () => {
     expect(dump.data.day_template_items).toHaveLength(1);
     expect(dump.data.goals).toHaveLength(1);
     expect(dump.data.calendar_feeds).toHaveLength(1);
+    expect(dump.data.contexts).toHaveLength(1);
+    expect(dump.data.habits).toHaveLength(1);
+    expect(dump.data.habit_logs).toHaveLength(1);
     expect(dump.data.tasks[0]).not.toHaveProperty('user_id');
   });
 
@@ -1682,6 +1843,13 @@ describe('backup / restore', () => {
     expect(goals[0].targetMinutes).toBe(1200);
     const feeds = await as(OTHER, () => sqliteStore.listCalendarFeeds());
     expect(feeds[0].url).toBe('https://x.test/c.ics');
+
+    const files = await as(OTHER, () => sqliteStore.listFiles());
+    expect(files.find((f) => f.id === 'Hábitos')?.type).toBe('habit');
+    const habits = await as(OTHER, () => sqliteStore.listHabits({ contextId: 'Hábitos' }));
+    expect(habits).toHaveLength(1);
+    expect(habits[0].name).toBe('Meditar');
+    expect(habits[0].doneDates).toEqual(['2026-08-24']);
   });
 
   it('rechaza el restore si la cuenta ya tiene datos', async () => {

@@ -105,16 +105,38 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     scopeWhere: 'user_id = ?',
     columns: ['week_start', 'body', 'updated_at'],
   },
+  {
+    table: 'contexts',
+    hasUserId: true,
+    scopeWhere: 'user_id = ?',
+    // `id` es el mismo string que `file` en el resto de las tablas — no es un
+    // uuid, así que no se regenera en el restore (ver ID_TABLES más abajo).
+    columns: ['id', 'type', 'created_at'],
+  },
+  {
+    table: 'habits',
+    hasUserId: true,
+    scopeWhere: 'user_id = ?',
+    columns: ['id', 'context_id', 'name', 'color', 'archived', 'order', 'created_at'],
+  },
+  {
+    table: 'habit_logs',
+    hasUserId: false,
+    scopeWhere: 'habit_id IN (SELECT id FROM habits WHERE user_id = ?)',
+    columns: ['habit_id', 'date'],
+  },
 ] as const;
 
 /** Tablas con `id` propio (uuid) que hay que regenerar al restaurar, para no
  *  chocar con las filas del usuario que exportó (los ids son globales). */
 const ID_TABLES = [
   'recurring_rules', 'tags', 'tasks', 'work_sessions', 'day_templates',
-  'day_template_items', 'goals', 'calendar_feeds',
+  'day_template_items', 'goals', 'calendar_feeds', 'habits',
 ] as const;
 
-/** Columnas que referencian el `id` de otra tabla: hay que remapearlas igual. */
+/** Columnas que referencian el `id` de otra tabla: hay que remapearlas igual.
+ *  `habits.context_id` no está acá: apunta a `contexts.id`, que es texto
+ *  libre (igual que `file` en el resto de las tablas) y no se remapea. */
 const REF_COLUMNS: { table: string; column: string; target: string }[] = [
   { table: 'tasks', column: 'recurring_rule_id', target: 'recurring_rules' },
   { table: 'tasks', column: 'feed_id', target: 'calendar_feeds' },
@@ -123,6 +145,7 @@ const REF_COLUMNS: { table: string; column: string; target: string }[] = [
   { table: 'work_sessions', column: 'task_id', target: 'tasks' },
   { table: 'day_template_items', column: 'template_id', target: 'day_templates' },
   { table: 'goals', column: 'tag_id', target: 'tags' },
+  { table: 'habit_logs', column: 'habit_id', target: 'habits' },
 ];
 
 /**
@@ -161,7 +184,7 @@ export function remapIds(data: Backup['data'], genId: () => string): Backup['dat
 
 /** Tablas que se chequean para decidir si una cuenta está "vacía". */
 export const ACCOUNT_NONEMPTY_TABLES = [
-  'tasks', 'tags', 'recurring_rules', 'day_templates', 'goals', 'calendar_feeds',
+  'tasks', 'tags', 'recurring_rules', 'day_templates', 'goals', 'calendar_feeds', 'habits',
 ] as const;
 
 const MAX_TOTAL_ROWS = 200_000;

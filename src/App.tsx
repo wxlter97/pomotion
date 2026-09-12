@@ -74,6 +74,8 @@ import { usePomodoroSetting } from './usePomodoroSetting';
 import { readFileOrder, useFileOrder } from './useFileOrder';
 import { orderFiles } from './fileOrder';
 import ContextOrderDialog from './components/ContextOrderDialog';
+import ManageContextsDialog from './components/ManageContextsDialog';
+import HabitsView from './components/HabitsView';
 import { useTheme } from './useTheme';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
@@ -186,11 +188,17 @@ export default function App() {
   const [fileOrder, setFileOrder] = useFileOrder();
   const orderedFiles = useMemo(() => orderFiles(files, fileOrder), [files, fileOrder]);
   const [showContextOrder, setShowContextOrder] = useState(false);
+  const [showManageContexts, setShowManageContexts] = useState(false);
   const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
   const selectedFileIdRef = useRef<string | null>(null);
   const filesLoadedRef = useRef(false);
 
   const selectMode = selectedIds.size > 0;
+
+  // Contexto elegido: si es de tipo 'habit' se ve la lista de hábitos en vez
+  // del tablero de tareas de la semana.
+  const selectedContext = orderedFiles.find((f) => f.id === selectedFileId) ?? null;
+  const isHabitContext = selectedContext?.type === 'habit';
 
   // Mientras haya un timer corriendo, la tarea activa queda con sus
   // controles de mover/borrar bloqueados — Timer.tsx detecta "cambié de
@@ -297,6 +305,28 @@ export default function App() {
       cancelled = true;
     };
   }, [refresh]);
+
+  // Recarga la lista de contextos tras crear/renombrar/tipar/borrar uno desde
+  // el diálogo de gestión. `keepId` es el id a preferir como seleccionado si
+  // sigue existiendo (ej. el nuevo id de un contexto recién renombrado) —
+  // por defecto el que ya estaba elegido, que puede haber dejado de existir
+  // (se borró, o se renombró y por eso cambió de id).
+  async function reloadFiles(keepId?: string | null) {
+    try {
+      const filesRes = await getFiles();
+      setFiles(filesRes.files);
+      const wantId = keepId !== undefined ? keepId : selectedFileIdRef.current;
+      const stillValid = wantId != null && filesRes.files.some((f) => f.id === wantId);
+      const nextFileId = stillValid ? wantId : (orderFiles(filesRes.files, readFileOrder())[0]?.id ?? null);
+      if (nextFileId !== selectedFileIdRef.current) {
+        setSelectedFileId(nextFileId);
+        selectedFileIdRef.current = nextFileId;
+      }
+      void refresh(undefined, undefined, nextFileId ?? undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo actualizar la lista de contextos');
+    }
+  }
 
   const guardIfRunning = useCallback(
     (message: string, run: () => void) => {
@@ -1000,6 +1030,9 @@ export default function App() {
               {t('menu.contextOrder')}
             </MenuItem>
           )}
+          <MenuItem onClick={() => { setShowManageContexts(true); close(); }}>
+            {t('menu.manageContexts')}
+          </MenuItem>
           <MenuItem onClick={() => { setShowBackup(true); close(); }}>{t('menu.backup')}</MenuItem>
           {authIsAdmin && (
             <MenuItem onClick={() => { setShowAdmin(true); close(); }}>{t('menu.approveUsers')}</MenuItem>
@@ -1119,7 +1152,9 @@ export default function App() {
         />
       )}
 
-      {data && (
+      {isHabitContext && selectedFileId && <HabitsView contextId={selectedFileId} />}
+
+      {data && !isHabitContext && (
         <>
           <div className="day-row">
             <DaySelector
@@ -1397,6 +1432,15 @@ export default function App() {
           order={fileOrder}
           onSave={setFileOrder}
           onClose={() => setShowContextOrder(false)}
+        />
+      )}
+
+      {showManageContexts && (
+        <ManageContextsDialog
+          files={orderedFiles}
+          onRenamed={(oldId, newId) => void reloadFiles(oldId === selectedFileId ? newId : undefined)}
+          onChanged={() => void reloadFiles()}
+          onClose={() => setShowManageContexts(false)}
         />
       )}
 

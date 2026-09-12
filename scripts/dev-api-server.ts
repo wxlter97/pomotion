@@ -17,6 +17,7 @@ import googleStartHandler from '../api/auth/google/start';
 import authLogoutHandler from '../api/auth/logout';
 import authStatusHandler from '../api/auth/status';
 import filesHandler from '../api/files';
+import habitsHandler from '../api/habits';
 import recurringHandler from '../api/recurring';
 import reportHandler from '../api/report';
 import sessionHandler from '../api/session';
@@ -36,6 +37,7 @@ const routes: Record<string, Handler> = {
   '/api/task-reorder': taskReorderHandler as Handler,
   '/api/task': taskHandler as Handler,
   '/api/files': filesHandler as Handler,
+  '/api/habits': habitsHandler as Handler,
   '/api/report': reportHandler as Handler,
   '/api/recurring': recurringHandler as Handler,
 };

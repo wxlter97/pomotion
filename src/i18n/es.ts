@@ -72,6 +72,7 @@ export const es = {
   'menu.pomodoroSettings': 'Ajustes de Pomodoro',
   'menu.focusMode': 'Modo foco',
   'menu.contextOrder': 'Orden de contextos',
+  'menu.manageContexts': 'Gestionar contextos',
   'menu.backup': 'Copia de seguridad',
   'menu.approveUsers': 'Aprobar usuarios',
   'menu.language': 'Idioma',
@@ -478,6 +479,34 @@ export const es = {
   'tags.color.blue': 'Azul',
   'tags.color.violet': 'Violeta',
   'tags.color.pink': 'Rosa',
+
+  // --- Gestión de contextos (crear / renombrar / tipo / borrar) ---
+  'contexts.title': 'Contextos',
+  'contexts.intro': 'Un contexto de tareas es un tablero normal (Trabajo, Casa…). Uno de hábitos muestra en cambio una lista con un check por día y racha.',
+  'contexts.none': 'Todavía no hay contextos.',
+  'contexts.newLabelPlaceholder': 'Nombre del contexto…',
+  'contexts.typeTask': 'Tareas',
+  'contexts.typeHabit': 'Hábitos',
+  'contexts.deleteTitle': 'Borrar contexto',
+  'contexts.deleteBody': 'Las tareas de «{name}» quedan sin contexto (no se borran). Si es de hábitos, sus hábitos y el historial se van con él.',
+  'contexts.deleteAria': 'Borrar el contexto {name}',
+  'contexts.sessionExpired': 'La sesión expiró. Recargá la página.',
+
+  // --- Hábitos (vista de un contexto de tipo hábito) ---
+  'habits.newPlaceholder': 'Nuevo hábito…',
+  'habits.none': 'Todavía no hay hábitos en este contexto.',
+  'habits.streakCurrent': 'Racha actual',
+  'habits.streakBest': 'Mejor racha',
+  'habits.archive': 'Archivar',
+  'habits.archiveTitle': 'Archivar (deja de contar para la racha, no se borra el historial)',
+  'habits.unarchive': 'Reactivar',
+  'habits.deleteTitle': 'Eliminar hábito',
+  'habits.deleteBody': 'Se borra «{name}» junto con todo su historial de días marcados. No se puede deshacer.',
+  'habits.deleteAria': 'Eliminar el hábito {name}',
+  'habits.checkAria': 'Marcar {name} el {date}',
+  'habits.showArchived': 'Ver archivados ({n})',
+  'habits.hideArchived': 'Ocultar archivados ({n})',
+  'habits.sessionExpired': 'La sesión expiró. Recargá la página.',
 
   // --- Calendarios ---
   'feeds.title': 'Calendarios',

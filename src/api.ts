@@ -7,6 +7,7 @@ import type {
   FileEntry,
   FocusHeatmap,
   GoalProgress,
+  Habit,
   MonthSummary,
   RecurringRule,
   Session,
@@ -91,6 +92,67 @@ export function logout() {
 
 export function getFiles() {
   return request<{ files: FileEntry[] }>('/api/files');
+}
+
+// --- Contextos (crear / renombrar / tipo / borrar) ---
+
+export function createContext(label: string, type: FileEntry['type']) {
+  return request<{ ok: true; context: FileEntry }>('/api/files', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_context', label, type }),
+  });
+}
+
+export function updateContext(id: string, fields: { label?: string; type?: FileEntry['type'] }) {
+  return request<{ ok: true; context: FileEntry }>('/api/files', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_context', id, ...fields }),
+  });
+}
+
+export function deleteContext(id: string) {
+  return request<{ ok: true }>('/api/files', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_context', id }),
+  });
+}
+
+// --- Hábitos ---
+
+export function getHabits(contextId: string) {
+  const params = new URLSearchParams({ context: contextId });
+  return request<{ habits: Habit[] }>(`/api/habits?${params.toString()}`);
+}
+
+export function createHabit(contextId: string, name: string, color: string) {
+  return request<{ ok: true; habit: Habit }>('/api/habits', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_habit', context_id: contextId, name, color }),
+  });
+}
+
+export function updateHabit(
+  id: string,
+  fields: { name?: string; color?: string; archived?: boolean; order?: number }
+) {
+  return request<{ ok: true; habit: Habit }>('/api/habits', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'update_habit', id, ...fields }),
+  });
+}
+
+export function deleteHabit(id: string) {
+  return request<{ ok: true }>('/api/habits', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_habit', id }),
+  });
+}
+
+export function toggleHabitLog(id: string, date: string, done: boolean) {
+  return request<{ ok: true; date: string; done: boolean }>('/api/habits', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'toggle_log', id, date, done }),
+  });
 }
 
 export function getTasks(day?: string, week?: string, fileId?: string, weekend?: boolean) {

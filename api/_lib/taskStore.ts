@@ -213,7 +213,32 @@ export type SessionRow = {
   end: string;
 };
 
-export type FileEntry = { id: string; label: string };
+/** Un contexto puede ser un tablero de tareas normal, o una lista de hábitos
+ *  con check diario (ver `Habit`). */
+export type ContextType = 'task' | 'habit';
+
+/** `id === label`: el mismo string que ya se usa como `Task.file` en el resto
+ *  del esquema (no es un uuid nuevo — ver migración 015). */
+export type FileEntry = { id: string; label: string; type: ContextType };
+
+/** Un hábito dentro de un contexto de tipo 'habit'. */
+export type Habit = {
+  id: string;
+  contextId: string;
+  name: string;
+  color: string;
+  archived: boolean;
+  order: number;
+};
+
+/** Un hábito con su historial reciente y racha, para la vista de hábitos. */
+export type HabitWithStats = Habit & {
+  /** 'YYYY-MM-DD' de los últimos días marcados como hechos (orden descendente). */
+  doneDates: string[];
+  /** Días consecutivos hasta hoy (o ayer, si hoy todavía no se marcó). */
+  currentStreak: number;
+  bestStreak: number;
+};
 
 /** Una tarea encontrada por la búsqueda de texto (ver `searchTasks`). */
 export type TaskSearchResult = {
@@ -353,6 +378,22 @@ export type UpdateTaskInput = {
 
 export type CreateTagInput = { name?: string; color?: string };
 export type UpdateTagInput = { id?: string; name?: string; color?: string };
+
+export type CreateContextInput = { label?: string; type?: string };
+/** `label` renombra (cambia el `file` en todas las tablas que lo usan);
+ *  `type` cambia entre 'task' y 'habit'. Ambos son opcionales e independientes. */
+export type UpdateContextInput = { id?: string; label?: string; type?: string };
+
+export type CreateHabitInput = { contextId?: string; name?: string; color?: string };
+export type UpdateHabitInput = {
+  id?: string;
+  name?: string;
+  color?: string;
+  archived?: boolean;
+  order?: number;
+};
+/** Marca (o desmarca) un hábito como hecho en una fecha puntual. */
+export type ToggleHabitLogInput = { habitId?: string; date?: string; done?: boolean };
 
 export type DayTemplateItemInput = {
   name?: string;
@@ -497,6 +538,20 @@ export interface TaskStore {
    */
   importBackup(input: { backup: unknown }): Promise<ImportResult>;
   listFiles(): Promise<FileEntry[]>;
+  createContext(input: CreateContextInput): Promise<FileEntry>;
+  /** Renombrar y/o cambiar el tipo de un contexto existente (o implícito). */
+  updateContext(input: UpdateContextInput): Promise<FileEntry>;
+  /** Borra el contexto; las tareas/hábitos que lo usaban quedan sin contexto
+   *  (no se borran) — salvo los hábitos, que se van con él (no tienen sentido sueltos). */
+  deleteContext(id?: string): Promise<void>;
+
+  /** Hábitos de un contexto de tipo 'habit', con su racha. */
+  listHabits(input: { contextId?: string }): Promise<HabitWithStats[]>;
+  createHabit(input: CreateHabitInput): Promise<Habit>;
+  updateHabit(input: UpdateHabitInput): Promise<Habit>;
+  deleteHabit(id?: string): Promise<void>;
+  toggleHabitLog(input: ToggleHabitLogInput): Promise<{ date: string; done: boolean }>;
+
   listTags(): Promise<Tag[]>;
   createTag(input: CreateTagInput): Promise<Tag>;
   updateTag(input: UpdateTagInput): Promise<Tag>;

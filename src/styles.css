@@ -4222,6 +4222,279 @@ kbd {
   margin-bottom: 0.4rem;
 }
 
+/* ---------------------------------------------------------------------
+ * Gestión de contextos (crear / renombrar / tipo / borrar) — ManageContextsDialog.
+ * ------------------------------------------------------------------- */
+
+.sheet--contexts {
+  max-width: min(94vw, 560px);
+}
+
+.context-new-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.context-new-form input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 980px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.context-new-form input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.context-type-toggle .segment {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.context-manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.context-manage-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--color-separator);
+}
+
+.context-manage-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.context-manage-name {
+  flex: 1 1 6rem;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--color-label);
+  cursor: pointer;
+  padding: 0.2rem 0;
+}
+
+.context-rename-input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.9rem;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-accent);
+  color: var(--color-label);
+  border-radius: 8px;
+  padding: 0.2rem 0.5rem;
+  outline: none;
+}
+
+.context-manage-delete {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.context-manage-delete:hover:not(:disabled) {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+}
+
+/* ---------------------------------------------------------------------
+ * Vista de hábitos — HabitsView (reemplaza el tablero de tareas cuando el
+ * contexto elegido es de tipo 'habit').
+ * ------------------------------------------------------------------- */
+
+.habits-view {
+  margin: 1rem 1.25rem;
+}
+
+.habit-new-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.1rem;
+}
+
+.habit-new-form input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  font-family: inherit;
+  background: var(--color-fill);
+  border: 1px solid transparent;
+  color: var(--color-label);
+  border-radius: 980px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.habit-new-form input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+.habit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.habit-row {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-separator);
+}
+
+.habit-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.habit-row-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.habit-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--tag-solid);
+  flex-shrink: 0;
+}
+
+.habit-name {
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: var(--color-label);
+}
+
+.habit-streaks {
+  display: inline-flex;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.habit-streak {
+  font-size: 0.78rem;
+  color: var(--color-label-secondary);
+  white-space: nowrap;
+}
+
+.habit-archive,
+.habit-unarchive {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.habit-archive:hover:not(:disabled),
+.habit-unarchive:hover:not(:disabled) {
+  color: var(--color-label);
+}
+
+.habit-delete {
+  background: none;
+  border: none;
+  color: var(--color-label-secondary);
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 8px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.habit-delete:hover:not(:disabled) {
+  color: var(--color-destructive);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+}
+
+.habit-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.35rem;
+  max-width: 24rem;
+}
+
+.habit-day {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid var(--color-separator);
+  background: var(--color-fill);
+  color: var(--color-label-secondary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.habit-day[data-today] {
+  border-color: var(--color-accent);
+}
+
+.habit-day.is-done {
+  background: var(--tag-solid);
+  color: var(--tag-fg);
+  border-color: transparent;
+}
+
+.habit-day:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.habit-archived {
+  margin-top: 1rem;
+  border-top: 1px solid var(--color-separator);
+  padding-top: 0.75rem;
+}
+
+.habit-list--archived {
+  margin-top: 0.6rem;
+  opacity: 0.7;
+}
+
+.habit-row--archived .habit-row-head {
+  margin-bottom: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation-duration: 0.01ms !important;
