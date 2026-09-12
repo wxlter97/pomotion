@@ -105,13 +105,19 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     scopeWhere: 'user_id = ?',
     columns: ['week_start', 'body', 'updated_at'],
   },
+  {
+    table: 'post_its',
+    hasUserId: true,
+    scopeWhere: 'user_id = ?',
+    columns: ['id', 'title', 'body', 'color', 'pinned', 'created_at', 'updated_at'],
+  },
 ] as const;
 
 /** Tablas con `id` propio (uuid) que hay que regenerar al restaurar, para no
  *  chocar con las filas del usuario que exportó (los ids son globales). */
 const ID_TABLES = [
   'recurring_rules', 'tags', 'tasks', 'work_sessions', 'day_templates',
-  'day_template_items', 'goals', 'calendar_feeds',
+  'day_template_items', 'goals', 'calendar_feeds', 'post_its',
 ] as const;
 
 /** Columnas que referencian el `id` de otra tabla: hay que remapearlas igual. */

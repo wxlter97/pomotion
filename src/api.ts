@@ -8,6 +8,7 @@ import type {
   FocusHeatmap,
   GoalProgress,
   MonthSummary,
+  PostIt,
   RecurringRule,
   Session,
   Tag,
@@ -337,6 +338,41 @@ export function deleteGoal(id: string) {
   return request<{ ok: true }>('/api/tasks', {
     method: 'POST',
     body: JSON.stringify({ action: 'delete_goal', id }),
+  });
+}
+
+// --- Post-its ---
+
+export function getPostIts() {
+  return request<{ postIts: PostIt[] }>('/api/tasks?post_its=1');
+}
+
+export function createPostIt(fields: { title?: string; body?: string; color?: string } = {}) {
+  return request<{ ok: true; postIt: PostIt }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'create_post_it', title: fields.title, body_text: fields.body, color: fields.color }),
+  });
+}
+
+export function updatePostIt(
+  id: string,
+  fields: { title?: string; body?: string; color?: string; pinned?: boolean }
+) {
+  const body: Record<string, unknown> = { action: 'update_post_it', id };
+  if (fields.title !== undefined) body.title = fields.title;
+  if (fields.body !== undefined) body.body_text = fields.body;
+  if (fields.color !== undefined) body.color = fields.color;
+  if (fields.pinned !== undefined) body.pinned = fields.pinned;
+  return request<{ ok: true; postIt: PostIt }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export function deletePostIt(id: string) {
+  return request<{ ok: true }>('/api/tasks', {
+    method: 'POST',
+    body: JSON.stringify({ action: 'delete_post_it', id }),
   });
 }
 

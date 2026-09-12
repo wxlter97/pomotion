@@ -28,6 +28,10 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       if (typeof req.query.goals === 'string') {
         return res.status(200).json({ goals: await sqliteStore.listGoals() });
       }
+      // ?post_its=1 → tablero de post-its del usuario.
+      if (typeof req.query.post_its === 'string') {
+        return res.status(200).json({ postIts: await sqliteStore.listPostIts() });
+      }
       // ?export=1 → volcado completo del dataset del usuario (backup).
       //   &download=1 fuerza la descarga como archivo .json (navegación normal).
       if (typeof req.query.export === 'string') {
@@ -100,6 +104,8 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         weekend?: boolean;
         body_text?: string;
         week_start?: string;
+        title?: string;
+        pinned?: boolean;
       };
       if (body.action === 'bulk') {
         const result = await sqliteStore.bulkTasks({
@@ -191,6 +197,28 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (body.action === 'delete_goal') {
         await sqliteStore.deleteGoal(body.id);
+        return res.status(200).json({ ok: true });
+      }
+      if (body.action === 'create_post_it') {
+        const postIt = await sqliteStore.createPostIt({
+          title: body.title,
+          body: body.body_text,
+          color: body.color,
+        });
+        return res.status(200).json({ ok: true, postIt });
+      }
+      if (body.action === 'update_post_it') {
+        const postIt = await sqliteStore.updatePostIt({
+          id: body.id,
+          title: body.title,
+          body: body.body_text,
+          color: body.color,
+          pinned: body.pinned,
+        });
+        return res.status(200).json({ ok: true, postIt });
+      }
+      if (body.action === 'delete_post_it') {
+        await sqliteStore.deletePostIt(body.id);
         return res.status(200).json({ ok: true });
       }
       if (body.action === 'create_feed') {
