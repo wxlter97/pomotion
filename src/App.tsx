@@ -29,6 +29,7 @@ import PendingApproval from './components/PendingApproval';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
+import PostItsDialog from './components/PostItsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import BackupDialog from './components/BackupDialog';
@@ -139,6 +140,7 @@ export default function App() {
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
+  const [showPostIts, setShowPostIts] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -931,6 +933,7 @@ export default function App() {
           <MenuItem onClick={() => { setShowTimeline(true); close(); }}>{t('menu.timeline')}</MenuItem>
           <MenuItem onClick={() => { setShowReview(true); close(); }}>{t('menu.weeklyReview')}</MenuItem>
           <MenuItem onClick={() => { setShowGoals(true); close(); }}>{t('menu.goals')}</MenuItem>
+          <MenuItem onClick={() => { setShowPostIts(true); close(); }}>{t('menu.postIts')}</MenuItem>
           <MenuItem onClick={() => { setShowReport(true); close(); }}>{t('menu.report')}</MenuItem>
           <MenuItem onClick={() => { setShowRecurring(true); close(); }}>{t('menu.recurring')}</MenuItem>
           <MenuItem onClick={() => { setShowTemplates(true); close(); }}>{t('menu.templates')}</MenuItem>
@@ -1378,6 +1381,8 @@ export default function App() {
           onClose={() => setShowGoals(false)}
         />
       )}
+
+      {showPostIts && <PostItsDialog onClose={() => setShowPostIts(false)} />}
 
       {showFeeds && (
         <CalendarFeedsDialog

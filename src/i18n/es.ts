@@ -58,6 +58,7 @@ export const es = {
   'menu.timeline': 'Agenda del día',
   'menu.weeklyReview': 'Revisión semanal',
   'menu.goals': 'Metas del mes',
+  'menu.postIts': 'Post-its',
   'menu.report': 'Reporte de tiempo',
   'menu.recurring': 'Tareas recurrentes',
   'menu.templates': 'Plantillas de día',
@@ -443,6 +444,20 @@ export const es = {
   'goals.deleteBody': 'Borra la meta. No toca tus tareas ni sesiones.',
   'goals.error': 'Algo salió mal',
   'goals.sessionExpired': 'La sesión expiró. Recargá la página.',
+
+  // --- Post-its ---
+  'postIts.title': 'Post-its',
+  'postIts.none': 'Todavía no tenés post-its. Creá uno para anotar algo suelto.',
+  'postIts.new': 'Nueva nota',
+  'postIts.titlePlaceholder': 'Título (opcional)',
+  'postIts.bodyPlaceholder': 'Escribí lo que quieras guardar…',
+  'postIts.pin': 'Fijar',
+  'postIts.unpin': 'Quitar de fijados',
+  'postIts.deleteAria': 'Eliminar post-it',
+  'postIts.deleteTitle': 'Eliminar post-it',
+  'postIts.deleteBody': 'Se borra para siempre, no se puede deshacer.',
+  'postIts.error': 'Algo salió mal',
+  'postIts.sessionExpired': 'La sesión expiró. Recargá la página.',
 
   // --- Plantillas de día ---
   'templates.title': 'Plantillas de día',

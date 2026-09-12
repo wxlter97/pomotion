@@ -55,6 +55,7 @@ export const en: Record<MsgKey, string> = {
   'menu.timeline': 'Day agenda',
   'menu.weeklyReview': 'Weekly review',
   'menu.goals': 'Monthly goals',
+  'menu.postIts': 'Post-its',
   'menu.report': 'Time report',
   'menu.recurring': 'Recurring tasks',
   'menu.templates': 'Day templates',
@@ -440,6 +441,20 @@ export const en: Record<MsgKey, string> = {
   'goals.deleteBody': 'Deletes the goal. It does not touch your tasks or sessions.',
   'goals.error': 'Something went wrong',
   'goals.sessionExpired': 'Your session expired. Reload the page.',
+
+  // --- Post-its ---
+  'postIts.title': 'Post-its',
+  'postIts.none': "You don't have any post-its yet. Create one to jot something down.",
+  'postIts.new': 'New note',
+  'postIts.titlePlaceholder': 'Title (optional)',
+  'postIts.bodyPlaceholder': 'Write whatever you want to keep…',
+  'postIts.pin': 'Pin',
+  'postIts.unpin': 'Unpin',
+  'postIts.deleteAria': 'Delete post-it',
+  'postIts.deleteTitle': 'Delete post-it',
+  'postIts.deleteBody': "It's deleted for good, this can't be undone.",
+  'postIts.error': 'Something went wrong',
+  'postIts.sessionExpired': 'Your session expired. Reload the page.',
 
   // --- Day templates ---
   'templates.title': 'Day templates',

@@ -2368,6 +2368,122 @@ body.is-dragging * {
   font-weight: 600;
 }
 
+/* --- Post-its --- */
+.sheet--post-its {
+  max-width: min(94vw, 760px);
+}
+
+.post-it-toolbar {
+  margin-bottom: 1rem;
+}
+
+.post-it-board {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.9rem;
+  max-height: min(60vh, 560px);
+  overflow-y: auto;
+}
+
+.post-it {
+  background: var(--tag-bg);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.post-it-head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.post-it-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: none;
+  border: none;
+  color: var(--tag-fg);
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.15rem 0.2rem;
+}
+
+.post-it-title-input:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--tag-fg) 8%, transparent);
+  border-radius: 6px;
+}
+
+.post-it-title-input::placeholder {
+  color: var(--tag-fg);
+  opacity: 0.55;
+}
+
+.post-it-pin,
+.post-it-delete {
+  background: none;
+  border: none;
+  color: var(--tag-fg);
+  opacity: 0.6;
+  cursor: pointer;
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.post-it-pin:hover:not(:disabled),
+.post-it-delete:hover:not(:disabled) {
+  opacity: 1;
+  background: color-mix(in srgb, var(--tag-fg) 12%, transparent);
+}
+
+.post-it-pin.is-active {
+  opacity: 1;
+}
+
+.post-it-delete {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.post-it-body-input {
+  resize: vertical;
+  min-height: 4.5rem;
+  background: color-mix(in srgb, var(--tag-fg) 6%, transparent);
+  border: none;
+  border-radius: 8px;
+  color: var(--tag-fg);
+  font-family: inherit;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  padding: 0.5rem 0.6rem;
+}
+
+.post-it-body-input:focus {
+  outline: 1px solid color-mix(in srgb, var(--tag-fg) 35%, transparent);
+}
+
+.post-it-body-input::placeholder {
+  color: var(--tag-fg);
+  opacity: 0.5;
+}
+
+.post-it .tag-swatches {
+  align-self: flex-start;
+}
+
 /* --- Admin: aprobación de usuarios --- */
 .sheet--admin {
   max-width: min(94vw, 460px);
