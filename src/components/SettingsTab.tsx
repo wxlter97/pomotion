@@ -42,6 +42,7 @@ export default function SettingsTab({
   onOpenBackup,
   multiFile,
   onOpenContextOrder,
+  onOpenManageContexts,
   isAdmin,
   onOpenAdmin,
   onRefresh,
@@ -79,6 +80,7 @@ export default function SettingsTab({
   onOpenBackup: () => void;
   multiFile: boolean;
   onOpenContextOrder: () => void;
+  onOpenManageContexts: () => void;
   isAdmin: boolean;
   onOpenAdmin: () => void;
   onRefresh: () => void;
@@ -178,6 +180,7 @@ export default function SettingsTab({
         <Row label={t('menu.feeds')} onClick={onOpenFeeds} />
         <Row label={t('menu.postIts')} onClick={onOpenPostIts} />
         {multiFile && <Row label={t('menu.contextOrder')} onClick={onOpenContextOrder} />}
+        <Row label={t('menu.manageContexts')} onClick={onOpenManageContexts} />
         <Row label={t('menu.backup')} onClick={onOpenBackup} />
         <Row label={t('app.refresh')} onClick={onRefresh} disabled={refreshing} />
       </Section>

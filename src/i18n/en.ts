@@ -85,6 +85,7 @@ export const en: Record<MsgKey, string> = {
   'menu.businessHours': 'Business hours',
   'menu.focusMode': 'Focus mode',
   'menu.contextOrder': 'Context order',
+  'menu.manageContexts': 'Manage contexts',
   'menu.backup': 'Backup',
   'menu.approveUsers': 'Approve users',
   'menu.language': 'Language',
@@ -505,6 +506,34 @@ export const en: Record<MsgKey, string> = {
   'tags.color.blue': 'Blue',
   'tags.color.violet': 'Violet',
   'tags.color.pink': 'Pink',
+
+  // --- Manage contexts (create / rename / type / delete) ---
+  'contexts.title': 'Contexts',
+  'contexts.intro': 'A task context is a normal board (Work, Home…). A habit context instead shows a list with a daily check and streak.',
+  'contexts.none': 'No contexts yet.',
+  'contexts.newLabelPlaceholder': 'Context name…',
+  'contexts.typeTask': 'Tasks',
+  'contexts.typeHabit': 'Habits',
+  'contexts.deleteTitle': 'Delete context',
+  'contexts.deleteBody': 'Tasks in "{name}" are left without a context (not deleted). If it\'s a habit context, its habits and their history go with it.',
+  'contexts.deleteAria': 'Delete context {name}',
+  'contexts.sessionExpired': 'Your session expired. Reload the page.',
+
+  // --- Habits (view for a habit-type context) ---
+  'habits.newPlaceholder': 'New habit…',
+  'habits.none': 'No habits in this context yet.',
+  'habits.streakCurrent': 'Current streak',
+  'habits.streakBest': 'Best streak',
+  'habits.archive': 'Archive',
+  'habits.archiveTitle': "Archive (stops counting for the streak, doesn't delete the history)",
+  'habits.unarchive': 'Unarchive',
+  'habits.deleteTitle': 'Delete habit',
+  'habits.deleteBody': '"{name}" will be deleted along with its whole history of checked days. This can\'t be undone.',
+  'habits.deleteAria': 'Delete habit {name}',
+  'habits.checkAria': 'Check {name} for {date}',
+  'habits.showArchived': 'Show archived ({n})',
+  'habits.hideArchived': 'Hide archived ({n})',
+  'habits.sessionExpired': 'Your session expired. Reload the page.',
 
   // --- Calendars ---
   'feeds.title': 'Calendars',

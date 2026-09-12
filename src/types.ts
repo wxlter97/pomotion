@@ -66,9 +66,28 @@ export type DayColumn = { day: string; date: string };
 /** Tarea sin hacer que vence hoy o ya venció. */
 export type DueReminder = { id: string; name: string; due: string };
 
+/** Un contexto puede ser un tablero de tareas normal, o una lista de hábitos
+ *  con check diario (ver `Habit`). */
+export type ContextType = 'task' | 'habit';
+
 export type FileEntry = {
   id: string;
   label: string;
+  type: ContextType;
+};
+
+/** Un hábito con su historial reciente y racha, para la vista de hábitos. */
+export type Habit = {
+  id: string;
+  contextId: string;
+  name: string;
+  color: string;
+  archived: boolean;
+  order: number;
+  /** 'YYYY-MM-DD' de los últimos días marcados como hechos, más reciente primero. */
+  doneDates: string[];
+  currentStreak: number;
+  bestStreak: number;
 };
 
 export type TasksResponse = {

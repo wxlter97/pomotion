@@ -60,9 +60,12 @@ import type {
   ImportResult,
   ApplyRecurringInput,
   CalendarFeed,
+  ContextType,
   CreateCalendarFeedInput,
+  CreateContextInput,
   CreateDayTemplateInput,
   CreateGoalInput,
+  CreateHabitInput,
   CreateRecurringRuleInput,
   CreateTagInput,
   CreateTaskInput,
@@ -79,6 +82,8 @@ import type {
   GetMonthSummaryInput,
   GetWeekViewInput,
   GetWeeklyReviewInput,
+  Habit,
+  HabitWithStats,
   LogSessionInput,
   MonthDaySummary,
   MonthSummary,
@@ -99,9 +104,12 @@ import type {
   TaskPriority,
   TaskSearchResult,
   TaskStore,
+  ToggleHabitLogInput,
   UpdateCalendarFeedInput,
+  UpdateContextInput,
   UpdateDayTemplateInput,
   UpdateGoalInput,
+  UpdateHabitInput,
   UpdateRecurringRuleInput,
   UpdateSessionInput,
   UpdateTagInput,
@@ -984,15 +992,346 @@ async function importBackup(input: { backup: unknown }): Promise<ImportResult> {
   return { imported };
 }
 
+const CONTEXT_LABEL_MAX = 40;
+const HABIT_NAME_MAX = 60;
+
+function normalizeContextType(type: string | null | undefined): ContextType {
+  return type === 'habit' ? 'habit' : 'task';
+}
+
+function cleanContextLabel(label: string | undefined): string {
+  const trimmed = typeof label === 'string' ? label.trim().replace(/\s+/g, ' ') : '';
+  if (!trimmed) throw new BadRequestError('invalid_context_label', 'El nombre del contexto no puede estar vacío');
+  if (trimmed.length > CONTEXT_LABEL_MAX) {
+    throw new BadRequestError('invalid_context_label', `El contexto no puede pasar de ${CONTEXT_LABEL_MAX} caracteres`);
+  }
+  return trimmed;
+}
+
+/**
+ * Contextos = valores distintos de `tasks.file` (como siempre) más los que
+ * solo existen como fila explícita en `contexts` (típico de un contexto de
+ * hábitos recién creado, todavía sin ninguna tarea). El tipo sale de
+ * `contexts`; si no hay fila ahí es un contexto implícito de tipo 'task'.
+ */
 async function listFiles(): Promise<FileEntry[]> {
   const userId = currentUserId();
-  const rows = (
-    await getDb().execute({
-      sql: 'SELECT DISTINCT file FROM tasks WHERE user_id = ? AND file IS NOT NULL ORDER BY file',
+  const db = getDb();
+  const [fileRows, contextRows] = await Promise.all([
+    db.execute({
+      sql: 'SELECT DISTINCT file FROM tasks WHERE user_id = ? AND file IS NOT NULL',
       args: [userId],
+    }),
+    db.execute({ sql: 'SELECT id, type FROM contexts WHERE user_id = ?', args: [userId] }),
+  ]);
+
+  const types = new Map<string, ContextType>();
+  for (const r of contextRows.rows) types.set(String(r.id), normalizeContextType(r.type as string | null));
+
+  const ids = new Set<string>();
+  for (const r of fileRows.rows) ids.add(String(r.file));
+  for (const id of types.keys()) ids.add(id);
+
+  return Array.from(ids)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+    .map((id) => ({ id, label: id, type: types.get(id) ?? 'task' }));
+}
+
+async function createContext(input: CreateContextInput): Promise<FileEntry> {
+  const userId = currentUserId();
+  const label = cleanContextLabel(input.label);
+  const type = normalizeContextType(input.type);
+  try {
+    await getDb().execute({
+      sql: 'INSERT INTO contexts (id, user_id, type, created_at) VALUES (?, ?, ?, ?)',
+      args: [label, userId, type, new Date().toISOString()],
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) throw new ConflictError('context_exists', `Ya existe un contexto "${label}"`);
+    throw err;
+  }
+  return { id: label, label, type };
+}
+
+/** Cambia el `file` de todas las tablas que lo usan, de una — incluye
+ *  `recurring_runs.file_key` (mismo campo, otro nombre) y `habits.context_id`. */
+async function renameContextEverywhere(userId: string, from: string, to: string): Promise<void> {
+  await getDb().batch(
+    [
+      { sql: 'UPDATE tasks SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE work_sessions SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE recurring_rules SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE calendar_feeds SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE goals SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE day_templates SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
+      { sql: 'UPDATE recurring_runs SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
+      { sql: 'UPDATE habits SET context_id = ? WHERE user_id = ? AND context_id = ?', args: [to, userId, from] },
+    ],
+    'write'
+  );
+}
+
+async function updateContext(input: UpdateContextInput): Promise<FileEntry> {
+  const userId = currentUserId();
+  const id = typeof input.id === 'string' ? input.id : '';
+  if (!id) throw new BadRequestError('invalid_context', 'Falta el contexto a actualizar');
+  if (input.label === undefined && input.type === undefined) {
+    throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+  }
+
+  const db = getDb();
+  const priorRow = (
+    await db.execute({ sql: 'SELECT type FROM contexts WHERE user_id = ? AND id = ?', args: [userId, id] })
+  ).rows[0];
+  const priorType = normalizeContextType(priorRow?.type as string | null | undefined);
+  const nextType = input.type !== undefined ? normalizeContextType(input.type) : priorType;
+
+  let nextId = id;
+  if (input.label !== undefined) {
+    const label = cleanContextLabel(input.label);
+    if (label !== id) {
+      const clash = (
+        await db.execute({
+          sql: `SELECT 1 AS x FROM contexts WHERE user_id = ? AND id = ?
+                UNION SELECT 1 FROM tasks WHERE user_id = ? AND file = ? LIMIT 1`,
+          args: [userId, label, userId, label],
+        })
+      ).rows[0];
+      if (clash) throw new ConflictError('context_exists', `Ya existe un contexto "${label}"`);
+      // La fila nueva tiene que existir ANTES de mover `habits.context_id` a
+      // apuntarle (si no, la FK compuesta rechaza el UPDATE de habits).
+      await db.execute({
+        sql: `INSERT INTO contexts (id, user_id, type, created_at) VALUES (?, ?, ?, ?)
+              ON CONFLICT (user_id, id) DO UPDATE SET type = excluded.type`,
+        args: [label, userId, nextType, new Date().toISOString()],
+      });
+      await renameContextEverywhere(userId, id, label);
+      await db.execute({ sql: 'DELETE FROM contexts WHERE user_id = ? AND id = ?', args: [userId, id] });
+      nextId = label;
+    }
+  }
+
+  await db.execute({
+    sql: `INSERT INTO contexts (id, user_id, type, created_at) VALUES (?, ?, ?, ?)
+          ON CONFLICT (user_id, id) DO UPDATE SET type = excluded.type`,
+    args: [nextId, userId, nextType, new Date().toISOString()],
+  });
+
+  return { id: nextId, label: nextId, type: nextType };
+}
+
+/** Borra el contexto; deja sin contexto (`file = NULL`) lo que lo usaba —
+ *  salvo sus hábitos, que se van con él (cascada por FK, no tienen sentido sueltos). */
+async function deleteContext(id?: string): Promise<void> {
+  const userId = currentUserId();
+  const contextId = typeof id === 'string' ? id : '';
+  if (!contextId) throw new BadRequestError('invalid_context', 'Falta el contexto a borrar');
+
+  await getDb().batch(
+    [
+      { sql: 'UPDATE tasks SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'UPDATE work_sessions SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'UPDATE recurring_rules SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'UPDATE calendar_feeds SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'UPDATE goals SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'UPDATE day_templates SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
+      { sql: 'DELETE FROM recurring_runs WHERE user_id = ? AND file_key = ?', args: [userId, contextId] },
+      { sql: 'DELETE FROM contexts WHERE user_id = ? AND id = ?', args: [userId, contextId] },
+    ],
+    'write'
+  );
+}
+
+// --- Hábitos ---
+
+function toHabit(r: Row): Habit {
+  const color = r.color == null ? DEFAULT_TAG_COLOR : String(r.color);
+  return {
+    id: String(r.id),
+    contextId: String(r.context_id),
+    name: String(r.name),
+    color: TAG_COLORS.has(color) ? color : DEFAULT_TAG_COLOR,
+    archived: Number(r.archived) === 1,
+    order: Number(r.order),
+  };
+}
+
+function cleanHabitName(name: string | undefined): string {
+  const trimmed = typeof name === 'string' ? name.trim().replace(/\s+/g, ' ') : '';
+  if (!trimmed) throw new BadRequestError('invalid_habit_name', 'El nombre del hábito no puede estar vacío');
+  if (trimmed.length > HABIT_NAME_MAX) {
+    throw new BadRequestError('invalid_habit_name', `El hábito no puede pasar de ${HABIT_NAME_MAX} caracteres`);
+  }
+  return trimmed;
+}
+
+/** Racha actual (hasta hoy, con un día de gracia si hoy todavía no se marcó)
+ *  y la mejor racha histórica, a partir de las fechas hechas (cualquier orden). */
+function computeStreaks(doneDates: string[], today: string): { currentStreak: number; bestStreak: number } {
+  if (doneDates.length === 0) return { currentStreak: 0, bestStreak: 0 };
+  const done = new Set(doneDates);
+
+  let currentStreak = 0;
+  let cursor = done.has(today) ? today : addDaysToDate(today, -1);
+  while (done.has(cursor)) {
+    currentStreak += 1;
+    cursor = addDaysToDate(cursor, -1);
+  }
+
+  const sortedAsc = Array.from(done).sort();
+  let bestStreak = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const d of sortedAsc) {
+    run = prev !== null && addDaysToDate(prev, 1) === d ? run + 1 : 1;
+    bestStreak = Math.max(bestStreak, run);
+    prev = d;
+  }
+
+  return { currentStreak, bestStreak: Math.max(bestStreak, currentStreak) };
+}
+
+async function listHabits(input: { contextId?: string }): Promise<HabitWithStats[]> {
+  const userId = currentUserId();
+  const contextId = typeof input.contextId === 'string' ? input.contextId : '';
+  if (!contextId) throw new BadRequestError('invalid_context', 'Falta el contexto');
+
+  const db = getDb();
+  const habitRows = (
+    await db.execute({
+      sql: 'SELECT * FROM habits WHERE user_id = ? AND context_id = ? ORDER BY archived, "order", created_at',
+      args: [userId, contextId],
     })
   ).rows;
-  return rows.map((r) => ({ id: String(r.file), label: String(r.file) }));
+  if (habitRows.length === 0) return [];
+
+  const ids = habitRows.map((r) => String(r.id));
+  const logRows = (
+    await db.execute({
+      sql: `SELECT habit_id, date FROM habit_logs WHERE habit_id IN (${ids.map(() => '?').join(', ')})`,
+      args: ids,
+    })
+  ).rows;
+
+  const datesByHabit = new Map<string, string[]>();
+  for (const r of logRows) {
+    const hid = String(r.habit_id);
+    const arr = datesByHabit.get(hid);
+    if (arr) arr.push(String(r.date));
+    else datesByHabit.set(hid, [String(r.date)]);
+  }
+
+  const today = todayDateStringInTz(TIMEZONE);
+  return habitRows.map((r) => {
+    const habit = toHabit(r);
+    const doneDates = datesByHabit.get(habit.id) ?? [];
+    const { currentStreak, bestStreak } = computeStreaks(doneDates, today);
+    return {
+      ...habit,
+      doneDates: doneDates.sort().reverse().slice(0, 14),
+      currentStreak,
+      bestStreak,
+    };
+  });
+}
+
+async function createHabit(input: CreateHabitInput): Promise<Habit> {
+  const userId = currentUserId();
+  const contextId = typeof input.contextId === 'string' ? input.contextId : '';
+  if (!contextId) throw new BadRequestError('invalid_context', 'Falta el contexto');
+  const name = cleanHabitName(input.name);
+  const color = normalizeTagColor(input.color);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const db = getDb();
+
+  // El contexto tiene que existir como 'habit' para que la FK de abajo no falle
+  // (si todavía era implícito, esto lo crea; si ya existía como 'task', lo pasa a 'habit').
+  await db.execute({
+    sql: `INSERT INTO contexts (id, user_id, type, created_at) VALUES (?, ?, 'habit', ?)
+          ON CONFLICT (user_id, id) DO UPDATE SET type = 'habit'`,
+    args: [contextId, userId, now],
+  });
+
+  const orderRow = (
+    await db.execute({
+      sql: 'SELECT COALESCE(MAX("order"), -1) AS max_order FROM habits WHERE user_id = ? AND context_id = ?',
+      args: [userId, contextId],
+    })
+  ).rows[0];
+  const order = Number(orderRow?.max_order ?? -1) + 1;
+
+  await db.execute({
+    sql: 'INSERT INTO habits (id, user_id, context_id, name, color, archived, "order", created_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)',
+    args: [id, userId, contextId, name, color, order, now],
+  });
+
+  return { id, contextId, name, color, archived: false, order };
+}
+
+async function updateHabit(input: UpdateHabitInput): Promise<Habit> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_habit_id', 'Falta id');
+
+  const sets: string[] = [];
+  const args: InValue[] = [];
+  if (input.name !== undefined) {
+    sets.push('name = ?');
+    args.push(cleanHabitName(input.name));
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    args.push(normalizeTagColor(input.color));
+  }
+  if (input.archived !== undefined) {
+    sets.push('archived = ?');
+    args.push(input.archived ? 1 : 0);
+  }
+  if (input.order !== undefined) {
+    sets.push('"order" = ?');
+    args.push(input.order);
+  }
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+
+  const res = await getDb().execute({
+    sql: `UPDATE habits SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`,
+    args: [...args, input.id, userId],
+  });
+  if (res.rowsAffected === 0) throw new NotFoundError('habit_not_found', 'Hábito no encontrado');
+
+  const row = (await getDb().execute({ sql: 'SELECT * FROM habits WHERE id = ?', args: [input.id] })).rows[0];
+  return toHabit(row);
+}
+
+async function deleteHabit(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_habit_id', 'Falta id');
+  await getDb().execute({ sql: 'DELETE FROM habits WHERE id = ? AND user_id = ?', args: [id, userId] });
+}
+
+async function toggleHabitLog(input: ToggleHabitLogInput): Promise<{ date: string; done: boolean }> {
+  const userId = currentUserId();
+  const habitId = typeof input.habitId === 'string' ? input.habitId : '';
+  if (!habitId) throw new BadRequestError('invalid_habit_id', 'Falta el hábito');
+  const date = typeof input.date === 'string' ? input.date : '';
+  if (!DATE_RE.test(date)) throw new BadRequestError('invalid_date', 'date debe ser "YYYY-MM-DD"');
+
+  const db = getDb();
+  const owns = (
+    await db.execute({ sql: 'SELECT 1 AS x FROM habits WHERE id = ? AND user_id = ?', args: [habitId, userId] })
+  ).rows[0];
+  if (!owns) throw new NotFoundError('habit_not_found', 'Hábito no encontrado');
+
+  const done = input.done !== false;
+  if (done) {
+    await db.execute({
+      sql: 'INSERT INTO habit_logs (habit_id, date) VALUES (?, ?) ON CONFLICT (habit_id, date) DO NOTHING',
+      args: [habitId, date],
+    });
+  } else {
+    await db.execute({ sql: 'DELETE FROM habit_logs WHERE habit_id = ? AND date = ?', args: [habitId, date] });
+  }
+  return { date, done };
 }
 
 // --- Etiquetas / proyectos ---
@@ -2664,6 +3003,14 @@ export const sqliteStore: TaskStore = {
   exportBackup,
   importBackup,
   listFiles,
+  createContext,
+  updateContext,
+  deleteContext,
+  listHabits,
+  createHabit,
+  updateHabit,
+  deleteHabit,
+  toggleHabitLog,
   listTags,
   createTag,
   updateTag,
