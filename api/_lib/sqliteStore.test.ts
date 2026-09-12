@@ -443,6 +443,62 @@ describe('metas del mes', () => {
   });
 });
 
+describe('post-its', () => {
+  it('crea con defaults y lista fijados primero, luego por última edición', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-15T09:00:00Z'));
+    const list = await as(USER, async () => {
+      const a = await sqliteStore.createPostIt({ body: 'primera' });
+      vi.setSystemTime(new Date('2026-08-15T09:01:00Z'));
+      await sqliteStore.createPostIt({ title: 'segunda', body: 'b', color: 'pink' });
+      vi.setSystemTime(new Date('2026-08-15T09:02:00Z'));
+      await sqliteStore.createPostIt({ body: 'tercera' });
+      vi.setSystemTime(new Date('2026-08-15T09:03:00Z'));
+      await sqliteStore.updatePostIt({ id: a.id, pinned: true });
+      return sqliteStore.listPostIts();
+    });
+    vi.useRealTimers();
+    expect(list.map((p) => p.body)).toEqual(['primera', 'tercera', 'b']);
+    expect(list[0]).toMatchObject({ pinned: true, title: '', color: 'amber' });
+  });
+
+  it('valida el largo del cuerpo y del título; ignora colores desconocidos', async () => {
+    await expect(
+      as(USER, () => sqliteStore.createPostIt({ body: 'x'.repeat(20001) }))
+    ).rejects.toThrow();
+
+    const p = await as(USER, () =>
+      sqliteStore.createPostIt({ title: '  hola  ', body: 'x', color: 'no-existe' })
+    );
+    expect(p.title).toBe('hola');
+    expect(p.color).toBe('amber');
+  });
+
+  it('actualiza campos sueltos y borra; todo scopeado por usuario', async () => {
+    const p = await as(USER, () => sqliteStore.createPostIt({ body: 'original' }));
+
+    const updated = await as(USER, () => sqliteStore.updatePostIt({ id: p.id, body: 'editada' }));
+    expect(updated.body).toBe('editada');
+    expect(updated.title).toBe(''); // no tocado
+
+    await expect(
+      as(OTHER, () => sqliteStore.updatePostIt({ id: p.id, body: 'ajena' }))
+    ).rejects.toThrow();
+    await expect(as(OTHER, () => sqliteStore.deletePostIt(p.id))).resolves.toBeUndefined();
+    // el delete de OTHER no afecta la fila (no era suya): sigue existiendo para USER.
+    expect(await as(USER, () => sqliteStore.listPostIts())).toHaveLength(1);
+
+    await as(USER, () => sqliteStore.deletePostIt(p.id));
+    expect(await as(USER, () => sqliteStore.listPostIts())).toHaveLength(0);
+  });
+
+  it('rechaza update sin id o sin campos', async () => {
+    await expect(as(USER, () => sqliteStore.updatePostIt({}))).rejects.toThrow();
+    const p = await as(USER, () => sqliteStore.createPostIt({ body: 'x' }));
+    await expect(as(USER, () => sqliteStore.updatePostIt({ id: p.id }))).rejects.toThrow();
+  });
+});
+
 describe('plantillas de día', () => {
   it('crea con ítems explícitos y aparece en getWeekView', async () => {
     const view = await as(USER, async () => {

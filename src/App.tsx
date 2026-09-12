@@ -29,6 +29,7 @@ import Splash from './components/Splash';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
+import PostItsDialog from './components/PostItsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import BackupDialog from './components/BackupDialog';
@@ -109,6 +110,7 @@ export default function App() {
   const [showRecurring, setShowRecurring] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showGoals, setShowGoals] = useState(false);
+  const [showPostIts, setShowPostIts] = useState(false);
   const [showTags, setShowTags] = useState(false);
   const [showFeeds, setShowFeeds] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -1307,6 +1309,7 @@ export default function App() {
           onOpenTemplates={() => setShowTemplates(true)}
           onOpenTags={() => setShowTags(true)}
           onOpenFeeds={() => setShowFeeds(true)}
+          onOpenPostIts={() => setShowPostIts(true)}
           onOpenBackup={() => setShowBackup(true)}
           multiFile={orderedFiles.length > 1}
           onOpenContextOrder={() => setShowContextOrder(true)}
@@ -1374,6 +1377,8 @@ export default function App() {
           onClose={() => setShowGoals(false)}
         />
       )}
+
+      {showPostIts && <PostItsDialog onClose={() => setShowPostIts(false)} />}
 
       {showFeeds && (
         <CalendarFeedsDialog

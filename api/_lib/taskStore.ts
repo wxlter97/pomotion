@@ -311,6 +311,17 @@ export type GoalProgress = Goal & {
   daysInMonth: number;
 };
 
+/** Post-it: nota suelta de texto libre, independiente del calendario. */
+export type PostIt = {
+  id: string;
+  title: string;
+  body: string;
+  /** Clave de la paleta de colores (ver src/tags.ts). */
+  color: string;
+  pinned: boolean;
+  updatedAt: string;
+};
+
 // --- Inputs (campos crudos de la request; los valida la implementación) ---
 
 export type GetWeekViewInput = {
@@ -345,6 +356,14 @@ export type GetAnalyticsInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 export type GetWeeklyReviewInput = { week?: string };
 export type SaveWeekFocusInput = { weekStart?: string; body?: string };
+export type CreatePostItInput = { title?: string; body?: string; color?: string };
+export type UpdatePostItInput = {
+  id?: string;
+  title?: string;
+  body?: string;
+  color?: string;
+  pinned?: boolean;
+};
 
 export type CreateTaskInput = {
   /** 'YYYY-MM-DD'; ausente/null = va al inbox (sin fecha). */
@@ -601,4 +620,10 @@ export interface TaskStore {
    * (ignora el debounce); sin él, sincroniza todos los que estén vencidos.
    */
   syncCalendarFeeds(input: { feedId?: string; force?: boolean }): Promise<SyncCalendarResult>;
+
+  /** Post-its del usuario: fijados primero, luego por última edición. */
+  listPostIts(): Promise<PostIt[]>;
+  createPostIt(input: CreatePostItInput): Promise<PostIt>;
+  updatePostIt(input: UpdatePostItInput): Promise<PostIt>;
+  deletePostIt(id?: string): Promise<void>;
 }

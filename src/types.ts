@@ -277,6 +277,17 @@ export type GoalProgress = Goal & {
   daysInMonth: number;
 };
 
+/** Post-it: nota suelta de texto libre, independiente del calendario.
+ *  `color` es una clave de la paleta (ver tags.ts). */
+export type PostIt = {
+  id: string;
+  title: string;
+  body: string;
+  color: string;
+  pinned: boolean;
+  updatedAt: string;
+};
+
 /** Volcado completo del dataset del usuario (backup manual). */
 export type Backup = {
   format: 'pomotion-backup';

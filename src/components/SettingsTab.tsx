@@ -38,6 +38,7 @@ export default function SettingsTab({
   onOpenTemplates,
   onOpenTags,
   onOpenFeeds,
+  onOpenPostIts,
   onOpenBackup,
   multiFile,
   onOpenContextOrder,
@@ -75,6 +76,7 @@ export default function SettingsTab({
   onOpenTemplates: () => void;
   onOpenTags: () => void;
   onOpenFeeds: () => void;
+  onOpenPostIts: () => void;
   onOpenBackup: () => void;
   multiFile: boolean;
   onOpenContextOrder: () => void;
@@ -176,6 +178,7 @@ export default function SettingsTab({
         <Row label={t('menu.templates')} onClick={onOpenTemplates} />
         <Row label={t('menu.tags')} onClick={onOpenTags} />
         <Row label={t('menu.feeds')} onClick={onOpenFeeds} />
+        <Row label={t('menu.postIts')} onClick={onOpenPostIts} />
         {multiFile && <Row label={t('menu.contextOrder')} onClick={onOpenContextOrder} />}
         <Row label={t('menu.manageContexts')} onClick={onOpenManageContexts} />
         <Row label={t('menu.backup')} onClick={onOpenBackup} />

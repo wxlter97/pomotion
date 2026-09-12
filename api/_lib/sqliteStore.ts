@@ -87,6 +87,9 @@ import type {
   LogSessionInput,
   MonthDaySummary,
   MonthSummary,
+  PostIt,
+  CreatePostItInput,
+  UpdatePostItInput,
   RecurringRule,
   ReportInput,
   SaveDayNoteInput,
@@ -2544,6 +2547,108 @@ async function deleteGoal(id?: string): Promise<void> {
   await getDb().execute({ sql: 'DELETE FROM goals WHERE id = ? AND user_id = ?', args: [id, userId] });
 }
 
+// --- Post-its ---
+// Tablero de notas sueltas de texto libre, independiente del calendario
+// (a diferencia de day_notes, acá hay muchas por usuario). Reusa la paleta
+// de colores de las etiquetas (TAG_COLORS) para pintar cada nota.
+
+const POST_IT_TITLE_MAX = 120;
+// Mismo tope defensivo que la bitácora del día.
+const POST_IT_BODY_MAX = 20000;
+const DEFAULT_POST_IT_COLOR = 'amber';
+
+function cleanPostItColor(color: string | undefined): string {
+  return color != null && TAG_COLORS.has(color) ? color : DEFAULT_POST_IT_COLOR;
+}
+
+function toPostIt(r: Row): PostIt {
+  const color = r.color == null ? DEFAULT_POST_IT_COLOR : String(r.color);
+  return {
+    id: String(r.id),
+    title: String(r.title ?? ''),
+    body: String(r.body ?? ''),
+    color: TAG_COLORS.has(color) ? color : DEFAULT_POST_IT_COLOR,
+    pinned: Number(r.pinned) === 1,
+    updatedAt: String(r.updated_at),
+  };
+}
+
+/** Post-its del usuario: fijados primero, luego por última edición. */
+async function listPostIts(): Promise<PostIt[]> {
+  const userId = currentUserId();
+  const rows = (
+    await getDb().execute({
+      sql: 'SELECT * FROM post_its WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC',
+      args: [userId],
+    })
+  ).rows;
+  return rows.map(toPostIt);
+}
+
+async function createPostIt(input: CreatePostItInput): Promise<PostIt> {
+  const userId = currentUserId();
+  const title = (input.title ?? '').trim().slice(0, POST_IT_TITLE_MAX);
+  const body = input.body ?? '';
+  if (body.length > POST_IT_BODY_MAX) {
+    throw new BadRequestError('invalid_body', `La nota no puede pasar de ${POST_IT_BODY_MAX} caracteres`);
+  }
+  const color = cleanPostItColor(input.color);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  await getDb().execute({
+    sql: `INSERT INTO post_its (id, user_id, title, body, color, pinned, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
+    args: [id, userId, title, body, color, now, now],
+  });
+  return { id, title, body, color, pinned: false, updatedAt: now };
+}
+
+async function updatePostIt(input: UpdatePostItInput): Promise<PostIt> {
+  const userId = currentUserId();
+  if (!input.id) throw new BadRequestError('invalid_id', 'Falta id');
+
+  const sets: string[] = [];
+  const args: InValue[] = [];
+  if (input.title !== undefined) {
+    sets.push('title = ?');
+    args.push(input.title.trim().slice(0, POST_IT_TITLE_MAX));
+  }
+  if (input.body !== undefined) {
+    if (input.body.length > POST_IT_BODY_MAX) {
+      throw new BadRequestError('invalid_body', `La nota no puede pasar de ${POST_IT_BODY_MAX} caracteres`);
+    }
+    sets.push('body = ?');
+    args.push(input.body);
+  }
+  if (input.color !== undefined) {
+    sets.push('color = ?');
+    args.push(cleanPostItColor(input.color));
+  }
+  if (input.pinned !== undefined) {
+    sets.push('pinned = ?');
+    args.push(input.pinned ? 1 : 0);
+  }
+  if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
+  sets.push('updated_at = ?');
+  const now = new Date().toISOString();
+  args.push(now);
+
+  const res = await getDb().execute({
+    sql: `UPDATE post_its SET ${sets.join(', ')} WHERE id = ? AND user_id = ?`,
+    args: [...args, input.id, userId],
+  });
+  if (res.rowsAffected === 0) throw new NotFoundError('post_it_not_found', 'Post-it no encontrado');
+
+  const row = (await getDb().execute({ sql: 'SELECT * FROM post_its WHERE id = ?', args: [input.id] })).rows[0];
+  return toPostIt(row);
+}
+
+async function deletePostIt(id?: string): Promise<void> {
+  const userId = currentUserId();
+  if (!id) throw new BadRequestError('invalid_id', 'Falta id');
+  await getDb().execute({ sql: 'DELETE FROM post_its WHERE id = ? AND user_id = ?', args: [id, userId] });
+}
+
 // --- Calendarios iCal ---
 
 const FEED_NAME_MAX = 80;
@@ -2933,6 +3038,10 @@ export const sqliteStore: TaskStore = {
   createGoal,
   updateGoal,
   deleteGoal,
+  listPostIts,
+  createPostIt,
+  updatePostIt,
+  deletePostIt,
   listCalendarFeeds,
   createCalendarFeed,
   updateCalendarFeed,
