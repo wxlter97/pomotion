@@ -99,6 +99,22 @@ describe('createTask + getWeekView', () => {
     });
     expect(view.tasks.map((t) => t.name)).toEqual(['A', 'B', 'C']);
   });
+
+  it('el orden manual manda aunque una tarea tenga hora planeada', async () => {
+    // Regresión: el ORDER BY priorizaba planned_start sobre "order", así que
+    // arrastrar una tarea sin horario por delante de una con horario (p. ej.
+    // importada del calendario) se revertía al refrescar.
+    const view = await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'A' });
+      const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'B' });
+      await sqliteStore.updateTask({ taskId: b.id, plannedStart: '08:00' });
+      const c = await sqliteStore.createTask({ date: '2026-08-24', text: 'C' });
+      // Arrastrar C al principio, por delante de B (que tiene hora planeada).
+      await sqliteStore.updateTaskPosition({ taskId: c.id, afterId: null });
+      return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
+    });
+    expect(view.tasks.map((t) => t.name)).toEqual(['C', 'A', 'B']);
+  });
 });
 
 describe('updateTask / deleteTask', () => {
@@ -242,16 +258,21 @@ describe('updateTask / deleteTask', () => {
     ).rejects.toThrow();
   });
 
-  it('ordena el día por hora planeada, dejando las tareas sin horario después', async () => {
+  it('poner hora planeada no reordena la lista — la posición sigue siendo manual', async () => {
+    // La hora planeada es solo el chip 🕐 (y la posición del bloque en la
+    // Agenda); no manda sobre el orden manual de la lista de tareas — si no,
+    // arrastrar una tarea por delante de una con horario se revertiría al
+    // refrescar (ver "el orden manual manda..." en el describe de arriba).
     const view = await as(USER, async () => {
       const a = await sqliteStore.createTask({ date: '2026-08-24', text: 'Sin horario' });
       const b = await sqliteStore.createTask({ date: '2026-08-24', text: 'A las 14:00' });
       const c = await sqliteStore.createTask({ date: '2026-08-24', text: 'A las 09:00' });
+      void a;
       await sqliteStore.updateTask({ taskId: b.id, plannedStart: '14:00' });
       await sqliteStore.updateTask({ taskId: c.id, plannedStart: '9:00' });
       return sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' });
     });
-    expect(view.tasks.map((t) => t.name)).toEqual(['A las 09:00', 'A las 14:00', 'Sin horario']);
+    expect(view.tasks.map((t) => t.name)).toEqual(['Sin horario', 'A las 14:00', 'A las 09:00']);
   });
 
   it('guarda el checklist, lo saneia y lo devuelve en la vista', async () => {

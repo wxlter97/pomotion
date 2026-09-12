@@ -9,15 +9,21 @@
 
 export const TIME_RE = /^\d{1,2}:\d{2}$/;
 
+/** ¿"HH:MM" con formato Y rango reales (00:00..23:59)? Rechaza, por ejemplo,
+ *  "7:99" o "25:00", que sí matchean `TIME_RE` (solo mira el formato). */
 export function isValidTimeLabel(value: string): boolean {
-  return TIME_RE.test(value.trim());
+  const trimmed = value.trim();
+  if (!TIME_RE.test(trimmed)) return false;
+  const [h, m] = trimmed.split(':').map(Number);
+  return h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }
 
 /** Zero-padea la hora de una "HH:MM" válida ("9:05" → "09:05") para que
- *  ordene bien como texto; `null` si `value` no matchea `TIME_RE`. */
+ *  ordene bien como texto; `null` si `value` no es una hora válida (formato
+ *  Y rango — ver `isValidTimeLabel`). */
 export function normalizeTimeLabel(value: string): string | null {
   const trimmed = value.trim();
-  if (!TIME_RE.test(trimmed)) return null;
+  if (!isValidTimeLabel(trimmed)) return null;
   const [h, m] = trimmed.split(':');
   return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
 }

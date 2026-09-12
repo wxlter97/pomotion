@@ -8,7 +8,6 @@ import {
   updateTaskText,
 } from '../api';
 import {
-  TIME_RE,
   addMinutesToTime,
   formatDurationLabel,
   isValidTimeLabel,
@@ -16,6 +15,7 @@ import {
   parseDurationToSeconds,
 } from '../duration';
 import type { Session, Tag, Task } from '../types';
+import { firstBlockStart, isoWeekdayOf, type BusinessHoursSettings } from '../businessHours';
 import {
   daysBetween,
   dueChipLabel,
@@ -112,6 +112,7 @@ export default function TaskList({
   onSendToInbox,
   onSessionUpdated,
   onManualSessionAdded,
+  businessHours,
 }: {
   tasks: Task[];
   selectedTaskId: string | null;
@@ -146,6 +147,8 @@ export default function TaskList({
   onSendToInbox: (task: Task) => void;
   onSessionUpdated: (taskId: string, session: Session) => void;
   onManualSessionAdded: (taskId: string, session: Session) => void;
+  /** Para sugerir la hora de inicio al agregar una sesión manual sin horario planeado. */
+  businessHours: BusinessHoursSettings;
 }) {
   const [pendingDelete, setPendingDelete] = useState<{ taskId: string; sessionId: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -293,7 +296,7 @@ export default function TaskList({
       setError(t('session.badDuration'));
       return null;
     }
-    if (!TIME_RE.test(start) || !TIME_RE.test(end)) {
+    if (!isValidTimeLabel(start) || !isValidTimeLabel(end)) {
       setError(t('session.badTime'));
       return null;
     }
@@ -304,7 +307,7 @@ export default function TaskList({
     const seconds = parseDurationToSeconds(durationInput);
     if (seconds === null || seconds <= 0) return null;
     const trimmedStart = start.trim();
-    if (!TIME_RE.test(trimmedStart)) return null;
+    if (!isValidTimeLabel(trimmedStart)) return null;
     return addMinutesToTime(trimmedStart, Math.round(seconds / 60));
   }
 
@@ -337,9 +340,14 @@ export default function TaskList({
     }
   }
 
-  // Encadena con la sesión más reciente de la tarea (mayor hora de fin) si
-  // hay alguna válida; si no, usa la hora actual.
+  // Hora de arranque sugerida para una sesión manual nueva, en orden de
+  // prioridad: 1) la hora planeada de la tarea (lo más específico que hay),
+  // 2) encadenar con la sesión más reciente de la tarea (mayor hora de fin,
+  // para no pisar tiempo ya cargado), 3) la primera hora hábil configurada
+  // para el día de `selectedDate`, 4) la hora actual como último recurso.
   function defaultManualStart(task: Task): string {
+    if (task.plannedStart && isValidTimeLabel(task.plannedStart)) return task.plannedStart;
+
     let latestEnd: string | null = null;
     for (const s of task.sessions) {
       if (!isValidTimeLabel(s.end)) continue;
@@ -347,7 +355,10 @@ export default function TaskList({
         latestEnd = s.end;
       }
     }
-    return latestEnd ?? nowAsHHMM();
+    if (latestEnd) return latestEnd;
+
+    const businessStart = firstBlockStart(businessHours, isoWeekdayOf(selectedDate));
+    return businessStart ?? nowAsHHMM();
   }
 
   function openManualEntry(task: Task) {

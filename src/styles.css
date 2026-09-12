@@ -196,6 +196,59 @@ h3 {
   opacity: 1;
 }
 
+/* --- Toasts: notificaciones fijas en pantalla (ver useToasts.ts) — cada
+   fila es un DismissibleBanner, solo que flotando en vez de empujar el
+   documento, así se ven sin importar dónde estés scrolleado. --- */
+.toast-stack {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(92vw, 420px);
+  pointer-events: none;
+}
+
+.toast-stack .banner {
+  margin: 0;
+  pointer-events: auto;
+  border: 1px solid var(--color-separator);
+  border-left-width: 3px;
+  box-shadow: var(--shadow-sheet);
+  animation: toast-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.toast-stack .error.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-destructive);
+}
+.toast-stack .warning.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-warning-fg);
+}
+.toast-stack .success.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-success);
+}
+.toast-stack .info.banner {
+  background: var(--color-bg-elevated);
+  border-left-color: var(--color-accent);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------------------------------------------------------------------
  * Botones — estilos "filled / tinted / plain / destructive / icon",
  * como los button styles de HIG. Pill-shaped (border-radius 980px).
@@ -381,6 +434,47 @@ h3 {
   border-color: var(--color-accent);
 }
 
+/* --- Splash (arranque, mientras se resuelve el login) --- */
+.splash-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  animation: fade-in 0.35s ease-out;
+}
+
+.splash-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  animation: splash-pulse 1.8s ease-in-out infinite;
+}
+
+.splash-card h1 {
+  margin: 0;
+  color: var(--color-accent);
+  font-size: 1.6rem;
+}
+
+.splash-card .spinner-large {
+  width: 22px;
+  height: 22px;
+  margin: 0.4rem 0 0;
+  border-width: 2.5px;
+}
+
+@keyframes splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.85;
+  }
+}
+
 /* --- App shell --- */
 .app {
   max-width: 980px;
@@ -391,10 +485,20 @@ h3 {
 }
 
 .app-header {
+  /* Estático (mobile): se queda fijo arriba en vez de desplazarse con el
+   * contenido — igual que .bottom-nav abajo. En desktop sigue oculto
+   * (ver @media min-width:861px), así que esto no le afecta. */
+  position: sticky;
+  top: 0;
+  z-index: 65;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: calc(1.25rem + env(safe-area-inset-top)) 1.5rem 1.25rem;
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--color-separator);
 }
 
 .app-header h1 {
@@ -553,6 +657,27 @@ h3 {
 .accent-swatch[data-accent='indigo']   { background: #6d63e0; }
 .accent-swatch[data-accent='pink']     { background: #e0559a; }
 .accent-swatch[data-accent='graphite'] { background: #71717a; }
+
+/* Color picker: el swatch en sí es un <label> — el <input type=color> real
+ * queda invisible encima, así que tocar el círculo abre el picker nativo
+ * sin necesitar un botón aparte. El fondo del <label> (inline style) ya
+ * muestra el color elegido. */
+.accent-swatch--custom {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.accent-swatch--custom input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
 
 /* --- Selector de archivo / contexto (Trabajo/Casa/…). Oculto si hay 0 o 1
  * (ver FileSelector.tsx). --- */
@@ -744,6 +869,22 @@ h3 {
   .main-grid {
     grid-template-columns: 1fr;
   }
+
+  /* Safari en iOS hace zoom automático al enfocar un campo con
+     font-size < 16px. Lo forzamos acá para todo campo de texto/número/
+     selector — el tamaño visual en desktop no cambia. */
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Con el timer apagado (ver "Usar timer" en Ajustes) no hay `.timer-panel`
+ * que mostrar — la lista de tareas ocupa todo el ancho en vez de dejar una
+ * columna vacía. */
+.main-grid--no-timer {
+  grid-template-columns: 1fr;
 }
 
 .card {
@@ -773,14 +914,20 @@ h3 {
   justify-content: center;
 }
 
-.app--focus > .app-header,
-.app--focus > .file-tabs,
-.app--focus > .day-row,
-.app--focus > .inbox,
-.app--focus > .day-note,
-.app--focus > .shortcuts-hint,
-.app--focus > .app-footer,
-.app--focus > .banner,
+/* Antes usaba el combinador > (hijo directo de .app) para todo, pero
+ * file-tabs/day-row/inbox/day-note/banner viven ahora dentro de
+ * .app-tab-body (ver App.tsx) — con > ya no calzaban con nada y modo foco
+ * los dejaba todos visibles. app-header y app-footer sí siguen siendo
+ * hijos directos de .app, pero el selector normal (sin >) los sigue
+ * encontrando igual. */
+.app--focus .app-header,
+.app--focus .file-tabs,
+.app--focus .day-row,
+.app--focus .inbox,
+.app--focus .day-note,
+.app--focus .shortcuts-hint,
+.app--focus .app-footer,
+.app--focus .banner,
 .app--focus .tasks-panel {
   display: none;
 }
@@ -1464,6 +1611,21 @@ body.is-dragging * {
   color: var(--color-destructive);
 }
 
+/* Cada regla trae un form de días + hora bastante ancho — con el `.sheet`
+ * default (340px) quedaba apretado como si fuera mobile aun en desktop,
+ * donde sobra espacio horizontal. */
+.sheet--recurring {
+  max-width: min(94vw, 640px);
+}
+
+/* La lista de reglas recurrentes crece con los datos del usuario — scrollea
+ * sola dentro de su `.sheet` (sin sheet--X propio); el intro y "Cerrar"
+ * quedan siempre a la vista. */
+.recurring-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .recurring-list {
   list-style: none;
   margin: 0.5rem 0 0;
@@ -1471,6 +1633,13 @@ body.is-dragging * {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+/* Lista de contextos — normalmente corta, pero sin límite real. Scrollea
+ * sola dentro de su `.sheet` (sin sheet--X propio). */
+.context-order-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .context-order-list {
@@ -1635,6 +1804,75 @@ body.is-dragging * {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-contrast);
+}
+
+/* --- Horas hábiles (BusinessHoursDialog) --- */
+.sheet--business-hours {
+  max-width: min(94vw, 680px);
+}
+
+.bh-master-toggle {
+  margin-bottom: 0.5rem;
+}
+
+.bh-scroll {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.bh-days {
+  list-style: none;
+  margin: 0 0 1.25rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bh-day {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem 0.5rem;
+  border-radius: 8px;
+}
+
+.bh-day:hover {
+  background: var(--color-fill);
+}
+
+.bh-day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.bh-day-name {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-label);
+  cursor: pointer;
+}
+
+.bh-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bh-block {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.bh-no-blocks {
+  margin: 0;
+  font-size: 0.82rem;
 }
 
 .task-add-form {
@@ -1978,7 +2216,14 @@ body.is-dragging * {
 
 /* Diálogo de gestión */
 .sheet--tags {
-  max-width: min(94vw, 460px);
+  max-width: min(94vw, 520px);
+}
+
+/* La lista de etiquetas crece con los datos del usuario — scrollea sola,
+ * el form de alta y "Cerrar" quedan siempre a la vista (ver `.sheet`). */
+.tags-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .tag-new-form {
@@ -2107,7 +2352,13 @@ body.is-dragging * {
 
 /* --- Plantillas de día --- */
 .sheet--templates {
-  max-width: min(94vw, 480px);
+  max-width: min(94vw, 560px);
+}
+
+/* La lista de plantillas crece con los datos del usuario — scrollea sola. */
+.dt-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .dt-create {
@@ -2233,7 +2484,13 @@ body.is-dragging * {
 
 /* --- Metas del mes --- */
 .sheet--goals {
-  max-width: min(94vw, 480px);
+  max-width: min(94vw, 540px);
+}
+
+/* La lista de metas crece con los datos del usuario — scrollea sola. */
+.goals-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .goal-new {
@@ -2486,7 +2743,13 @@ body.is-dragging * {
 
 /* --- Admin: aprobación de usuarios --- */
 .sheet--admin {
-  max-width: min(94vw, 460px);
+  max-width: min(94vw, 560px);
+}
+
+/* La lista de usuarios crece con la cuenta — scrollea sola. */
+.admin-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .admin-section-title {
@@ -2582,7 +2845,13 @@ body.is-dragging * {
 
 /* --- Calendarios iCal --- */
 .sheet--feeds {
-  max-width: min(94vw, 520px);
+  max-width: min(94vw, 600px);
+}
+
+/* La lista de calendarios crece con los datos del usuario — scrollea sola. */
+.feeds-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .feeds-intro {
@@ -2953,6 +3222,15 @@ body.is-dragging * {
 .sheet-backdrop {
   position: fixed;
   inset: 0;
+  /* `inset:0` por sí solo ata el alto al viewport "grande" (ignora el
+   * teclado en pantalla en mobile) — con top/left/right ya en 0, fijar
+   * `height` explícito gana sobre el `bottom:0` implícito y hace que el
+   * backdrop encoja de verdad cuando aparece el teclado, en vez de quedar
+   * fijo al alto de layout con el sheet (bottom-aligned) tapado debajo del
+   * teclado. dvh cae a la versión con vh en navegadores que no la conocen
+   * (valor inválido → toda la declaración se ignora). */
+  height: 100vh;
+  height: 100dvh;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -2968,10 +3246,28 @@ body.is-dragging * {
   background: var(--color-bg-elevated);
   border-radius: 20px;
   padding: 1.5rem;
-  max-width: 340px;
+  /* 340px leía como una hoja mobile aun en desktop, donde sobra ancho —
+   * este es el piso; los diálogos con contenido más denso (listas,
+   * formularios de varias columnas) lo suben más todavía vía su propio
+   * `.sheet--X` (ver más abajo). */
+  max-width: min(92vw, 420px);
   width: 100%;
   box-shadow: var(--shadow-sheet);
   animation: sheet-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Red de seguridad: sin esto, un diálogo con contenido largo (una lista
+   * que crece con los datos del usuario) puede quedar más alto que el
+   * viewport — .sheet-backdrop es position:fixed sin scroll propio, así que
+   * lo que se pasa del alto queda inalcanzable (título tapado arriba,
+   * "Cerrar" inalcanzable abajo). Cada diálogo con contenido variable
+   * envuelve esa parte en su propio "-scroll" (overflow-y:auto; min-height:0)
+   * para que sea eso lo que scrollea y no el diálogo entero; el header y las
+   * acciones del final quedan siempre fijos. Los `.sheet--*` con su propio
+   * max-height/max-width (report/search/timeline/analytics) pisan estos
+   * valores default.
+   */
+  max-height: min(85vh, 640px);
+  display: flex;
+  flex-direction: column;
 }
 
 .sheet h2 {
@@ -3095,7 +3391,7 @@ body.is-dragging * {
 
 /* --- Search dialog --- */
 .sheet--search {
-  max-width: 440px;
+  max-width: min(94vw, 540px);
   max-height: min(80vh, 620px);
   display: flex;
   flex-direction: column;
@@ -3168,7 +3464,7 @@ body.is-dragging * {
 
 /* --- Backup dialog --- */
 .sheet--backup {
-  max-width: 420px;
+  max-width: min(94vw, 480px);
 }
 
 .backup-section {
@@ -3212,7 +3508,7 @@ body.is-dragging * {
 
 /* --- Timer settings dialog --- */
 .sheet--timer {
-  max-width: 380px;
+  max-width: min(94vw, 440px);
 }
 
 .timer-fields {
@@ -3283,7 +3579,14 @@ body.is-dragging * {
 
 /* --- Month view --- */
 .sheet--month {
-  max-width: 460px;
+  max-width: min(94vw, 540px);
+}
+
+/* Un mes de 6 semanas es alto — de sobra en un teléfono chico. Scrollea
+ * solo, el header (‹ mes › + Hoy) y "Cerrar" quedan siempre a la vista. */
+.month-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .month-header {
@@ -3552,10 +3855,21 @@ body.is-dragging * {
 /* --- Analítica --- */
 .sheet--analytics {
   max-width: min(94vw, 560px);
+  max-height: min(88vh, 760px);
+  display: flex;
+  flex-direction: column;
 }
 
 .an-range {
   margin-bottom: 1rem;
+}
+
+/* Todo lo variable (mensaje de error/vacío, stats, gráficos) vive acá
+ * adentro, que es lo que scrollea — el título + los tabs de rango y
+ * "Cerrar" quedan siempre a la vista (mismo patrón que .timeline-content). */
+.an-scroll {
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .an-body {
@@ -4336,6 +4650,478 @@ kbd {
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.4rem;
+}
+
+/* =======================================================================
+ * App shell: nav (bottom tab bar + FAB on mobile, sidebar on desktop)
+ * ===================================================================== */
+
+:root {
+  --nav-bp: 860px;
+  --bottom-nav-h: 58px;
+  --side-nav-w: 232px;
+}
+
+/* --- Mobile: every existing dialog becomes a real bottom sheet instead
+ * of a centered card (desktop keeps the .sheet/.sheet-backdrop rules
+ * defined earlier in this file). ------------------------------------- */
+@media (max-width: 860px) {
+  .sheet-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .sheet {
+    width: 100%;
+    max-width: 100% !important;
+    max-height: min(88vh, 760px) !important;
+    /* Mismo motivo que el `height` del backdrop: con dvh, el tope de alto
+     * del sheet encoge junto con el teclado en vez de seguir midiéndose
+     * contra el viewport completo (lo que lo empujaba a desbordar por
+     * arriba, con el teclado tapando la mitad de abajo). */
+    max-height: min(88dvh, 760px) !important;
+    border-radius: 20px 20px 0 0;
+    padding: 0.6rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+    animation: sheet-slide-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .sheet::before {
+    content: '';
+    flex-shrink: 0;
+    width: 36px;
+    height: 4px;
+    margin: 0.15rem auto 0.85rem;
+    border-radius: 999px;
+    background: var(--color-fill-strong);
+  }
+
+  /* .app-header ahora es sticky con un borde inferior (ver más arriba) —
+   * sin este aire, Trabajo/Casa quedaban pegados justo debajo de esa
+   * línea. */
+  .file-tabs {
+    padding-top: 0.9rem;
+  }
+
+  /* Los chips de día (Lunes…Viernes) se centran en el día activo y, si no
+   * caben todos, el resto queda recortado a la mitad de una letra contra
+   * el padding de .day-row — se ve como un error más que como "esto
+   * scrollea". Point 1: dejar que ESTA fila (y solo esta) sangre hasta el
+   * borde real de la pantalla en vez de cortar contra el padding del
+   * contenedor, para que el chip cortado se lea como el inicio de una
+   * cinta continua. Point 2 (la mejora extra): un fundido en los bordes
+   * que insinúa que hay más para el lado — mismo patrón que un carrusel
+   * nativo. */
+  .day-tabs {
+    margin: 0 -1.5rem;
+    padding: 0.15rem 1.5rem;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 1.1rem,
+      black calc(100% - 1.1rem),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 1.1rem,
+      black calc(100% - 1.1rem),
+      transparent
+    );
+  }
+}
+
+@keyframes sheet-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Bottom tab bar + FAB (mobile) ----------------------------------- */
+
+.bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--color-separator);
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  color: var(--color-label-secondary);
+  cursor: pointer;
+  padding: 0.3rem 0.25rem;
+}
+
+.nav-item svg {
+  width: 22px;
+  height: 22px;
+}
+
+.nav-item span {
+  font-size: 0.66rem;
+  font-weight: 500;
+}
+
+.nav-item.active {
+  color: var(--color-accent);
+}
+
+.nav-item.active span {
+  font-weight: 700;
+}
+
+.nav-fab-slot {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.fab {
+  width: 52px;
+  height: 52px;
+  margin-top: -22px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  box-shadow: var(--shadow-sheet);
+  cursor: pointer;
+}
+
+.fab svg {
+  width: 24px;
+  height: 24px;
+}
+
+.fab:active {
+  transform: scale(0.94);
+}
+
+.fab-desktop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: auto;
+  height: auto;
+  /* Alineado al borde de los nav-item de arriba (mismo padding del
+   * contenedor, sin margen lateral extra) y con aire propio arriba para
+   * separarse de la lista de navegación en vez de quedar pegado a ella. */
+  margin: 1rem 0 0;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.fab-desktop svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* --- Sidebar (desktop) ------------------------------------------------ */
+
+.side-nav {
+  display: none;
+}
+
+/* Buscar (desktop): botón flotante arriba del contenido — en mobile el
+ * header ya trae su propio botón de búsqueda, así que este se queda
+ * oculto ahí. */
+.desktop-search-float {
+  display: none;
+}
+
+@media (min-width: 861px) {
+  .bottom-nav,
+  .fab {
+    display: none;
+  }
+
+  .side-nav {
+    position: fixed;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--side-nav-w);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    padding: calc(1.1rem + env(safe-area-inset-top)) 0.9rem 1rem;
+    padding-left: calc(0.9rem + env(safe-area-inset-left));
+    border-right: 1px solid var(--color-separator);
+    background: var(--color-bg-elevated);
+  }
+
+  .side-nav-brand {
+    color: var(--color-accent);
+    font-size: 1.2rem;
+    font-weight: 800;
+    padding: 0 0.5rem;
+    margin: 0 0 1.4rem;
+  }
+
+  .side-nav-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .side-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    border: none;
+    background: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-label-secondary);
+    padding: 0.6rem 0.7rem;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .side-nav-item svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+  }
+
+  .side-nav-item:hover {
+    background: var(--color-fill);
+    color: var(--color-label);
+  }
+
+  .side-nav-item.active {
+    background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+    color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  /* Antes usaba margin-top:auto para pegarse al fondo del sidebar, lo que
+   * dejaba un hueco enorme y vacío entre "Nueva tarea" y el cambio de tema.
+   * Ahora va justo debajo, con un separador sutil, en vez de flotar solo
+   * al fondo de la pantalla. */
+  .side-nav-footer {
+    margin-top: 1.5rem;
+    padding-top: 0.85rem;
+    border-top: 1px solid var(--color-separator);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  /* App shell shifts right to make room for the fixed sidebar. */
+  .app {
+    max-width: none;
+    margin: 0;
+    padding-left: calc(var(--side-nav-w) + env(safe-area-inset-left));
+  }
+
+  .app-header {
+    display: none;
+  }
+
+  .app-footer {
+    padding-left: 1.5rem;
+  }
+
+  /* Centrado dentro del área libre a la derecha del sidebar (no pegado al
+   * borde izquierdo) y con más aire para aprovechar pantallas anchas, en
+   * vez de quedarse angosto contra el sidebar con todo el resto de la
+   * ventana vacío. padding-top compensa que .app-header (que en mobile le
+   * daba aire arriba) está oculto en desktop — sin esto los chips de
+   * contexto (Trabajo/Casa) quedan pegados al borde superior. */
+  .app-tab-body {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding-top: 1.9rem;
+  }
+
+  /* Buscar flota en esa misma franja superior, a la derecha, en vez de
+   * vivir dentro de la sidebar. */
+  .desktop-search-float {
+    display: inline-flex;
+    position: fixed;
+    top: 1.75rem;
+    right: 1.75rem;
+    z-index: 65;
+    box-shadow: var(--shadow-sheet);
+  }
+}
+
+@media (max-width: 860px) {
+  .app {
+    padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 0.75rem);
+  }
+}
+
+.app--focus .bottom-nav,
+.app--focus .side-nav,
+.app--focus .desktop-search-float {
+  display: none;
+}
+
+/* --- Settings tab ------------------------------------------------------ */
+
+.settings-section {
+  margin: 0 0 1.5rem;
+}
+
+/* Sin padding/margin horizontal propio: .stats-tab (el contenedor, ver
+ * más abajo) ya pone 1.5rem a los lados — repetirlo aquí encimaba los
+ * dos, dejando estos bloques ~3rem más angostos que el título "Ajustes" o
+ * "APARIENCIA", que solo llevan el del contenedor. */
+.settings-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-label-secondary);
+  margin: 0 0 0.4rem;
+}
+
+.settings-list {
+  background: var(--color-bg-elevated);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.settings-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--color-label);
+  text-align: left;
+  padding: 0.8rem 1rem;
+  cursor: pointer;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--color-separator);
+}
+
+.settings-row:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-row--danger {
+  color: var(--color-destructive);
+}
+
+.settings-row-state {
+  color: var(--color-label-secondary);
+  font-size: 0.86rem;
+}
+
+.settings-user {
+  padding: 0.4rem 0 1rem;
+  color: var(--color-label-secondary);
+  font-size: 0.82rem;
+}
+
+/* --- Agenda tab (DayTimeline embebido, sin backdrop/sheet) ------------- */
+
+.timeline-embedded {
+  padding: 1.25rem 1.5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Stats tab ---------------------------------------------------------- */
+
+.stats-tab {
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.stats-tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+}
+
+.stats-tab-header h2 {
+  margin: 0;
+}
+
+.stats-tabs {
+  margin: 0 0 1.1rem;
+  overflow-x: auto;
+}
+
+/* Analytics / Report / FocusHeatmap / WeeklyReview, embebidos dentro de
+ * .stats-tab (sin su propio padding — ya lo trae el contenedor). */
+.analytics-embedded,
+.report-embedded,
+.heatmap-embedded,
+.wr-embedded {
+  display: contents;
+}
+
+.analytics-inner,
+.report-inner,
+.heatmap-inner,
+.wr-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Quick add (FAB) sheet ---------------------------------------------- */
+
+.quick-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.quick-add-form input {
+  font-size: 1rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

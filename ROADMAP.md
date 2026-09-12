@@ -496,12 +496,12 @@ valor/costo dentro de cada tier; nada bloquea a nada.
 
 - ~~**Time-blocking**~~ ✅ (arrastrado del §9), en dos tandas:
   - **v1 "blando"**: hora planeada por tarea — campo "Hora planeada" en el panel de
-    detalle (`<input type="time">`), chip 🕐 HH:MM en la fila, y el día se ordena por
-    esa hora (las tareas sin horario quedan después, en su orden manual de siempre).
-    Migración `010_time_blocking.sql` (`tasks.planned_start` TEXT nullable).
-    `getWeekView` ordena `ORDER BY date, (planned_start IS NULL), planned_start,
-    "order", created_at`. `normalizeTimeLabel` nuevo en `shared/duration.ts`
-    (zero-pad para que el `ORDER BY` como texto ordene bien).
+    detalle (`<input type="time">`) y chip 🕐 HH:MM en la fila. Migración
+    `010_time_blocking.sql` (`tasks.planned_start` TEXT nullable). `normalizeTimeLabel`
+    nuevo en `shared/duration.ts` (zero-pad para que un `ORDER BY` como texto ordene
+    bien). Originalmente el día se ordenaba por esa hora (las tareas sin horario
+    quedaban después); ver el fix más abajo, "El reordenamiento no se guardaba si el
+    día tenía una tarea con hora planeada" — la posición en la lista es 100% manual.
   - **v2, vista de agenda/timeline**: diálogo "Agenda del día" (menú "Ver"): franja
     vertical de 24h con los bloques planeados a la izquierda (arrastrar para mover,
     borde inferior para redimensionar — cambia la duración) y las sesiones reales
@@ -609,6 +609,44 @@ valor/costo dentro de cada tier; nada bloquea a nada.
   borrados y salta el `create` correspondiente. `deleteCalendarFeed` limpia los
   tombstones del feed que borra (uno nuevo, si se re-suscribe, arranca de cero: otro
   `feed_id`). Sin función serverless nueva.
+- ~~**El reordenamiento no se guardaba si el día tenía una tarea con hora planeada**~~ ✅
+  — `getWeekView` ordenaba `ORDER BY date, (planned_start IS NULL), planned_start,
+  "order", created_at`: cualquier tarea con `planned_start` (hora planeada manual, o
+  puesta sola al importar del calendario — ver el fix de arriba) siempre iba primero
+  por hora, sin importar `"order"`. Arrastrar una tarea para ponerla antes de una con
+  horario se veía, pero al refrescar volvía a su posición: el drop nunca tenía efecto
+  real sobre esas filas. `"order"` (drag-and-drop, ↑/↓) es la única fuente de verdad de
+  la posición en la lista — el chip 🕐 queda como dato informativo (y sigue mandando en
+  el layout de la Agenda, que no depende del orden del array). Se quita `(planned_start
+  IS NULL), planned_start` del `ORDER BY`. Sin migración, sin función nueva.
+- ~~**Analítica se desbordaba en mobile**~~ ✅ — mismo problema que ya se había arreglado
+  en la Agenda (`.sheet--timeline`, ver arriba): `.sheet--analytics` no tenía
+  `max-height`, así que con suficiente contenido (24 barras de "Por hora del día" +
+  las de "Tendencia semanal") el diálogo crecía más alto que el viewport sin ninguna
+  forma de scrollear — el título y los tabs de rango quedaban tapados por la barra de
+  estado y "Cerrar" inalcanzable. Se envolvió el contenido variable (mensaje de
+  error/vacío + `.an-body`) en `.an-scroll`, que scrollea, con el mismo patrón
+  `max-height + display:flex;flex-direction:column` que ya usan
+  `.sheet--report`/`.sheet--search`/`.sheet--timeline`; el título y los tabs de rango
+  quedan siempre fijos arriba, "Cerrar" siempre fijo abajo. Sin migración, sin función
+  nueva, 100% CSS.
+- ~~**El mismo desborde en el resto de los diálogos**~~ ✅ — auditoría de todos los
+  `.sheet` tras el fix de Analítica: Etiquetas, Plantillas de día, Metas, Admin,
+  Calendarios iCal, Tareas recurrentes, Revisión semanal, Vista de mes y Orden de
+  contextos tenían el mismo problema — una lista que crece con los datos del usuario
+  (etiquetas, plantillas, metas, usuarios, feeds, reglas recurrentes, tareas
+  pendientes, semanas de un mes largo, contextos) sin `max-height` en el diálogo. En
+  vez de repetir el fix en cada `.sheet--*`, se subió la red de seguridad a la clase
+  base `.sheet` (`max-height: min(85vh, 640px); display:flex; flex-direction:column`)
+  — los `.sheet--*` con su propio tamaño (report/search/timeline/analytics) lo siguen
+  pisando igual que antes. Cada diálogo envuelve su parte variable en un
+  `<algo>-scroll` (`tags-scroll`, `dt-scroll`, `goals-scroll`, `admin-scroll`,
+  `feeds-scroll`, `recurring-scroll`, `context-order-scroll`, `month-scroll`, y
+  `an-scroll` reusado en `WeeklyReviewDialog`, que comparte `.sheet--analytics` con
+  Analítica pero tiene su propio JSX). De paso, `WeeklyReviewDialog` tenía un
+  `XXKEEP` literal en vez de `{data.thisFocus}` (paso 3 "Tu foco para esta semana") —
+  typo de la migración a i18n (`8810572`), corregido. Sin migración, sin función
+  nueva, 100% CSS/JSX.
 
 ### Fuera de alcance (sigue igual que §9)
 

@@ -135,68 +135,70 @@ export default function TagsDialog({
           </button>
         </form>
 
-        {tags.length === 0 ? (
-          <p className="muted">{t('tags.none')}</p>
-        ) : (
-          <ul className="tag-manage-list">
-            {tags.map((tag) => (
-              <li key={tag.id} className="tag-manage-item">
-                <span className="tag-dot" data-tag-color={tagColorOf(tag.color)} aria-hidden="true" />
-                {editingId === tag.id ? (
-                  <input
-                    type="text"
-                    className="tag-rename-input"
-                    value={editingName}
-                    onChange={(e) => setEditingName(e.target.value)}
-                    onBlur={() => void saveName(tag)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        void saveName(tag);
-                      } else if (e.key === 'Escape') {
-                        e.preventDefault();
-                        setEditingId(null);
-                      }
-                    }}
+        <div className="tags-scroll">
+          {tags.length === 0 ? (
+            <p className="muted">{t('tags.none')}</p>
+          ) : (
+            <ul className="tag-manage-list">
+              {tags.map((tag) => (
+                <li key={tag.id} className="tag-manage-item">
+                  <span className="tag-dot" data-tag-color={tagColorOf(tag.color)} aria-hidden="true" />
+                  {editingId === tag.id ? (
+                    <input
+                      type="text"
+                      className="tag-rename-input"
+                      value={editingName}
+                      onChange={(e) => setEditingName(e.target.value)}
+                      onBlur={() => void saveName(tag)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          void saveName(tag);
+                        } else if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setEditingId(null);
+                        }
+                      }}
+                      disabled={busy}
+                      autoFocus
+                      maxLength={40}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      className="tag-manage-name"
+                      onClick={() => {
+                        setEditingId(tag.id);
+                        setEditingName(tag.name);
+                      }}
+                      title={t('common.rename')}
+                    >
+                      {tag.name}
+                    </button>
+                  )}
+                  <Swatches
+                    value={tagColorOf(tag.color)}
+                    onPick={(c) => void run(() => updateTag(tag.id, { color: c }))}
                     disabled={busy}
-                    autoFocus
-                    maxLength={40}
+                    label={colorLabel}
                   />
-                ) : (
                   <button
                     type="button"
-                    className="tag-manage-name"
-                    onClick={() => {
-                      setEditingId(tag.id);
-                      setEditingName(tag.name);
-                    }}
-                    title={t('common.rename')}
+                    className="tag-manage-delete"
+                    onClick={() => setPendingDelete(tag)}
+                    disabled={busy}
+                    aria-label={t('common.delete') + ' ' + tag.name}
+                    title={t('tags.deleteTitle')}
                   >
-                    {tag.name}
+                    ×
                   </button>
-                )}
-                <Swatches
-                  value={tagColorOf(tag.color)}
-                  onPick={(c) => void run(() => updateTag(tag.id, { color: c }))}
-                  disabled={busy}
-                  label={colorLabel}
-                />
-                <button
-                  type="button"
-                  className="tag-manage-delete"
-                  onClick={() => setPendingDelete(tag)}
-                  disabled={busy}
-                  aria-label={t('common.delete') + ' ' + tag.name}
-                  title={t('tags.deleteTitle')}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                </li>
+              ))}
+            </ul>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>

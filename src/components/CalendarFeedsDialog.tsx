@@ -183,61 +183,63 @@ export default function CalendarFeedsDialog({
           </div>
         </form>
 
-        {loading ? (
-          <p className="muted">{t('common.loading')}</p>
-        ) : feeds.length === 0 ? (
-          <p className="muted">{t('feeds.none')}</p>
-        ) : (
-          <ul className="feed-list">
-            {feeds.map((feed) => {
-              const busy = busyId === feed.id;
-              return (
-                <li key={feed.id} className="feed-item" data-error={feed.lastError ? '' : undefined}>
-                  <div className="feed-item-main">
-                    <span className="feed-item-name">{feed.name}</span>
-                    <span className="feed-item-sub">{hostOf(feed.url)}</span>
-                    <span className="feed-item-sync">{syncLabel(feed, t)}</span>
-                  </div>
-                  <div className="feed-item-actions">
-                    <label className="feed-toggle" title={t('feeds.syncOne')}>
-                      <input
-                        type="checkbox"
-                        checked={feed.enabled}
+        <div className="feeds-scroll">
+          {loading ? (
+            <p className="muted">{t('common.loading')}</p>
+          ) : feeds.length === 0 ? (
+            <p className="muted">{t('feeds.none')}</p>
+          ) : (
+            <ul className="feed-list">
+              {feeds.map((feed) => {
+                const busy = busyId === feed.id;
+                return (
+                  <li key={feed.id} className="feed-item" data-error={feed.lastError ? '' : undefined}>
+                    <div className="feed-item-main">
+                      <span className="feed-item-name">{feed.name}</span>
+                      <span className="feed-item-sub">{hostOf(feed.url)}</span>
+                      <span className="feed-item-sync">{syncLabel(feed, t)}</span>
+                    </div>
+                    <div className="feed-item-actions">
+                      <label className="feed-toggle" title={t('feeds.syncOne')}>
+                        <input
+                          type="checkbox"
+                          checked={feed.enabled}
+                          disabled={busy}
+                          onChange={(e) =>
+                            void run(feed.id, () =>
+                              updateCalendarFeed(feed.id, { enabled: e.target.checked })
+                            )
+                          }
+                        />
+                        <span>{t('feeds.active')}</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-plain btn-small"
+                        disabled={busy || !feed.enabled}
+                        onClick={() => void run(feed.id, () => syncCalendarFeeds(feed.id))}
+                      >
+                        {busy ? t('feeds.syncBusy') : t('feeds.sync')}
+                      </button>
+                      <button
+                        type="button"
+                        className="feed-item-delete"
                         disabled={busy}
-                        onChange={(e) =>
-                          void run(feed.id, () =>
-                            updateCalendarFeed(feed.id, { enabled: e.target.checked })
-                          )
-                        }
-                      />
-                      <span>{t('feeds.active')}</span>
-                    </label>
-                    <button
-                      type="button"
-                      className="btn btn-plain btn-small"
-                      disabled={busy || !feed.enabled}
-                      onClick={() => void run(feed.id, () => syncCalendarFeeds(feed.id))}
-                    >
-                      {busy ? t('feeds.syncBusy') : t('feeds.sync')}
-                    </button>
-                    <button
-                      type="button"
-                      className="feed-item-delete"
-                      disabled={busy}
-                      onClick={() => setPendingDelete(feed)}
-                      aria-label={`Eliminar ${feed.name}`}
-                      title={t('feeds.deleteTitle')}
-                    >
-                      ×
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                        onClick={() => setPendingDelete(feed)}
+                        aria-label={`Eliminar ${feed.name}`}
+                        title={t('feeds.deleteTitle')}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          {error && <p className="error">{error}</p>}
+        </div>
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>
