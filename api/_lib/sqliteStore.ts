@@ -415,11 +415,11 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
   const weekTotalSeconds = sessRows.reduce((sum, r) => sum + Number(r.duration_sec), 0);
 
   return {
-    week: weekLabelOf(weekStart),
+    week: weekLabelOf(weekStart, weekend),
     weekStart,
     isCurrentWeek,
-    previousWeekLabel: weekLabelOf(addDaysToDate(weekStart, -7)),
-    nextWeekLabel: weekLabelOf(addDaysToDate(weekStart, 7)),
+    previousWeekLabel: weekLabelOf(addDaysToDate(weekStart, -7), weekend),
+    nextWeekLabel: weekLabelOf(addDaysToDate(weekStart, 7), weekend),
     days: visibleDayNames(weekend).map((day, i) => ({ day, date: dates[i] })),
     selectedDay,
     selectedDate,

@@ -38,6 +38,8 @@ export const es = {
   'app.offline': 'Sin conexión — estás viendo lo último que se guardó.',
   'app.updateReady': 'Hay una versión nueva de pomotion.',
   'app.update': 'Actualizar',
+  'app.installPrompt': 'Instalá pomotion en este dispositivo para abrirla más rápido y usarla sin conexión.',
+  'app.install': 'Instalar',
   'app.noTaskSelected': 'Ninguna tarea seleccionada',
   'app.refresh': 'Actualizar',
   'app.exitFocus': 'Salir de foco',
@@ -63,6 +65,7 @@ export const es = {
   'settings.behavior': 'Comportamiento',
   'settings.data': 'Datos',
   'settings.account': 'Cuenta',
+  'settings.about': 'Acerca de',
 
   // --- Alta rápida (FAB) ---
   'quickAdd.title': 'Nueva tarea',
@@ -92,6 +95,12 @@ export const es = {
   'menu.backup': 'Copia de seguridad',
   'menu.approveUsers': 'Aprobar usuarios',
   'menu.language': 'Idioma',
+  'menu.installApp': 'Instalar app',
+  'menu.about': 'Acerca de',
+  'about.title': 'Acerca de pomotion',
+  'about.version': 'Versión {version}',
+  'about.installed': 'Instalada en este dispositivo',
+  'about.install': 'Instalar en este dispositivo',
   'menu.logout': 'Salir',
 
   'shortcut.space': 'espacio',
@@ -137,6 +146,14 @@ export const es = {
   'total.estimate': 'Est',
   'total.week': 'Sem',
   'total.title': 'Tiempo registrado y estimado',
+
+  // --- Estado del día (completadas/total) + filtro ---
+  'day.completed': 'Completadas',
+  'day.completedTitle': 'Tareas completadas del día',
+  'taskList.filterAll': 'Todas',
+  'taskList.filterDone': 'Hechas',
+  'taskList.filterPending': 'Pendientes',
+  'taskList.filterByStatus': 'Filtrar por estado',
 
   // --- Carry-over ---
   'carryOver.one': 'Tenés 1 tarea pendiente de un día pasado.',

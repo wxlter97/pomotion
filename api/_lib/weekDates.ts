@@ -40,9 +40,10 @@ export function weekDates(mondayStr: string, includeWeekend = false): string[] {
   return Array.from({ length: n }, (_, i) => addDaysToDate(mondayStr, i));
 }
 
-/** Etiqueta "2026.08.24 - 2026.08.28" de la semana del lunes dado. */
-export function weekLabelOf(mondayStr: string): string {
-  return formatWeekLabel(mondayStr, addDaysToDate(mondayStr, 4));
+/** Etiqueta "2026.08.24 - 2026.08.28" de la semana del lunes dado (o
+ *  "2026.08.24 - 2026.08.30" con `includeWeekend`, hasta el domingo). */
+export function weekLabelOf(mondayStr: string, includeWeekend = false): string {
+  return formatWeekLabel(mondayStr, addDaysToDate(mondayStr, includeWeekend ? 6 : 4));
 }
 
 /** El lunes de la semana pedida: del label si es parseable, si no el de hoy. */

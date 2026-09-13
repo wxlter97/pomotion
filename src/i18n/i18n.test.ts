@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { es } from './es';
 import { en } from './en';
-import { localizeDay, makeT, monthName, plural } from './index';
+import { dayOfMonth, formatFullDate, localizeDay, makeT, monthName, plural } from './index';
 
 describe('diccionarios', () => {
   it('en tiene exactamente las mismas claves que es', () => {
@@ -59,5 +59,17 @@ describe('plural / localizeDay / monthName', () => {
     expect(monthName(0, 'en')).toBe('January');
     expect(monthName(0, 'es', true)).toBe('Enero');
     expect(monthName(8, 'es')).toBe('septiembre');
+  });
+
+  it('dayOfMonth', () => {
+    expect(dayOfMonth('2026-08-27')).toBe(27);
+    expect(dayOfMonth('2026-08-05')).toBe(5);
+  });
+
+  it('formatFullDate', () => {
+    expect(formatFullDate('2026-08-27', 'es')).toBe('27 de agosto');
+    expect(formatFullDate('2026-08-27', 'en')).toBe('August 27');
+    expect(formatFullDate('2026-08-27', 'es', true)).toBe('27 de agosto de 2026');
+    expect(formatFullDate('2026-08-27', 'en', true)).toBe('August 27, 2026');
   });
 });

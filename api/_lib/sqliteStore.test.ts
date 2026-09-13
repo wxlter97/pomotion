@@ -84,7 +84,7 @@ describe('createTask + getWeekView', () => {
       'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo',
     ]);
     expect(conFinde.days[6].date).toBe('2026-08-30');
-    expect(conFinde.week).toBe('2026.08.24 - 2026.08.28'); // la etiqueta no cambia
+    expect(conFinde.week).toBe('2026.08.24 - 2026.08.30'); // la etiqueta se amplía hasta el domingo
     expect(conFinde.selectedDay).toBe('Sábado');
     expect(conFinde.tasks.map((t) => t.name)).toEqual(['sábado']);
   });

@@ -50,8 +50,11 @@ describe('weekDates / weekLabelOf', () => {
       '2026-08-30',
     ]);
   });
-  it('la etiqueta sigue siendo Lun–Vie aunque se muestre el finde', () => {
+  it('la etiqueta es Lun–Vie por defecto', () => {
     expect(weekLabelOf('2026-08-24')).toBe('2026.08.24 - 2026.08.28');
+  });
+  it('con includeWeekend la etiqueta se amplía hasta el domingo', () => {
+    expect(weekLabelOf('2026-08-24', true)).toBe('2026.08.24 - 2026.08.30');
   });
 });
 
