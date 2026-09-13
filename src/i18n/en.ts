@@ -35,6 +35,8 @@ export const en: Record<MsgKey, string> = {
   'app.offline': "Offline — you're seeing the last saved version.",
   'app.updateReady': 'A new version of pomotion is available.',
   'app.update': 'Update',
+  'app.installPrompt': 'Install pomotion on this device for faster access and offline use.',
+  'app.install': 'Install',
   'app.noTaskSelected': 'No task selected',
   'app.refresh': 'Refresh',
   'app.exitFocus': 'Exit focus',
@@ -60,6 +62,7 @@ export const en: Record<MsgKey, string> = {
   'settings.behavior': 'Behavior',
   'settings.data': 'Data',
   'settings.account': 'Account',
+  'settings.about': 'About',
 
   // --- Quick add (FAB) ---
   'quickAdd.title': 'New task',
@@ -89,6 +92,12 @@ export const en: Record<MsgKey, string> = {
   'menu.backup': 'Backup',
   'menu.approveUsers': 'Approve users',
   'menu.language': 'Language',
+  'menu.installApp': 'Install app',
+  'menu.about': 'About',
+  'about.title': 'About pomotion',
+  'about.version': 'Version {version}',
+  'about.installed': 'Installed on this device',
+  'about.install': 'Install on this device',
   'menu.logout': 'Sign out',
 
   'shortcut.space': 'space',
@@ -134,6 +143,14 @@ export const en: Record<MsgKey, string> = {
   'total.estimate': 'Est',
   'total.week': 'Wk',
   'total.title': 'Logged and estimated time',
+
+  // --- Day status (done/total) + filter ---
+  'day.completed': 'Completed',
+  'day.completedTitle': 'Tasks completed today',
+  'taskList.filterAll': 'All',
+  'taskList.filterDone': 'Done',
+  'taskList.filterPending': 'Pending',
+  'taskList.filterByStatus': 'Filter by status',
 
   // --- Carry-over ---
   'carryOver.one': 'You have 1 unfinished task from a past day.',

@@ -798,6 +798,9 @@ h3 {
 
 .day-tab {
   flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
   font-family: inherit;
   border: none;
   cursor: pointer;
@@ -808,6 +811,17 @@ h3 {
   font-size: 0.85rem;
   font-weight: 500;
   transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.day-tab-date {
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+}
+
+.day-tab.active .day-tab-date {
+  opacity: 0.85;
 }
 
 .day-tab:disabled {
@@ -855,6 +869,21 @@ h3 {
   font-size: 0.95rem;
   color: var(--color-accent);
   font-variant-numeric: tabular-nums;
+}
+
+.completion-pill {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  background: var(--color-fill);
+  padding: 0.4rem 0.9rem;
+  border-radius: 980px;
+  white-space: nowrap;
+}
+
+.completion-pill-of {
+  color: var(--color-label-secondary);
+  font-weight: 500;
 }
 
 /* --- Layout --- */
@@ -1804,6 +1833,23 @@ body.is-dragging * {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-contrast);
+}
+
+/* --- Acerca de (AboutDialog) --- */
+.sheet--about {
+  max-width: min(94vw, 420px);
+}
+
+.about-version {
+  color: var(--color-label-secondary);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.about-installed {
+  color: var(--color-success);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 /* --- Horas hábiles (BusinessHoursDialog) --- */

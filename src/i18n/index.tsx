@@ -117,6 +117,21 @@ export function monthName(index: number, lang: Lang, capitalized = false): strin
   return capitalized ? name.charAt(0).toUpperCase() + name.slice(1) : name;
 }
 
+/** Solo el día del mes de una fecha 'YYYY-MM-DD', como número ("27"). */
+export function dayOfMonth(dateStr: string): number {
+  return Number(dateStr.slice(8, 10));
+}
+
+/** "27 de agosto" / "August 27" — fecha larga sin año, para el selector de
+ *  días. Con `withYear` agrega el año ("27 de agosto de 2026" / "August 27, 2026"). */
+export function formatFullDate(dateStr: string, lang: Lang, withYear = false): string {
+  const [y, m] = dateStr.split('-').map(Number);
+  const day = dayOfMonth(dateStr);
+  const month = monthName(m - 1, lang);
+  if (lang === 'en') return withYear ? `${month} ${day}, ${y}` : `${month} ${day}`;
+  return withYear ? `${day} de ${month} de ${y}` : `${day} de ${month}`;
+}
+
 const MONTH_ABBR_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const MONTH_ABBR_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

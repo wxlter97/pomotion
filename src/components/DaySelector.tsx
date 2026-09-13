@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { localizeDay, useLang, useT } from '../i18n';
+import { dayOfMonth, formatFullDate, localizeDay, useLang, useT } from '../i18n';
+import type { DayColumn } from '../types';
 
 function Spinner() {
   return <span className="spinner" aria-hidden="true" />;
@@ -17,7 +18,7 @@ export default function DaySelector({
   loading,
 }: {
   week: string;
-  days: string[];
+  days: DayColumn[];
   selectedDay: string;
   onSelectDay: (day: string) => void;
   isCurrentWeek: boolean;
@@ -76,7 +77,7 @@ export default function DaySelector({
         )}
       </div>
       <div className="day-tabs" ref={tabsRef}>
-        {days.map((day) => (
+        {days.map(({ day, date }) => (
           <button
             key={day}
             ref={day === selectedDay ? activeTabRef : undefined}
@@ -85,8 +86,10 @@ export default function DaySelector({
             disabled={loading}
             type="button"
             data-drag-zone={`day:${day}`}
+            title={`${localizeDay(day, lang)}, ${formatFullDate(date, lang, true)}`}
           >
             {localizeDay(day, lang)}
+            <span className="day-tab-date">{dayOfMonth(date)}</span>
           </button>
         ))}
       </div>

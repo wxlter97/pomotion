@@ -32,6 +32,7 @@ import GoalsDialog from './components/GoalsDialog';
 import PostItsDialog from './components/PostItsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
+import AboutDialog from './components/AboutDialog';
 import BackupDialog from './components/BackupDialog';
 import BulkActionBar from './components/BulkActionBar';
 import BusinessHoursDialog from './components/BusinessHoursDialog';
@@ -60,6 +61,7 @@ import type { DueReminder, FileEntry, Session, Task, TasksResponse, TimerPhase }
 import { applyUpdate, registerServiceWorker } from './pwa';
 import { useAccent } from './useAccent';
 import { useCarryOverSetting } from './useCarryOverSetting';
+import { useInstallPrompt } from './useInstallPrompt';
 import { useOnlineStatus } from './useOnlineStatus';
 import { useDueNotifications } from './useDueNotifications';
 import { useTimerSettings } from './useTimerSettings';
@@ -124,12 +126,20 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [showTimerSettings, setShowTimerSettings] = useState(false);
   const [filterTagId, setFilterTagId] = useState<string | null>(null);
+  const [completionFilter, setCompletionFilter] = useState<'all' | 'done' | 'pending'>('all');
   const [carryingOver, setCarryingOver] = useState(false);
   const online = useOnlineStatus();
   const [updateReady, setUpdateReady] = useState(false);
   useEffect(() => {
     registerServiceWorker(() => setUpdateReady(true));
   }, []);
+  const installPrompt = useInstallPrompt();
+  const [installBannerDismissed, setInstallBannerDismissed] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
+  async function handleInstall() {
+    await installPrompt.requestInstall();
+    setInstallBannerDismissed(true);
+  }
   const [theme, toggleTheme] = useTheme();
   const [accent, chooseAccent, customAccentColor, chooseCustomAccentColor] = useAccent(theme);
   const [timerSettings, updateTimerSettings, resetTimerSettings] = useTimerSettings();
@@ -210,10 +220,17 @@ export default function App() {
     }
   }, [data, filterTagId]);
 
-  const visibleTasks =
-    filterTagId && data
-      ? data.tasks.filter((t) => t.tagIds.includes(filterTagId))
-      : (data?.tasks ?? []);
+  // Status del día (no depende de los filtros de abajo — cuenta todas las
+  // tareas del día visible, aunque estén ocultas por el filtro de etiqueta
+  // o de completadas/pendientes).
+  const dayDoneCount = (data?.tasks ?? []).filter((t) => t.done).length;
+  const dayTaskCount = data?.tasks.length ?? 0;
+
+  const visibleTasks = (data?.tasks ?? [])
+    .filter((t) => !filterTagId || t.tagIds.includes(filterTagId))
+    .filter((t) =>
+      completionFilter === 'done' ? t.done : completionFilter === 'pending' ? !t.done : true
+    );
 
   const refresh = useCallback(async (
     day?: string,
@@ -1068,6 +1085,25 @@ export default function App() {
             </button>
           </div>
         )}
+        {installPrompt.available && !installBannerDismissed && (
+          <div className="info banner pwa-update-banner">
+            <span>{t('app.installPrompt')}</span>
+            <span className="carry-over-actions">
+              <button type="button" className="btn btn-tinted btn-small" onClick={() => void handleInstall()}>
+                {t('app.install')}
+              </button>
+              <button
+                type="button"
+                className="banner-dismiss"
+                onClick={() => setInstallBannerDismissed(true)}
+                aria-label={t('common.dismissNotice')}
+                title={t('common.close')}
+              >
+                ×
+              </button>
+            </span>
+          </div>
+        )}
 
         {error && <p className="error banner">{error}</p>}
         {data && data.carryOverCount > 0 && (
@@ -1089,7 +1125,7 @@ export default function App() {
           <div className="day-row">
             <DaySelector
               week={data.week}
-              days={data.days.map((d) => d.day)}
+              days={data.days}
               selectedDay={data.selectedDay}
               onSelectDay={guardedSelectDay}
               isCurrentWeek={data.isCurrentWeek}
@@ -1099,6 +1135,15 @@ export default function App() {
               loading={loading}
             />
             <div className="day-row-actions">
+              {dayTaskCount > 0 && (
+                <div className="completion-pill" title={t('day.completedTitle')}>
+                  <span className="total-pill-label">{t('day.completed')}</span>
+                  <span className="total-pill-value">
+                    {dayDoneCount}
+                    <span className="completion-pill-of">/{dayTaskCount}</span>
+                  </span>
+                </div>
+              )}
               {(data.dayTotalSeconds > 0 ||
                 data.weekTotalSeconds > 0 ||
                 dayEstimateSeconds > 0) && (
@@ -1164,6 +1209,31 @@ export default function App() {
                   onCancel={clearSelection}
                 />
               )}
+              {dayTaskCount > 0 && (
+                <div className="tag-filter" role="group" aria-label={t('taskList.filterByStatus')}>
+                  <button
+                    type="button"
+                    className={completionFilter === 'all' ? 'tag-filter-chip is-on' : 'tag-filter-chip'}
+                    onClick={() => setCompletionFilter('all')}
+                  >
+                    {t('taskList.filterAll')}
+                  </button>
+                  <button
+                    type="button"
+                    className={completionFilter === 'pending' ? 'tag-filter-chip is-on' : 'tag-filter-chip'}
+                    onClick={() => setCompletionFilter('pending')}
+                  >
+                    {t('taskList.filterPending')}
+                  </button>
+                  <button
+                    type="button"
+                    className={completionFilter === 'done' ? 'tag-filter-chip is-on' : 'tag-filter-chip'}
+                    onClick={() => setCompletionFilter('done')}
+                  >
+                    {t('taskList.filterDone')}
+                  </button>
+                </div>
+              )}
               {data.tags.length > 0 && (
                 <div className="tag-filter" role="group" aria-label="Filtrar por etiqueta">
                   <button
@@ -1204,7 +1274,7 @@ export default function App() {
                 fileId={selectedFileId}
                 allTags={data.tags}
                 onManageTags={() => setShowTags(true)}
-                canReorder={!filterTagId}
+                canReorder={!filterTagId && completionFilter === 'all'}
                 lockedTaskId={lockedTaskId}
                 busyTaskIds={busyTaskIds}
                 selectedIds={selectedIds}
@@ -1320,6 +1390,9 @@ export default function App() {
           refreshing={loading}
           authEmail={authEmail}
           onLogout={() => void handleLogout()}
+          installAvailable={installPrompt.available}
+          onInstallApp={() => void handleInstall()}
+          onOpenAbout={() => setShowAbout(true)}
         />
       )}
       </div>
@@ -1391,6 +1464,10 @@ export default function App() {
       {showAdmin && <AdminUsersDialog onClose={() => setShowAdmin(false)} />}
 
       {showBackup && <BackupDialog onClose={() => setShowBackup(false)} />}
+
+      {showAbout && (
+        <AboutDialog installPrompt={installPrompt} onClose={() => setShowAbout(false)} />
+      )}
 
       {showContextOrder && (
         <ContextOrderDialog

@@ -49,6 +49,9 @@ export default function SettingsTab({
   refreshing,
   authEmail,
   onLogout,
+  installAvailable,
+  onInstallApp,
+  onOpenAbout,
 }: {
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
@@ -87,6 +90,10 @@ export default function SettingsTab({
   refreshing: boolean;
   authEmail: string | null;
   onLogout: () => void;
+  /** Hay un prompt de instalación de PWA listo (ver useInstallPrompt). */
+  installAvailable: boolean;
+  onInstallApp: () => void;
+  onOpenAbout: () => void;
 }) {
   const t = useT();
 
@@ -188,6 +195,11 @@ export default function SettingsTab({
       <Section title={t('settings.account')}>
         {isAdmin && <Row label={t('menu.approveUsers')} onClick={onOpenAdmin} />}
         <Row label={t('menu.logout')} onClick={onLogout} danger />
+      </Section>
+
+      <Section title={t('settings.about')}>
+        {installAvailable && <Row label={t('menu.installApp')} onClick={onInstallApp} />}
+        <Row label={t('menu.about')} onClick={onOpenAbout} />
       </Section>
 
       {authEmail && <p className="settings-user">{authEmail}</p>}
