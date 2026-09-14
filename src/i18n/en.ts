@@ -45,6 +45,7 @@ export const en: Record<MsgKey, string> = {
 
   // --- Navigation (bottom nav / sidebar) ---
   'nav.label': 'Main navigation',
+  'nav.home': 'Back to portfolio home',
   'nav.today': 'Today',
   'nav.agenda': 'Agenda',
   'nav.stats': 'Stats',

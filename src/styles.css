@@ -508,6 +508,11 @@ h3 {
   font-weight: 700;
 }
 
+.app-header h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -5208,6 +5213,11 @@ kbd {
     font-weight: 800;
     padding: 0 0.5rem;
     margin: 0 0 1.4rem;
+  }
+
+  .side-nav-brand a {
+    color: inherit;
+    text-decoration: none;
   }
 
   .side-nav-items {
