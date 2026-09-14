@@ -48,6 +48,7 @@ export const es = {
 
   // --- Navegación (bottom nav / sidebar) ---
   'nav.label': 'Navegación principal',
+  'nav.home': 'Volver al inicio del portafolio',
   'nav.today': 'Hoy',
   'nav.agenda': 'Agenda',
   'nav.stats': 'Stats',

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useT } from '../i18n';
 import { PlusIcon } from './icons';
 import { NAV_ITEMS, type NavTab } from './navItems';
+import { PORTFOLIO_HOME_URL } from '../constants';
 
 /**
  * Sidebar fija (desktop): logo, navegación primaria, "+ Nueva tarea" y,
@@ -30,7 +31,11 @@ export default function SideNav({
 
   return (
     <nav className="side-nav" aria-label={t('nav.label')}>
-      <h1 className="side-nav-brand">pomotion</h1>
+      <h1 className="side-nav-brand">
+        <a href={PORTFOLIO_HOME_URL} title={t('nav.home')}>
+          pomotion
+        </a>
+      </h1>
       <div className="side-nav-items">
         {NAV_ITEMS.map((item) => {
           const isActive = active === item.key;

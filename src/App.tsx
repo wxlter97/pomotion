@@ -86,6 +86,7 @@ import StatsTab from './components/StatsTab';
 import SettingsTab from './components/SettingsTab';
 import QuickAddSheet from './components/QuickAddSheet';
 import type { NavTab } from './components/navItems';
+import { PORTFOLIO_HOME_URL } from './constants';
 
 type AuthState = 'checking' | 'authed' | 'guest' | 'pending' | 'error';
 type PendingSwitch = { message: string; run: () => void };
@@ -1029,7 +1030,11 @@ export default function App() {
         </button>
       )}
       <header className="app-header">
-        <h1>pomotion</h1>
+        <h1>
+          <a href={PORTFOLIO_HOME_URL} title={t('nav.home')}>
+            pomotion
+          </a>
+        </h1>
         <div className="header-actions">
           {focusModeButton}
           <button
