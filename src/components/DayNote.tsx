@@ -34,16 +34,19 @@ function ChevronIcon() {
 }
 
 /**
- * Bitácora del día: texto libre por día, aparte de las tareas. Cajón plegable
- * bajo el inbox. Guarda al perder el foco (o con ⌘/Ctrl+Enter) si cambió.
- * Se remonta al cambiar de día (App le pone `key={date}`).
+ * Bitácora del día: texto libre por día y por espacio/contexto, aparte de
+ * las tareas. Cajón plegable bajo el inbox. Guarda al perder el foco (o con
+ * ⌘/Ctrl+Enter) si cambió. Se remonta al cambiar de día o de espacio (App le
+ * pone `key` combinando ambos).
  */
 export default function DayNote({
   date,
+  fileId,
   note,
   onSaved,
 }: {
   date: string;
+  fileId: string | null;
   note: string;
   onSaved: (date: string, body: string) => void;
 }) {
@@ -68,7 +71,7 @@ export default function DayNote({
     setSaving(true);
     setError(null);
     try {
-      const res = await saveDayNote(date, next);
+      const res = await saveDayNote(date, next, fileId ?? undefined);
       savedRef.current = res.body;
       setText(res.body);
       onSaved(date, res.body);

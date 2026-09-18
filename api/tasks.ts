@@ -121,7 +121,11 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'save_day_note') {
-        const result = await sqliteStore.saveDayNote({ date: body.date, body: body.body_text });
+        const result = await sqliteStore.saveDayNote({
+          date: body.date,
+          body: body.body_text,
+          fileId: body.file,
+        });
         return res.status(200).json({ ok: true, ...result });
       }
       if (body.action === 'save_week_focus') {

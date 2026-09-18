@@ -151,9 +151,12 @@ function PostItCard({
   );
 }
 
-/** Tablero de post-its: notas sueltas de texto libre, independientes del
- *  calendario. Se abre desde el menú Ver, igual que Metas / Etiquetas. */
-export default function PostItsDialog({ onClose }: { onClose: () => void }) {
+/** Contenido del tablero: toolbar de "+ nueva" + tarjetas + errores. Sin
+ *  chrome propio (ni modal ni cabecera) para poder montarse tanto dentro del
+ *  diálogo de Ajustes (`PostItsDialog`) como inline en la pantalla principal
+ *  (`PostItsPanel`). `onRequestClose`, si viene, se llama con Escape —
+ *  salvo que haya una confirmación de borrado abierta, que se cierra primero. */
+function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
   const t = useT();
   const colorLabel = (key: TagColor) => t(`tags.color.${key}` as MsgKey);
 
@@ -179,12 +182,13 @@ export default function PostItsDialog({ onClose }: { onClose: () => void }) {
   }, [reload]);
 
   useEffect(() => {
+    if (!onRequestClose) return;
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !pendingDelete) onClose();
+      if (e.key === 'Escape' && !pendingDelete) onRequestClose!();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [onClose, pendingDelete]);
+  }, [onRequestClose, pendingDelete]);
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -221,51 +225,35 @@ export default function PostItsDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="sheet-backdrop" onClick={onClose} role="presentation">
-      <div
-        className="sheet sheet--post-its"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="post-its-title"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 id="post-its-title">{t('postIts.title')}</h2>
-
-        <div className="post-it-toolbar">
-          <button type="button" className="btn btn-tinted btn-small" onClick={() => void addNew()} disabled={busy}>
-            + {t('postIts.new')}
-          </button>
-        </div>
-
-        {loading ? (
-          <p className="muted">{t('common.loading')}</p>
-        ) : postIts.length === 0 ? (
-          <p className="muted">{t('postIts.none')}</p>
-        ) : (
-          <ul className="post-it-board">
-            {postIts.map((p) => (
-              <PostItCard
-                key={p.id}
-                postIt={p}
-                autoFocusBody={p.id === newestId}
-                busy={busy}
-                colorLabel={colorLabel}
-                t={t}
-                onSave={(id, fields) => run(() => updatePostIt(id, fields))}
-                onDelete={setPendingDelete}
-              />
-            ))}
-          </ul>
-        )}
-
-        {error && <p className="error">{error}</p>}
-
-        <div className="sheet-actions">
-          <button type="button" className="btn btn-plain" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
+    <>
+      <div className="post-it-toolbar">
+        <button type="button" className="btn btn-tinted btn-small" onClick={() => void addNew()} disabled={busy}>
+          + {t('postIts.new')}
+        </button>
       </div>
+
+      {loading ? (
+        <p className="muted">{t('common.loading')}</p>
+      ) : postIts.length === 0 ? (
+        <p className="muted">{t('postIts.none')}</p>
+      ) : (
+        <ul className="post-it-board">
+          {postIts.map((p) => (
+            <PostItCard
+              key={p.id}
+              postIt={p}
+              autoFocusBody={p.id === newestId}
+              busy={busy}
+              colorLabel={colorLabel}
+              t={t}
+              onSave={(id, fields) => run(() => updatePostIt(id, fields))}
+              onDelete={setPendingDelete}
+            />
+          ))}
+        </ul>
+      )}
+
+      {error && <p className="error">{error}</p>}
 
       {pendingDelete && (
         <ConfirmDialog
@@ -277,6 +265,101 @@ export default function PostItsDialog({ onClose }: { onClose: () => void }) {
           onCancel={() => setPendingDelete(null)}
         />
       )}
+    </>
+  );
+}
+
+const PANEL_COLLAPSED_KEY = 'pomotion:post-its-collapsed';
+
+function readPanelCollapsed(): boolean {
+  try {
+    return localStorage.getItem(PANEL_COLLAPSED_KEY) === '1'; // abierto por defecto
+  } catch {
+    return false;
+  }
+}
+
+/** Post-its "a mano" en la pantalla principal: mismo cajón plegable que
+ *  `DayNote`, pero abierto por defecto — a diferencia de la bitácora, un
+ *  post-it real siempre está a la vista. */
+export function PostItsPanel() {
+  const t = useT();
+  const [collapsed, setCollapsed] = useState(readPanelCollapsed);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PANEL_COLLAPSED_KEY, collapsed ? '1' : '0');
+    } catch {
+      // ignorar
+    }
+  }, [collapsed]);
+
+  return (
+    <section className={collapsed ? 'day-note' : 'day-note is-open'}>
+      <button
+        type="button"
+        className="inbox-header"
+        onClick={() => setCollapsed((v) => !v)}
+        aria-expanded={!collapsed}
+      >
+        <ChevronIcon />
+        <span>{t('postIts.title')}</span>
+      </button>
+
+      {!collapsed && (
+        <div className="day-note-body">
+          <PostItsBoard />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ChevronIcon() {
+  return (
+    <svg
+      className="inbox-chevron"
+      viewBox="0 0 24 24"
+      width="14"
+      height="14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 6l6 6-6 6" />
+    </svg>
+  );
+}
+
+/** Tablero de post-its en un diálogo de página completa: notas sueltas de
+ *  texto libre, independientes del calendario. Se abre desde Ajustes, para
+ *  quienes prefieren una vista más grande que el panel de la pantalla
+ *  principal (`PostItsPanel`). */
+export default function PostItsDialog({ onClose }: { onClose: () => void }) {
+  const t = useT();
+
+  return (
+    <div className="sheet-backdrop" onClick={onClose} role="presentation">
+      <div
+        className="sheet sheet--post-its"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="post-its-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 id="post-its-title">{t('postIts.title')}</h2>
+
+        <PostItsBoard onRequestClose={onClose} />
+
+        <div className="sheet-actions">
+          <button type="button" className="btn btn-plain" onClick={onClose}>
+            {t('common.close')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

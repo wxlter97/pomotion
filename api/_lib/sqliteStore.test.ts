@@ -832,6 +832,25 @@ describe('notas del día / bitácora', () => {
       as(USER, () => sqliteStore.saveDayNote({ date: '24-08-2026', body: 'x' }))
     ).rejects.toThrow();
   });
+
+  it('está scopeada por espacio/contexto, no compartida entre todos', async () => {
+    await as(USER, () =>
+      sqliteStore.saveDayNote({ date: '2026-08-24', body: 'nota de Trabajo', fileId: 'Trabajo' })
+    );
+    await as(USER, () =>
+      sqliteStore.saveDayNote({ date: '2026-08-24', body: 'nota sin contexto' })
+    );
+
+    const trabajo = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes', fileId: 'Trabajo' })
+    );
+    expect(trabajo.dayNote).toBe('nota de Trabajo');
+
+    const sinContexto = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Lunes' })
+    );
+    expect(sinContexto.dayNote).toBe('nota sin contexto');
+  });
 });
 
 describe('revisión semanal (getWeeklyReview / saveWeekFocus)', () => {

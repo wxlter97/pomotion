@@ -29,7 +29,7 @@ import Splash from './components/Splash';
 import RecurringTasksDialog from './components/RecurringTasksDialog';
 import DayTemplatesDialog from './components/DayTemplatesDialog';
 import GoalsDialog from './components/GoalsDialog';
-import PostItsDialog from './components/PostItsDialog';
+import PostItsDialog, { PostItsPanel } from './components/PostItsDialog';
 import CalendarFeedsDialog from './components/CalendarFeedsDialog';
 import AdminUsersDialog from './components/AdminUsersDialog';
 import AboutDialog from './components/AboutDialog';
@@ -1191,11 +1191,14 @@ export default function App() {
           />
 
           <DayNote
-            key={data.selectedDate}
+            key={`${selectedFileId ?? ''}-${data.selectedDate}`}
             date={data.selectedDate}
+            fileId={selectedFileId}
             note={data.dayNote}
             onSaved={handleDayNoteSaved}
           />
+
+          <PostItsPanel />
 
           <div className={timerEnabled ? 'main-grid' : 'main-grid main-grid--no-timer'}>
             <section className="tasks-panel card">

@@ -232,12 +232,13 @@ export function saveWeekFocus(weekStart: string, body: string) {
 
 // --- Tareas ---
 
-/** Guarda la bitácora de un día ('YYYY-MM-DD'). Texto vacío borra la nota.
- *  Devuelve el texto final (ya trimmeado). */
-export function saveDayNote(date: string, body: string) {
+/** Guarda la bitácora de un día ('YYYY-MM-DD') para un espacio/contexto
+ *  puntual. Texto vacío borra la nota. Devuelve el texto final (ya
+ *  trimmeado). */
+export function saveDayNote(date: string, body: string, fileId?: string) {
   return request<{ ok: true; body: string }>('/api/tasks', {
     method: 'POST',
-    body: JSON.stringify({ action: 'save_day_note', date, body_text: body }),
+    body: JSON.stringify({ action: 'save_day_note', date, body_text: body, file: fileId }),
   });
 }
 
