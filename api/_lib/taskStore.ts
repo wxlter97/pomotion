@@ -332,7 +332,7 @@ export type GetWeekViewInput = {
   includeWeekend?: boolean;
 };
 export type SearchTasksInput = { query?: string; fileId?: string };
-export type SaveDayNoteInput = { date?: string; body?: string };
+export type SaveDayNoteInput = { date?: string; body?: string; fileId?: string };
 
 /** Valores que sobreviven al round-trip por JSON de una fila de la DB. */
 export type BackupValue = string | number | null;

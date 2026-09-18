@@ -403,8 +403,8 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
   const dayNote = String(
     (
       await db.execute({
-        sql: 'SELECT body FROM day_notes WHERE user_id = ? AND date = ?',
-        args: [userId, selectedDate],
+        sql: 'SELECT body FROM day_notes WHERE user_id = ? AND date = ? AND file_key = ?',
+        args: [userId, selectedDate, input.fileId ?? ''],
       })
     ).rows[0]?.body ?? ''
   );
@@ -521,18 +521,19 @@ async function saveDayNote(input: SaveDayNoteInput): Promise<{ body: string }> {
     throw new BadRequestError('invalid_body', `La nota no puede pasar de ${DAY_NOTE_MAX} caracteres`);
   }
   const body = raw.trim();
+  const fileKey = input.fileId ?? '';
   const db = getDb();
   if (body === '') {
     await db.execute({
-      sql: 'DELETE FROM day_notes WHERE user_id = ? AND date = ?',
-      args: [userId, input.date],
+      sql: 'DELETE FROM day_notes WHERE user_id = ? AND date = ? AND file_key = ?',
+      args: [userId, input.date, fileKey],
     });
     return { body: '' };
   }
   await db.execute({
-    sql: `INSERT INTO day_notes (user_id, date, body, updated_at) VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id, date) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
-    args: [userId, input.date, body, new Date().toISOString()],
+    sql: `INSERT INTO day_notes (user_id, date, file_key, body, updated_at) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(user_id, date, file_key) DO UPDATE SET body = excluded.body, updated_at = excluded.updated_at`,
+    args: [userId, input.date, fileKey, body, new Date().toISOString()],
   });
   return { body };
 }
@@ -1054,7 +1055,8 @@ async function createContext(input: CreateContextInput): Promise<FileEntry> {
 }
 
 /** Cambia el `file` de todas las tablas que lo usan, de una — incluye
- *  `recurring_runs.file_key` (mismo campo, otro nombre) y `habits.context_id`. */
+ *  `recurring_runs.file_key` / `day_notes.file_key` (mismo campo, otro
+ *  nombre) y `habits.context_id`. */
 async function renameContextEverywhere(userId: string, from: string, to: string): Promise<void> {
   await getDb().batch(
     [
@@ -1065,6 +1067,7 @@ async function renameContextEverywhere(userId: string, from: string, to: string)
       { sql: 'UPDATE goals SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
       { sql: 'UPDATE day_templates SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
       { sql: 'UPDATE recurring_runs SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
+      { sql: 'UPDATE day_notes SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
       { sql: 'UPDATE habits SET context_id = ? WHERE user_id = ? AND context_id = ?', args: [to, userId, from] },
     ],
     'write'
@@ -1121,7 +1124,9 @@ async function updateContext(input: UpdateContextInput): Promise<FileEntry> {
 }
 
 /** Borra el contexto; deja sin contexto (`file = NULL`) lo que lo usaba —
- *  salvo sus hábitos, que se van con él (cascada por FK, no tienen sentido sueltos). */
+ *  salvo sus hábitos (cascada por FK) y su nota del día por contexto, que se
+ *  van con él (no tienen sentido sueltos / no hay un contexto por defecto
+ *  claro al cual fusionarlos). */
 async function deleteContext(id?: string): Promise<void> {
   const userId = currentUserId();
   const contextId = typeof id === 'string' ? id : '';
@@ -1136,6 +1141,7 @@ async function deleteContext(id?: string): Promise<void> {
       { sql: 'UPDATE goals SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
       { sql: 'UPDATE day_templates SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
       { sql: 'DELETE FROM recurring_runs WHERE user_id = ? AND file_key = ?', args: [userId, contextId] },
+      { sql: 'DELETE FROM day_notes WHERE user_id = ? AND file_key = ?', args: [userId, contextId] },
       { sql: 'DELETE FROM contexts WHERE user_id = ? AND id = ?', args: [userId, contextId] },
     ],
     'write'
