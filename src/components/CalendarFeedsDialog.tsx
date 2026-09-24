@@ -200,6 +200,30 @@ export default function CalendarFeedsDialog({
                       <span className="feed-item-sync">{syncLabel(feed, t)}</span>
                     </div>
                     <div className="feed-item-actions">
+                      <select
+                        value={feed.file ?? NO_FILE}
+                        disabled={busy}
+                        onChange={(e) =>
+                          void run(feed.id, () =>
+                            updateCalendarFeed(feed.id, {
+                              fileId: e.target.value === NO_FILE ? null : e.target.value,
+                            })
+                          )
+                        }
+                        className="feed-file-select"
+                        aria-label={t('feeds.contextLabel')}
+                        title={t('feeds.contextLabel')}
+                      >
+                        <option value={NO_FILE}>{t('common.noContext')}</option>
+                        {feed.file && !files.some((f) => f.id === feed.file) && (
+                          <option value={feed.file}>{feed.file}</option>
+                        )}
+                        {files.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.label}
+                          </option>
+                        ))}
+                      </select>
                       <label className="feed-toggle" title={t('feeds.syncOne')}>
                         <input
                           type="checkbox"

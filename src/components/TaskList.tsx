@@ -400,8 +400,10 @@ export default function TaskList({
             const checklistDone = task.checklist.length > 0 && task.checklist.every((c) => c.done);
             // Chip de "lleva mucho abierta": solo en tareas sin hacer y que no
             // sean de un día futuro (planificar a futuro no es estar estancado).
+            // Tampoco en eventos de calendario: el sync los crea hasta 4
+            // semanas antes, así que su `createdAt` no dice nada de atraso.
             const ageLabel =
-              !task.done && selectedDate <= today
+              !task.done && task.source !== 'calendar' && selectedDate <= today
                 ? taskAgeLabel(task.createdAt, today, t)
                 : null;
             const manualOverlap =

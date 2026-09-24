@@ -440,6 +440,13 @@ async function getWeekView(input: GetWeekViewInput): Promise<WeekView> {
 // "se me pasó". Más viejas = abandonadas, no se traen.
 const CARRY_OVER_WINDOW_DAYS = 14;
 
+// Sin tiempo registrado y que no venga de un calendario: un evento pasado
+// (la reunión de ayer) no es algo "pendiente" que haya que traer a hoy, y
+// moverlo deja `date` distinta de `external_date`, con lo que el sync lo da
+// por tocado y deja de mantenerlo (quedaba colgado como pendiente).
+const CARRY_OVER_ELIGIBLE = `t.source <> 'calendar'
+              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id)`;
+
 /** Tareas pendientes (done=0, sin sesiones) de un día anterior a hoy dentro
  *  de la ventana: las candidatas a "traer a hoy". */
 async function countCarryOver(
@@ -454,7 +461,7 @@ async function countCarryOver(
       sql: `SELECT count(*) AS c FROM tasks t
             WHERE t.user_id = ? AND ${f.clause} AND t.done = 0 AND t.date IS NOT NULL
               AND t.date < ? AND t.date >= ?
-              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id)`,
+              AND ${CARRY_OVER_ELIGIBLE}`,
       args: [userId, ...f.args, target, addDaysToDate(target, -CARRY_OVER_WINDOW_DAYS)],
     })
   ).rows[0];
@@ -479,7 +486,7 @@ async function carryOverToToday(input: {
       sql: `SELECT t.id FROM tasks t
             WHERE t.user_id = ? AND ${f.clause} AND t.done = 0 AND t.date IS NOT NULL
               AND t.date < ? AND t.date >= ?
-              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = t.id)
+              AND ${CARRY_OVER_ELIGIBLE}
             ORDER BY t.date, t."order", t.created_at`,
       args: [userId, ...f.args, target, addDaysToDate(target, -CARRY_OVER_WINDOW_DAYS)],
     })
@@ -2751,6 +2758,18 @@ async function updateCalendarFeed(input: UpdateCalendarFeedInput): Promise<Calen
     args: [...args, input.id, userId],
   });
   if (res.rowsAffected === 0) throw new NotFoundError('feed_not_found', 'Calendario no encontrado');
+
+  // Cambió el contexto destino: las tareas ya sincronizadas se mudan con el
+  // feed, salvo las que tienen tiempo registrado (sus sesiones quedaron
+  // anotadas en el contexto viejo y separarlas descuadraría el historial).
+  if (input.fileId !== undefined) {
+    await getDb().execute({
+      sql: `UPDATE tasks SET file = ?, updated_at = ?
+            WHERE user_id = ? AND feed_id = ?
+              AND NOT EXISTS (SELECT 1 FROM work_sessions ws WHERE ws.task_id = tasks.id)`,
+      args: [input.fileId ?? null, new Date().toISOString(), userId, input.id],
+    });
+  }
 
   const row = (
     await getDb().execute({ sql: 'SELECT * FROM calendar_feeds WHERE id = ?', args: [input.id] })

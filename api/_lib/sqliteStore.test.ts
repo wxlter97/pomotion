@@ -791,6 +791,29 @@ describe('carry-over', () => {
     expect(lunes.tasks.map((t) => t.name)).toEqual(['ya hecha']);
     vi.useRealTimers();
   });
+
+  it('no arrastra eventos de calendario pasados', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z')); // hoy = miércoles 26
+
+    const now = new Date().toISOString();
+    await db.execute({
+      sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, source, feed_id,
+                               external_uid, external_date, created_at, updated_at)
+            VALUES ('cal-1', ?, 'Daily', '2026-08-25', 0, 1, NULL, 'calendar', 'feed-1',
+                    'uid-1', '2026-08-25', ?, ?)`,
+      args: [USER, now, now],
+    });
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(view.carryOverCount).toBe(0);
+    expect((await as(USER, () => sqliteStore.carryOverToToday({}))).moved).toBe(0);
+    const row = (await db.execute("SELECT date FROM tasks WHERE id = 'cal-1'")).rows[0];
+    expect(row.date).toBe('2026-08-25');
+    vi.useRealTimers();
+  });
 });
 
 describe('notas del día / bitácora', () => {
