@@ -60,6 +60,14 @@ export function dueChipLabel(due: string, today: string, t: TFn, lang: Lang): st
 /** A partir de cuántos días una tarea abierta muestra el chip de "edad". */
 export const TASK_AGE_MIN_DAYS = 7;
 
+/** Desde cuándo cuenta la "edad": el día de la tarea si es posterior a su
+ *  creación (planificar con semanas de anticipación no es estar atrasada),
+ *  si no la fecha de creación. 'YYYY-MM-DD'. */
+export function taskAgeStart(createdAt: string, date: string | null): string {
+  const created = createdAt.slice(0, 10);
+  return date && date > created ? date : created;
+}
+
 /** Chip compacto: "9d" hasta ~2 semanas, después "3sem". `null` si es nueva. */
 export function taskAgeLabel(createdAt: string, today: string, t: TFn): string | null {
   const days = daysBetween(createdAt.slice(0, 10), today);

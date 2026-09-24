@@ -22,6 +22,7 @@ import {
   dueLabel,
   isOverdue,
   taskAgeLabel,
+  taskAgeStart,
   taskAgeTitle,
   taskTimeSummary,
 } from '../taskMeta';
@@ -400,9 +401,11 @@ export default function TaskList({
             const checklistDone = task.checklist.length > 0 && task.checklist.every((c) => c.done);
             // Chip de "lleva mucho abierta": solo en tareas sin hacer y que no
             // sean de un día futuro (planificar a futuro no es estar estancado).
+            // Tampoco en eventos de calendario: el sync los crea hasta 4
+            // semanas antes, así que su `createdAt` no dice nada de atraso.
             const ageLabel =
-              !task.done && selectedDate <= today
-                ? taskAgeLabel(task.createdAt, today, t)
+              !task.done && task.source !== 'calendar' && selectedDate <= today
+                ? taskAgeLabel(taskAgeStart(task.createdAt, task.date), today, t)
                 : null;
             const manualOverlap =
               manualEntryTaskId === task.id
@@ -543,7 +546,7 @@ export default function TaskList({
                         </span>
                       )}
                       {ageLabel && (
-                        <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today, t)}>
+                        <span className="task-age-chip" title={taskAgeTitle(taskAgeStart(task.createdAt, task.date), today, t)}>
                           {ageLabel}
                         </span>
                       )}

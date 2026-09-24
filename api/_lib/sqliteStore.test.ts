@@ -791,6 +791,29 @@ describe('carry-over', () => {
     expect(lunes.tasks.map((t) => t.name)).toEqual(['ya hecha']);
     vi.useRealTimers();
   });
+
+  it('no arrastra eventos de calendario pasados', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z')); // hoy = miércoles 26
+
+    const now = new Date().toISOString();
+    await db.execute({
+      sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", file, source, feed_id,
+                               external_uid, external_date, created_at, updated_at)
+            VALUES ('cal-1', ?, 'Daily', '2026-08-25', 0, 1, NULL, 'calendar', 'feed-1',
+                    'uid-1', '2026-08-25', ?, ?)`,
+      args: [USER, now, now],
+    });
+
+    const view = await as(USER, () =>
+      sqliteStore.getWeekView({ week: '2026.08.24 - 2026.08.28', day: 'Miércoles' })
+    );
+    expect(view.carryOverCount).toBe(0);
+    expect((await as(USER, () => sqliteStore.carryOverToToday({}))).moved).toBe(0);
+    const row = (await db.execute("SELECT date FROM tasks WHERE id = 'cal-1'")).rows[0];
+    expect(row.date).toBe('2026-08-25');
+    vi.useRealTimers();
+  });
 });
 
 describe('notas del día / bitácora', () => {
@@ -1782,6 +1805,58 @@ describe('calendarios iCal', () => {
     await expect(
       as(OTHER, () => sqliteStore.updateCalendarFeed({ id: feed.id, enabled: false }))
     ).rejects.toThrow();
+  });
+
+  it('dos syncs simultáneos del mismo feed no duplican el evento', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-26T12:00:00Z'));
+    stubFetch(icsWith(vevent('a', 'Reunión', '20260827')));
+
+    const feed = await as(USER, () =>
+      sqliteStore.createCalendarFeed({ name: 'Trabajo', url: 'https://x.test/c.ics' })
+    );
+    const [r1, r2] = await Promise.all([
+      as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id })),
+      as(USER, () => sqliteStore.syncCalendarFeeds({ feedId: feed.id })),
+    ]);
+    expect(await thursday()).toEqual([{ name: 'Reunión', source: 'calendar' }]);
+    expect(r1.added + r2.added).toBe(1);
+  });
+
+  it('la migración 017 limpia duplicados existentes sin perder historial', async () => {
+    await db.execute('DROP INDEX idx_tasks_feed_uid_unique');
+    const now = '2026-08-20T00:00:00.000Z';
+    const insert = (id: string, done: number, createdAt: string) =>
+      db.execute({
+        sql: `INSERT INTO tasks (id, user_id, name, date, done, "order", source, feed_id,
+                                 external_uid, external_date, created_at, updated_at)
+              VALUES (?, ?, 'Daily', '2026-08-27', ?, 1, 'calendar', 'f1', 'uid-1', '2026-08-27', ?, ?)`,
+        args: [id, USER, done, createdAt, now],
+      });
+    await insert('vieja', 0, '2026-08-01T00:00:00.000Z');
+    await insert('con-sesion', 0, '2026-08-02T00:00:00.000Z');
+    await insert('hecha', 1, '2026-08-03T00:00:00.000Z');
+    await insert('sobrante', 0, '2026-08-04T00:00:00.000Z');
+    await db.execute({
+      sql: `INSERT INTO work_sessions (id, user_id, task_id, date, start_hhmm, end_hhmm, duration_sec, created_at)
+            VALUES ('s1', ?, 'con-sesion', '2026-08-27', '09:00', '09:10', 600, ?)`,
+      args: [USER, now],
+    });
+
+    const { readFileSync } = await import('node:fs');
+    await db.executeMultiple(
+      readFileSync(new URL('../../scripts/migrations/017_calendar_task_unique.sql', import.meta.url), 'utf8')
+    );
+
+    const rows = (await db.execute('SELECT id, feed_id FROM tasks ORDER BY id')).rows.map((r) => ({
+      id: String(r.id),
+      linked: r.feed_id != null,
+    }));
+    // Se queda la de sesiones; la hecha se desvincula; las demás se borran.
+    expect(rows).toEqual([
+      { id: 'con-sesion', linked: true },
+      { id: 'hecha', linked: false },
+    ]);
   });
 });
 
