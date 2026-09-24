@@ -10,6 +10,7 @@ import {
   priorityLabel,
   shortDate,
   taskAgeLabel,
+  taskAgeStart,
   taskAgeTitle,
   taskTimeSummary,
 } from './taskMeta';
@@ -110,6 +111,19 @@ describe('taskTimeSummary', () => {
 
   it('marca over cuando lo registrado pasa la estimación', () => {
     expect(taskTimeSummary(9000, 120, t)).toEqual({ text: '2h 30m / 2h', over: true });
+  });
+});
+
+describe('taskAgeStart', () => {
+  it('cuenta desde el día de la tarea si es posterior a la creación', () => {
+    // creada hace 3 semanas para hoy → no está atrasada
+    expect(taskAgeStart('2026-08-08T10:00:00Z', '2026-08-29')).toBe('2026-08-29');
+    expect(taskAgeLabel(taskAgeStart('2026-08-08T10:00:00Z', '2026-08-29'), '2026-08-29', t)).toBeNull();
+  });
+
+  it('usa la creación si el día es anterior o no hay fecha', () => {
+    expect(taskAgeStart('2026-08-08T10:00:00Z', '2026-08-01')).toBe('2026-08-08');
+    expect(taskAgeStart('2026-08-08T10:00:00Z', null)).toBe('2026-08-08');
   });
 });
 

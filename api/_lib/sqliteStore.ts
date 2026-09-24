@@ -2934,8 +2934,10 @@ async function syncCalendarFeeds(input: {
       for (const d of plan.create) {
         const order = (maxOrderByDate.get(d.date) ?? 0) + 1;
         maxOrderByDate.set(d.date, order);
+        // OR IGNORE: si otro sync del mismo feed ya lo insertó (carrera),
+        // el índice único (user_id, feed_id, external_uid) lo descarta.
         writes.push({
-          sql: `INSERT INTO tasks
+          sql: `INSERT OR IGNORE INTO tasks
                   (id, user_id, name, date, done, "order", file, source, feed_id, external_uid,
                    external_date, estimate_min, planned_start, notes, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 0, ?, ?, 'calendar', ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -2991,12 +2993,16 @@ async function syncCalendarFeeds(input: {
         });
       }
 
-      if (writes.length > 0) await db.batch(writes, 'write');
+      const results = writes.length > 0 ? await db.batch(writes, 'write') : [];
+      // Los INSERT van primero en `writes`: contar los que sí entraron.
+      const added = results
+        .slice(0, plan.create.length)
+        .reduce((n, r) => n + r.rowsAffected, 0);
 
-      result.added += plan.create.length;
+      result.added += added;
       result.updated += plan.update.length;
       result.removed += plan.remove.length + plan.orphan.length;
-      if (plan.create.length || plan.update.length || plan.remove.length || plan.orphan.length) {
+      if (added || plan.update.length || plan.remove.length || plan.orphan.length) {
         result.changed = true;
       }
 

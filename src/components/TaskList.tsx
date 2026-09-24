@@ -22,6 +22,7 @@ import {
   dueLabel,
   isOverdue,
   taskAgeLabel,
+  taskAgeStart,
   taskAgeTitle,
   taskTimeSummary,
 } from '../taskMeta';
@@ -404,7 +405,7 @@ export default function TaskList({
             // semanas antes, así que su `createdAt` no dice nada de atraso.
             const ageLabel =
               !task.done && task.source !== 'calendar' && selectedDate <= today
-                ? taskAgeLabel(task.createdAt, today, t)
+                ? taskAgeLabel(taskAgeStart(task.createdAt, task.date), today, t)
                 : null;
             const manualOverlap =
               manualEntryTaskId === task.id
@@ -545,7 +546,7 @@ export default function TaskList({
                         </span>
                       )}
                       {ageLabel && (
-                        <span className="task-age-chip" title={taskAgeTitle(task.createdAt, today, t)}>
+                        <span className="task-age-chip" title={taskAgeTitle(taskAgeStart(task.createdAt, task.date), today, t)}>
                           {ageLabel}
                         </span>
                       )}
