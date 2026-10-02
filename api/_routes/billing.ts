@@ -25,7 +25,7 @@ import {
  * El estado ("¿ya pagó?") viaja en `GET /api/auth/status` → `user.adsFree`.
  */
 
-// El HMAC se calcula sobre el cuerpo CRUDO: el enrutador (`api/[...path].ts`)
+// El HMAC se calcula sobre el cuerpo CRUDO: el enrutador (`api/router.ts`)
 // lo deja en `req.rawBody` antes de parsear el JSON.
 function readRawBody(req: VercelRequest): string {
   const raw = (req as VercelRequest & { rawBody?: string }).rawBody;

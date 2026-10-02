@@ -1,5 +1,9 @@
 /**
- * Único punto de entrada de `/api/*` en Vercel. Hobby limita a 12 las
+ * Único punto de entrada de `/api/*` en Vercel. `vercel.json` reescribe
+ * `/api/<ruta>` a `/api/router?__path=<ruta>`: un `[...path].ts` no recoge
+ * rutas con varios segmentos (`/api/auth/status`) en este proyecto, un
+ * archivo plano + rewrite sí.
+ * Hobby limita a 12 las
  * funciones serverless por deployment, así que en vez de un archivo por
  * endpoint hay UNA función que enruta a los handlers de `api/_routes/`
  * (el prefijo `_` hace que Vercel no los despliegue como funciones).
@@ -22,7 +26,13 @@ async function readRawBody(req: VercelRequest): Promise<string> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const pathname = new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/$/, '');
+  const rewritten = req.query?.__path;
+  const pathname =
+    typeof rewritten === 'string'
+      ? `/api/${rewritten}`.replace(/\/$/, '')
+      : new URL(req.url ?? '/', 'http://localhost').pathname.replace(/\/$/, '');
+  // El parámetro es solo de enrutado: los handlers no deben verlo.
+  if (req.query) delete req.query.__path;
   const route = routes[pathname];
   if (!route) return res.status(404).json({ error: 'not_found' });
 

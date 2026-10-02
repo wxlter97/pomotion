@@ -3,7 +3,7 @@
  * (los que Vercel despliega como funciones serverless) sobre un servidor
  * http plano, sin necesitar `vercel dev` ni una cuenta de Vercel logueada.
  *
- * No se usa en producción — ahí Vercel ejecuta `api/[...path].ts`, que
+ * No se usa en producción — ahí Vercel ejecuta `api/router.ts`, que
  * enruta con la misma tabla (`api/_routes/routes.ts`). Esto es solo un
  * adaptador mínimo de req/res para probar localmente. Uso: `npm run dev:api` (ver vite.config.ts para el proxy).
  */
