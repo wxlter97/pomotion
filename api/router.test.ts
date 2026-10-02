@@ -1,11 +1,11 @@
 import { Readable } from 'node:stream';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { describe, expect, it, vi } from 'vitest';
-import handler from './[...path].js';
+import handler from './router.js';
 import { routes } from './_routes/routes.js';
 
-function fakeReq(method: string, url: string, body?: string): VercelRequest {
-  return Object.assign(Readable.from(body ? [Buffer.from(body)] : []), { method, url }) as unknown as VercelRequest;
+function fakeReq(method: string, url: string, body?: string, query: Record<string, string> = {}): VercelRequest {
+  return Object.assign(Readable.from(body ? [Buffer.from(body)] : []), { method, url, query }) as unknown as VercelRequest;
 }
 
 function fakeRes() {
@@ -15,7 +15,7 @@ function fakeRes() {
   return res as VercelResponse & { statusCode: number; payload: unknown };
 }
 
-describe('api/[...path] (enrutador único)', () => {
+describe('api/router (enrutador único)', () => {
   it('registra todos los endpoints esperados', () => {
     expect(Object.keys(routes).sort()).toEqual([
       '/api/auth/google/callback',
@@ -38,6 +38,20 @@ describe('api/[...path] (enrutador único)', () => {
     const res = fakeRes();
     await handler(fakeReq('GET', '/api/nope'), res);
     expect(res.statusCode).toBe(404);
+  });
+
+  it('enruta por el rewrite de vercel.json (rutas anidadas, query __path)', async () => {
+    const spy = vi.fn();
+    const original = routes['/api/auth/status'];
+    routes['/api/auth/status'] = spy;
+    try {
+      // Vercel entrega el destino del rewrite: /api/router?__path=auth/status
+      await handler(fakeReq('GET', '/api/router?__path=auth/status', undefined, { __path: 'auth/status', users: '1' }), fakeRes());
+      const req = spy.mock.calls[0][0];
+      expect(req.query).toEqual({ users: '1' }); // __path no llega al handler
+    } finally {
+      routes['/api/auth/status'] = original;
+    }
   });
 
   it('parsea el JSON y deja el cuerpo crudo para la firma del webhook', async () => {
