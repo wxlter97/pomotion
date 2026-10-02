@@ -285,6 +285,9 @@ export type PostIt = {
   body: string;
   color: string;
   pinned: boolean;
+  /** Tamaño elegido por el usuario en px; null = el por defecto. */
+  width: number | null;
+  height: number | null;
   updatedAt: string;
 };
 

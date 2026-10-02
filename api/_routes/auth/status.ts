@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAuthedUser } from '../_lib/auth.js';
-import { listUsersForAdmin, setUserApproval, type UserRow } from '../_lib/authRepo.js';
+import { getAuthedUser } from '../../_lib/auth.js';
+import { listUsersForAdmin, setUserApproval, type UserRow } from '../../_lib/authRepo.js';
 
 /**
  * Endpoint de auth para el frontend:
@@ -44,6 +44,7 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
       name: user.name,
       pictureUrl: user.pictureUrl,
       isAdmin: user.isAdmin,
+      adsFree: user.adsFreeAt !== null,
     },
   });
 }

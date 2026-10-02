@@ -129,7 +129,7 @@ export const BACKUP_TABLES: readonly BackupTable[] = [
     table: 'post_its',
     hasUserId: true,
     scopeWhere: 'user_id = ?',
-    columns: ['id', 'title', 'body', 'color', 'pinned', 'created_at', 'updated_at'],
+    columns: ['id', 'title', 'body', 'color', 'pinned', 'width', 'height', 'created_at', 'updated_at'],
   },
 ] as const;
 

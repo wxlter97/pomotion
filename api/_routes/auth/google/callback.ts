@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setSessionCookie } from '../../_lib/auth.js';
-import { createAuthSession, takeOAuthState, upsertUserFromGoogle } from '../../_lib/authRepo.js';
-import { exchangeCode, googleConfig } from '../../_lib/googleOAuth.js';
+import { setSessionCookie } from '../../../_lib/auth.js';
+import { createAuthSession, takeOAuthState, upsertUserFromGoogle } from '../../../_lib/authRepo.js';
+import { exchangeCode, googleConfig } from '../../../_lib/googleOAuth.js';
 
 function fail(res: VercelResponse, reason: string) {
   return res.redirect(302, `/?auth_error=${encodeURIComponent(reason)}`);

@@ -5,6 +5,7 @@ import {
   createInboxTask,
   createTask,
   getAuthStatus,
+  startAdsFreeCheckout,
   getFiles,
   getTasks,
   logout,
@@ -83,6 +84,7 @@ import { SunIcon, MoonIcon, SearchIcon, FocusIcon } from './components/icons';
 import BottomNav from './components/BottomNav';
 import SideNav from './components/SideNav';
 import StatsTab from './components/StatsTab';
+import AdSlot from './components/AdSlot';
 import SettingsTab from './components/SettingsTab';
 import QuickAddSheet from './components/QuickAddSheet';
 import type { NavTab } from './components/navItems';
@@ -98,6 +100,20 @@ export default function App() {
   const [authState, setAuthState] = useState<AuthState>('checking');
   const [authEmail, setAuthEmail] = useState<string | null>(null);
   const [authIsAdmin, setAuthIsAdmin] = useState(false);
+  const [adsFree, setAdsFree] = useState(false);
+  // Wompi nos devuelve a `/?pago=ok|cancelado`: se lee una sola vez al montar
+  // (y se limpia la URL) para que sobreviva al doble efecto de StrictMode.
+  const [paymentReturn] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const value = params.get('pago');
+    if (value) {
+      params.delete('pago');
+      const qs = params.toString();
+      window.history.replaceState(null, '', window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash);
+    }
+    return value;
+  });
+  const [startingCheckout, setStartingCheckout] = useState(false);
   const [data, setData] = useState<TasksResponse | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(false);
@@ -310,6 +326,7 @@ export default function App() {
         }
         setAuthEmail(status.user.email);
         setAuthIsAdmin(status.user.isAdmin);
+        setAdsFree(status.user.adsFree);
         if (!status.approved) {
           setAuthState('pending');
           return;
@@ -936,6 +953,55 @@ export default function App() {
     }
   }
 
+  // Vuelta del checkout de Wompi. El webhook que activa "sin anuncios" puede
+  // llegar unos segundos después de la redirección: se consulta el estado
+  // varias veces antes de rendirse con un aviso.
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
+  useEffect(() => {
+    if (authState !== 'authed' || !paymentReturn) return;
+    if (paymentReturn === 'cancelado') {
+      toastRef.current.push(tRef.current('ads.cancelled'), 'info');
+      return;
+    }
+    if (paymentReturn !== 'ok') return;
+    let cancelled = false;
+    (async () => {
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        try {
+          const status = await getAuthStatus();
+          if (cancelled) return;
+          if (status.authed && status.user.adsFree) {
+            setAdsFree(true);
+            toastRef.current.push(tRef.current('ads.paidOk'), 'success');
+            return;
+          }
+        } catch {
+          // reintenta
+        }
+        await new Promise((resolve) => setTimeout(resolve, 2500));
+        if (cancelled) return;
+      }
+      toastRef.current.push(tRef.current('ads.paidPending'), 'info');
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authState, paymentReturn]);
+
+  /** Abre el checkout de Wompi para el pago único que quita los anuncios. */
+  async function handleRemoveAds() {
+    if (startingCheckout || adsFree) return;
+    setStartingCheckout(true);
+    try {
+      const { url } = await startAdsFreeCheckout();
+      window.location.assign(url);
+    } catch (err) {
+      toast.push(err instanceof Error ? err.message : tRef.current('ads.startError'), 'error');
+      setStartingCheckout(false);
+    }
+  }
+
   async function handleLogout() {
     try {
       await logout();
@@ -945,6 +1011,7 @@ export default function App() {
     setAuthState('guest');
     setAuthEmail(null);
     setAuthIsAdmin(false);
+    setAdsFree(false);
     setData(null);
     setSelectedTask(null);
     filesLoadedRef.current = false;
@@ -1301,23 +1368,26 @@ export default function App() {
             </section>
 
             {timerEnabled && (
-              <section className="timer-panel card">
-                {focusMode && timerPhase !== 'work' && (
-                  <p className="focus-task">
-                    {selectedTask?.name ?? t("app.noTaskSelected")}
-                  </p>
-                )}
-                <Timer
-                  ref={timerRef}
-                  task={selectedTask}
-                  settings={timerSettings}
-                  onSessionLogged={handleSessionLogged}
-                  onPhaseChange={setTimerPhase}
-                  soundsEnabled={soundsEnabled}
-                  notificationsEnabled={notifications.enabled}
-                  pomodoroEnabled={pomodoroEnabled}
-                />
-              </section>
+              <div className="timer-column">
+                <section className="timer-panel card">
+                  {focusMode && timerPhase !== 'work' && (
+                    <p className="focus-task">
+                      {selectedTask?.name ?? t("app.noTaskSelected")}
+                    </p>
+                  )}
+                  <Timer
+                    ref={timerRef}
+                    task={selectedTask}
+                    settings={timerSettings}
+                    onSessionLogged={handleSessionLogged}
+                    onPhaseChange={setTimerPhase}
+                    soundsEnabled={soundsEnabled}
+                    notificationsEnabled={notifications.enabled}
+                    pomodoroEnabled={pomodoroEnabled}
+                  />
+                </section>
+                {!adsFree && <AdSlot onRemoveAds={() => void handleRemoveAds()} removing={startingCheckout} />}
+              </div>
             )}
           </div>
 
@@ -1388,6 +1458,9 @@ export default function App() {
           onOpenTags={() => setShowTags(true)}
           onOpenFeeds={() => setShowFeeds(true)}
           onOpenPostIts={() => setShowPostIts(true)}
+          adsFree={adsFree}
+          onRemoveAds={() => void handleRemoveAds()}
+          removingAds={startingCheckout}
           onOpenBackup={() => setShowBackup(true)}
           multiFile={orderedFiles.length > 1}
           onOpenContextOrder={() => setShowContextOrder(true)}
