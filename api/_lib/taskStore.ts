@@ -319,6 +319,9 @@ export type PostIt = {
   /** Clave de la paleta de colores (ver src/tags.ts). */
   color: string;
   pinned: boolean;
+  /** Tamaño elegido por el usuario en px; null = el por defecto. */
+  width: number | null;
+  height: number | null;
   updatedAt: string;
 };
 
@@ -363,6 +366,9 @@ export type UpdatePostItInput = {
   body?: string;
   color?: string;
   pinned?: boolean;
+  /** Tamaño en px; `null` vuelve al tamaño por defecto. */
+  width?: number | null;
+  height?: number | null;
 };
 
 export type CreateTaskInput = {

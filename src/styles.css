@@ -934,11 +934,68 @@ h3 {
   padding: 2.5rem 1.5rem;
 }
 
-.timer-panel {
+.timer-column {
   position: sticky;
   top: 1rem;
   align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
+
+/* --- Publicidad (bajo el timer, solo desktop) --- */
+.ad-slot {
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.ad-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.ad-slot-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-label-secondary);
+}
+
+.ad-slot-remove {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--color-label-secondary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.ad-slot-remove:hover:not(:disabled) {
+  color: var(--color-label);
+}
+
+/* Alto reservado (300x250, el rectángulo medio) para que activar la red de
+ * anuncios no mueva el layout. */
+.ad-slot-body {
+  min-height: 250px;
+  display: flex;
+  align-items: stretch;
+}
+
+.ad-slot-body > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ad-slot-placeholder {
+  border: 1px dashed var(--color-separator, rgba(128, 128, 128, 0.35));
+  border-radius: 12px;
+}
+
 
 /* --- Modo foco: solo el timer + la tarea en curso --- */
 .app--focus {
@@ -973,8 +1030,12 @@ h3 {
   padding: 1.5rem;
 }
 
-.app--focus .timer-panel {
+.app--focus .timer-column {
   position: static;
+}
+
+.app--focus .ad-slot {
+  display: none;
 }
 
 .focus-task {
@@ -2685,18 +2746,26 @@ body.is-dragging * {
   margin-bottom: 1rem;
 }
 
+/* Flex en vez de grid: cada nota tiene su propio ancho (se arrastra la
+ * esquina y se guarda por nota), no el de una columna compartida. */
 .post-it-board {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.9rem;
-  max-height: min(60vh, 560px);
+  max-height: min(70vh, 860px);
   overflow-y: auto;
 }
 
 .post-it {
+  box-sizing: border-box;
+  flex: 1 1 200px;
+  max-width: 100%;
+  min-width: 160px;
+  min-height: 120px;
   background: var(--tag-bg);
   border-radius: 12px;
   padding: 0.7rem 0.8rem 0.8rem;
@@ -2704,6 +2773,19 @@ body.is-dragging * {
   flex-direction: column;
   gap: 0.5rem;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+/* Con ratón se puede arrastrar la esquina para cambiar ancho y alto
+ * (`--pi-w`/`--pi-h` vienen de lo guardado). En pantallas chicas no hay
+ * manija: la nota ocupa el ancho disponible. */
+@media (min-width: 721px) {
+  .post-it {
+    flex: 0 0 auto;
+    width: var(--pi-w, 240px);
+    height: var(--pi-h, auto);
+    resize: both;
+    overflow: auto;
+  }
 }
 
 .post-it-head {
@@ -2767,8 +2849,10 @@ body.is-dragging * {
 }
 
 .post-it-body-input {
-  resize: vertical;
-  min-height: 4.5rem;
+  /* Crece con la nota: el tamaño lo manda la esquina de la tarjeta. */
+  flex: 1 1 auto;
+  resize: none;
+  min-height: 3rem;
   background: color-mix(in srgb, var(--tag-fg) 6%, transparent);
   border: none;
   border-radius: 8px;

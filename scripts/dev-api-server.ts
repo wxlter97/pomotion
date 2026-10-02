@@ -3,51 +3,26 @@
  * (los que Vercel despliega como funciones serverless) sobre un servidor
  * http plano, sin necesitar `vercel dev` ni una cuenta de Vercel logueada.
  *
- * No se usa en producción — ahí Vercel enruta cada archivo de /api
- * directamente. Esto es solo un adaptador mínimo de req/res para probar
- * localmente. Uso: `npm run dev:api` (ver vite.config.ts para el proxy).
+ * No se usa en producción — ahí Vercel ejecuta `api/[...path].ts`, que
+ * enruta con la misma tabla (`api/_routes/routes.ts`). Esto es solo un
+ * adaptador mínimo de req/res para probar localmente. Uso: `npm run dev:api` (ver vite.config.ts para el proxy).
  */
 import 'dotenv/config';
 import http from 'node:http';
 import { URL } from 'node:url';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-import googleCallbackHandler from '../api/auth/google/callback';
-import googleStartHandler from '../api/auth/google/start';
-import authLogoutHandler from '../api/auth/logout';
-import authStatusHandler from '../api/auth/status';
-import filesHandler from '../api/files';
-import habitsHandler from '../api/habits';
-import recurringHandler from '../api/recurring';
-import reportHandler from '../api/report';
-import sessionHandler from '../api/session';
-import taskHandler from '../api/task';
-import taskReorderHandler from '../api/task-reorder';
-import tasksHandler from '../api/tasks';
-
-type Handler = (req: VercelRequest, res: VercelResponse) => unknown | Promise<unknown>;
-
-const routes: Record<string, Handler> = {
-  '/api/auth/google/start': googleStartHandler as Handler,
-  '/api/auth/google/callback': googleCallbackHandler as Handler,
-  '/api/auth/status': authStatusHandler as Handler,
-  '/api/auth/logout': authLogoutHandler as Handler,
-  '/api/tasks': tasksHandler as Handler,
-  '/api/session': sessionHandler as Handler,
-  '/api/task-reorder': taskReorderHandler as Handler,
-  '/api/task': taskHandler as Handler,
-  '/api/files': filesHandler as Handler,
-  '/api/habits': habitsHandler as Handler,
-  '/api/report': reportHandler as Handler,
-  '/api/recurring': recurringHandler as Handler,
-};
+import { routes } from '../api/_routes/routes';
 
 const PORT = Number(process.env.API_PORT) || 3000;
 
-async function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
+async function readRawBody(req: http.IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
-  const raw = Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+function parseJson(raw: string): unknown {
   if (!raw) return undefined;
   try {
     return JSON.parse(raw);
@@ -71,12 +46,14 @@ const server = http.createServer(async (req, res) => {
     query[key] = value;
   });
 
-  const body =
-    req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' || req.method === 'DELETE'
-      ? await readJsonBody(req)
-      : undefined;
+  const hasBody =
+    req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT' || req.method === 'DELETE';
+  // `rawBody` imita lo que el webhook de Wompi necesita en producción (la
+  // firma HMAC se calcula sobre el cuerpo tal cual llegó).
+  const rawBody = hasBody ? await readRawBody(req) : undefined;
+  const body = rawBody !== undefined ? parseJson(rawBody) : undefined;
 
-  const vercelReq = Object.assign(req, { query, body }) as unknown as VercelRequest;
+  const vercelReq = Object.assign(req, { query, body, rawBody }) as unknown as VercelRequest;
 
   let statusCode = 200;
   const vercelRes = {

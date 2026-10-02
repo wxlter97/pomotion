@@ -77,6 +77,8 @@ export const es = {
   'menu.monthView': 'Vista mensual',
   'menu.goals': 'Metas del mes',
   'menu.postIts': 'Post-its',
+  'menu.removeAds': 'Quitar anuncios',
+  'menu.adsRemoved': 'Sin anuncios',
   'menu.recurring': 'Tareas recurrentes',
   'menu.templates': 'Plantillas de día',
   'menu.tags': 'Etiquetas',
@@ -480,6 +482,16 @@ export const es = {
   'goals.sessionExpired': 'La sesión expiró. Recargá la página.',
 
   // --- Post-its ---
+  // --- Anuncios / pago único ---
+  'ads.label': 'Publicidad',
+  'ads.remove': 'Quitar anuncios · {price}',
+  'ads.starting': 'Abriendo el pago…',
+  'ads.startError': 'No se pudo iniciar el pago',
+  'ads.paidOk': '¡Gracias! Ya no verás anuncios.',
+  'ads.paidPending': 'Estamos confirmando tu pago; en unos minutos se quitarán los anuncios.',
+  'ads.cancelled': 'Pago cancelado.',
+  'ads.settingsState': 'Pago único {price}',
+
   'postIts.title': 'Post-its',
   'postIts.none': 'Todavía no tenés post-its. Creá uno para anotar algo suelto.',
   'postIts.new': 'Nueva nota',

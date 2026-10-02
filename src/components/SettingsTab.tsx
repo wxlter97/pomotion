@@ -1,4 +1,5 @@
 import { ACCENTS, accentColorForTheme, type Accent } from '../accent';
+import { ADS_FREE_PRICE_LABEL } from '../constants';
 import { LANGS, useT, type Lang, type MsgKey } from '../i18n';
 import type { NotificationSetting } from '../useNotificationSetting';
 import { MoonIcon, SunIcon } from './icons';
@@ -39,6 +40,9 @@ export default function SettingsTab({
   onOpenTags,
   onOpenFeeds,
   onOpenPostIts,
+  adsFree,
+  onRemoveAds,
+  removingAds,
   onOpenBackup,
   multiFile,
   onOpenContextOrder,
@@ -80,6 +84,9 @@ export default function SettingsTab({
   onOpenTags: () => void;
   onOpenFeeds: () => void;
   onOpenPostIts: () => void;
+  adsFree: boolean;
+  onRemoveAds: () => void;
+  removingAds: boolean;
   onOpenBackup: () => void;
   multiFile: boolean;
   onOpenContextOrder: () => void;
@@ -193,6 +200,16 @@ export default function SettingsTab({
       </Section>
 
       <Section title={t('settings.account')}>
+        {adsFree ? (
+          <Row label={t('menu.adsRemoved')} onClick={() => {}} state="✓" disabled />
+        ) : (
+          <Row
+            label={t('menu.removeAds')}
+            onClick={onRemoveAds}
+            state={t('ads.settingsState', { price: ADS_FREE_PRICE_LABEL })}
+            disabled={removingAds}
+          />
+        )}
         {isAdmin && <Row label={t('menu.approveUsers')} onClick={onOpenAdmin} />}
         <Row label={t('menu.logout')} onClick={onLogout} danger />
       </Section>

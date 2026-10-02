@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sendError } from './_lib/errors.js';
-import { withAuth } from './_lib/handler.js';
-import { sqliteStore } from './_lib/sqliteStore.js';
-import type { DayTemplateItemInput } from './_lib/taskStore.js';
+import { sendError } from '../_lib/errors.js';
+import { withAuth } from '../_lib/handler.js';
+import { sqliteStore } from '../_lib/sqliteStore.js';
+import type { DayTemplateItemInput } from '../_lib/taskStore.js';
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   try {
@@ -106,6 +106,8 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         week_start?: string;
         title?: string;
         pinned?: boolean;
+        width?: number | null;
+        height?: number | null;
       };
       if (body.action === 'bulk') {
         const result = await sqliteStore.bulkTasks({
@@ -218,6 +220,8 @@ async function handler(req: VercelRequest, res: VercelResponse) {
           body: body.body_text,
           color: body.color,
           pinned: body.pinned,
+          width: body.width,
+          height: body.height,
         });
         return res.status(200).json({ ok: true, postIt });
       }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPostIt, deletePostIt, getPostIts, updatePostIt, UnauthorizedError } from '../api';
 import { TAG_COLORS, tagColorOf, type TagColor } from '../tags';
 import type { PostIt } from '../types';
@@ -8,6 +8,12 @@ import { useT, type MsgKey, type TFn } from '../i18n';
 const TITLE_MAX = 120;
 /** Coincide con el tope del backend. */
 const BODY_MAX = 20000;
+/** El tamaño solo se aplica y se guarda en pantallas anchas: en el celular
+ *  la nota ocupa el ancho disponible y no hay manija de arrastre. Mismo
+ *  corte que el CSS (`.post-it`). */
+const RESIZABLE_QUERY = '(min-width: 721px)';
+/** Espera a que el usuario suelte la manija antes de guardar. */
+const RESIZE_SAVE_DELAY_MS = 500;
 
 function errText(err: unknown, t: TFn): string {
   if (err instanceof UnauthorizedError) return t('postIts.sessionExpired');
@@ -69,6 +75,7 @@ function PostItCard({
   colorLabel,
   t,
   onSave,
+  onResize,
   onDelete,
 }: {
   postIt: PostIt;
@@ -77,11 +84,61 @@ function PostItCard({
   colorLabel: (key: TagColor) => string;
   t: TFn;
   onSave: (id: string, fields: { title?: string; body?: string; color?: string; pinned?: boolean }) => Promise<void>;
+  onResize: (id: string, width: number, height: number) => void;
   onDelete: (postIt: PostIt) => void;
 }) {
   const [title, setTitle] = useState(postIt.title);
   const [body, setBody] = useState(postIt.body);
   const savedRef = useRef({ title: postIt.title, body: postIt.body });
+  const cardRef = useRef<HTMLLIElement>(null);
+  const onResizeRef = useRef(onResize);
+  onResizeRef.current = onResize;
+
+  // El navegador cambia el tamaño de la tarjeta al arrastrar la esquina
+  // (`resize: both`); acá solo lo detectamos y lo guardamos, sin pasar por
+  // `busy`/recarga para no quitarle el foco al texto. Se compara contra el
+  // tamaño medido al montar (ya con el guardado aplicado por CSS), así que
+  // un tamaño por defecto o recortado por el contenedor nunca se persiste
+  // salvo que el usuario lo mueva. Un redimensionado de la ventana también
+  // cambia el tamaño medido, por eso se ignora si acaba de ocurrir.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let baseline = { w: el.offsetWidth, h: el.offsetHeight };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastWindowResize = 0;
+    const onWindowResize = () => {
+      lastWindowResize = Date.now();
+    };
+    window.addEventListener('resize', onWindowResize);
+
+    const observer = new ResizeObserver(() => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!window.matchMedia(RESIZABLE_QUERY).matches) return;
+        const w = Math.round(el.offsetWidth);
+        const h = Math.round(el.offsetHeight);
+        if (Date.now() - lastWindowResize < RESIZE_SAVE_DELAY_MS * 2) {
+          baseline = { w, h };
+          return;
+        }
+        if (Math.abs(w - baseline.w) < 2 && Math.abs(h - baseline.h) < 2) return;
+        baseline = { w, h };
+        onResizeRef.current(postIt.id, w, h);
+      }, RESIZE_SAVE_DELAY_MS);
+    });
+    observer.observe(el);
+    return () => {
+      clearTimeout(timer);
+      observer.disconnect();
+      window.removeEventListener('resize', onWindowResize);
+    };
+  }, [postIt.id]);
+
+  const sizeVars = {
+    ...(postIt.width != null ? { '--pi-w': `${postIt.width}px` } : {}),
+    ...(postIt.height != null ? { '--pi-h': `${postIt.height}px` } : {}),
+  } as CSSProperties;
 
   async function commit() {
     const nextTitle = title.trim();
@@ -95,7 +152,7 @@ function PostItCard({
   }
 
   return (
-    <li className="post-it" data-tag-color={tagColorOf(postIt.color)}>
+    <li ref={cardRef} className="post-it" data-tag-color={tagColorOf(postIt.color)} style={sizeVars}>
       <div className="post-it-head">
         <input
           type="text"
@@ -217,6 +274,13 @@ function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
     }
   }
 
+  /** Guarda el tamaño sin recargar ni bloquear la UI; el estado local se
+   *  actualiza a mano para que coincida con lo guardado. */
+  function saveSize(id: string, width: number, height: number) {
+    setPostIts((prev) => prev.map((p) => (p.id === id ? { ...p, width, height } : p)));
+    updatePostIt(id, { width, height }).catch((err) => setError(errText(err, t)));
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     const p = pendingDelete;
@@ -247,6 +311,7 @@ function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
               colorLabel={colorLabel}
               t={t}
               onSave={(id, fields) => run(() => updatePostIt(id, fields))}
+              onResize={saveSize}
               onDelete={setPendingDelete}
             />
           ))}

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { authorizeUrl, googleConfig, makePkce } from '../../_lib/googleOAuth.js';
-import { putOAuthState } from '../../_lib/authRepo.js';
+import { authorizeUrl, googleConfig, makePkce } from '../../../_lib/googleOAuth.js';
+import { putOAuthState } from '../../../_lib/authRepo.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {

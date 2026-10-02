@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { clearSessionCookie, getSessionToken } from '../_lib/auth.js';
-import { deleteAuthSession } from '../_lib/authRepo.js';
+import { clearSessionCookie, getSessionToken } from '../../_lib/auth.js';
+import { deleteAuthSession } from '../../_lib/authRepo.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

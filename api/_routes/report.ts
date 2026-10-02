@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sendError } from './_lib/errors.js';
-import { withAuth } from './_lib/handler.js';
-import { sqliteStore } from './_lib/sqliteStore.js';
-import { formatDurationLabel } from '../shared/duration.js';
-import type { SessionRow } from './_lib/taskStore.js';
+import { sendError } from '../_lib/errors.js';
+import { withAuth } from '../_lib/handler.js';
+import { sqliteStore } from '../_lib/sqliteStore.js';
+import { formatDurationLabel } from '../../shared/duration.js';
+import type { SessionRow } from '../_lib/taskStore.js';
 
 const CSV_COLUMNS: { header: string; value: (r: SessionRow) => string | number }[] = [
   { header: 'fecha', value: (r) => r.date },

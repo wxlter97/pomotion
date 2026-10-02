@@ -2569,6 +2569,22 @@ const POST_IT_TITLE_MAX = 120;
 // Mismo tope defensivo que la bitácora del día.
 const POST_IT_BODY_MAX = 20000;
 const DEFAULT_POST_IT_COLOR = 'amber';
+// Rango del tamaño en px (coincide con el CSS del tablero).
+const POST_IT_WIDTH_RANGE = [160, 720] as const;
+const POST_IT_HEIGHT_RANGE = [120, 800] as const;
+
+/** `null` = tamaño por defecto; un número se redondea y se recorta al rango. */
+function cleanPostItSize(value: number | null, [min, max]: readonly [number, number]): number | null {
+  if (value === null) return null;
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new BadRequestError('invalid_size', 'Tamaño inválido');
+  }
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function sizeOrNull(v: unknown): number | null {
+  return v == null ? null : Number(v);
+}
 
 function cleanPostItColor(color: string | undefined): string {
   return color != null && TAG_COLORS.has(color) ? color : DEFAULT_POST_IT_COLOR;
@@ -2582,6 +2598,8 @@ function toPostIt(r: Row): PostIt {
     body: String(r.body ?? ''),
     color: TAG_COLORS.has(color) ? color : DEFAULT_POST_IT_COLOR,
     pinned: Number(r.pinned) === 1,
+    width: sizeOrNull(r.width),
+    height: sizeOrNull(r.height),
     updatedAt: String(r.updated_at),
   };
 }
@@ -2613,7 +2631,7 @@ async function createPostIt(input: CreatePostItInput): Promise<PostIt> {
           VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
     args: [id, userId, title, body, color, now, now],
   });
-  return { id, title, body, color, pinned: false, updatedAt: now };
+  return { id, title, body, color, pinned: false, width: null, height: null, updatedAt: now };
 }
 
 async function updatePostIt(input: UpdatePostItInput): Promise<PostIt> {
@@ -2640,6 +2658,14 @@ async function updatePostIt(input: UpdatePostItInput): Promise<PostIt> {
   if (input.pinned !== undefined) {
     sets.push('pinned = ?');
     args.push(input.pinned ? 1 : 0);
+  }
+  if (input.width !== undefined) {
+    sets.push('width = ?');
+    args.push(cleanPostItSize(input.width, POST_IT_WIDTH_RANGE));
+  }
+  if (input.height !== undefined) {
+    sets.push('height = ?');
+    args.push(cleanPostItSize(input.height, POST_IT_HEIGHT_RANGE));
   }
   if (sets.length === 0) throw new BadRequestError('nothing_to_update', 'Nada que actualizar');
   sets.push('updated_at = ?');

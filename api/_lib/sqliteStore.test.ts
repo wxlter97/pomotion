@@ -492,6 +492,34 @@ describe('post-its', () => {
     expect(await as(USER, () => sqliteStore.listPostIts())).toHaveLength(0);
   });
 
+  it('guarda ancho y alto por nota, los recorta al rango y null vuelve al defecto', async () => {
+    const p = await as(USER, () => sqliteStore.createPostIt({ body: 'x' }));
+    expect(p.width).toBeNull();
+    expect(p.height).toBeNull();
+
+    const sized = await as(USER, () => sqliteStore.updatePostIt({ id: p.id, width: 333.4, height: 250 }));
+    expect(sized).toMatchObject({ width: 333, height: 250 });
+    // otra nota no se ve afectada y el tamaño sobrevive al listado
+    const other = await as(USER, () => sqliteStore.createPostIt({ body: 'y' }));
+    const list = await as(USER, () => sqliteStore.listPostIts());
+    expect(list.find((n) => n.id === p.id)).toMatchObject({ width: 333, height: 250 });
+    expect(list.find((n) => n.id === other.id)).toMatchObject({ width: null, height: null });
+
+    const clamped = await as(USER, () => sqliteStore.updatePostIt({ id: p.id, width: 5, height: 99999 }));
+    expect(clamped).toMatchObject({ width: 160, height: 800 });
+
+    // cambiar solo el ancho no pisa el alto
+    const onlyWidth = await as(USER, () => sqliteStore.updatePostIt({ id: p.id, width: 400 }));
+    expect(onlyWidth).toMatchObject({ width: 400, height: 800 });
+
+    const reset = await as(USER, () => sqliteStore.updatePostIt({ id: p.id, width: null, height: null }));
+    expect(reset).toMatchObject({ width: null, height: null });
+
+    await expect(
+      as(USER, () => sqliteStore.updatePostIt({ id: p.id, width: 'ancho' as unknown as number }))
+    ).rejects.toThrow();
+  });
+
   it('rechaza update sin id o sin campos', async () => {
     await expect(as(USER, () => sqliteStore.updatePostIt({}))).rejects.toThrow();
     const p = await as(USER, () => sqliteStore.createPostIt({ body: 'x' }));

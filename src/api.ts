@@ -53,11 +53,20 @@ export type AuthUser = {
   name: string | null;
   pictureUrl: string | null;
   isAdmin: boolean;
+  /** Ya pagó "quitar anuncios". */
+  adsFree: boolean;
 };
 export type AuthStatus = { authed: false } | { authed: true; approved: boolean; user: AuthUser };
 
 export function getAuthStatus() {
   return request<AuthStatus>('/api/auth/status');
+}
+
+// --- Pago único "quitar anuncios" (Wompi) ---
+
+/** Crea el enlace de pago; hay que navegar a `url` para que el usuario pague. */
+export function startAdsFreeCheckout() {
+  return request<{ url: string }>('/api/billing', { method: 'POST' });
 }
 
 /** URL a la que navega el botón "Continuar con Google". */
@@ -419,13 +428,15 @@ export function createPostIt(fields: { title?: string; body?: string; color?: st
 
 export function updatePostIt(
   id: string,
-  fields: { title?: string; body?: string; color?: string; pinned?: boolean }
+  fields: { title?: string; body?: string; color?: string; pinned?: boolean; width?: number | null; height?: number | null }
 ) {
   const body: Record<string, unknown> = { action: 'update_post_it', id };
   if (fields.title !== undefined) body.title = fields.title;
   if (fields.body !== undefined) body.body_text = fields.body;
   if (fields.color !== undefined) body.color = fields.color;
   if (fields.pinned !== undefined) body.pinned = fields.pinned;
+  if (fields.width !== undefined) body.width = fields.width;
+  if (fields.height !== undefined) body.height = fields.height;
   return request<{ ok: true; postIt: PostIt }>('/api/tasks', {
     method: 'POST',
     body: JSON.stringify(body),

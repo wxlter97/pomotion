@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sendError } from './_lib/errors.js';
-import { withAuth } from './_lib/handler.js';
-import { sqliteStore } from './_lib/sqliteStore.js';
-import type { TaskPriority } from './_lib/taskStore.js';
+import { sendError } from '../_lib/errors.js';
+import { withAuth } from '../_lib/handler.js';
+import { sqliteStore } from '../_lib/sqliteStore.js';
+import type { TaskPriority } from '../_lib/taskStore.js';
 
 async function handler(req: VercelRequest, res: VercelResponse) {
   try {

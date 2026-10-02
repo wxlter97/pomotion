@@ -15,6 +15,8 @@ export type UserRow = {
   googleSub: string;
   approvedLogin: boolean;
   isAdmin: boolean;
+  /** Fecha (ISO) en que pagó "quitar anuncios", o null. */
+  adsFreeAt: string | null;
   createdAt: string;
   lastSeenAt: string | null;
 };
@@ -38,6 +40,7 @@ function rowToUser(r: Row): UserRow {
     googleSub: str(r.google_sub),
     approvedLogin: Number(r.approved_login) === 1,
     isAdmin: Number(r.is_admin) === 1,
+    adsFreeAt: nullableStr(r.ads_free_at),
     createdAt: str(r.created_at),
     lastSeenAt: nullableStr(r.last_seen_at),
   };
@@ -105,6 +108,7 @@ export async function upsertUserFromGoogle(input: {
     googleSub: input.googleSub,
     approvedLogin: isSeedAdmin,
     isAdmin: isSeedAdmin,
+    adsFreeAt: null,
     createdAt: now,
     lastSeenAt: now,
   };

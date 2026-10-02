@@ -74,6 +74,8 @@ export const en: Record<MsgKey, string> = {
   'menu.monthView': 'Month view',
   'menu.goals': 'Monthly goals',
   'menu.postIts': 'Post-its',
+  'menu.removeAds': 'Remove ads',
+  'menu.adsRemoved': 'Ad-free',
   'menu.recurring': 'Recurring tasks',
   'menu.templates': 'Day templates',
   'menu.tags': 'Tags',
@@ -477,6 +479,16 @@ export const en: Record<MsgKey, string> = {
   'goals.sessionExpired': 'Your session expired. Reload the page.',
 
   // --- Post-its ---
+  // --- Ads / one-time payment ---
+  'ads.label': 'Advertising',
+  'ads.remove': 'Remove ads · {price}',
+  'ads.starting': 'Opening checkout…',
+  'ads.startError': "Couldn't start the payment",
+  'ads.paidOk': "Thanks! You won't see ads anymore.",
+  'ads.paidPending': "We're confirming your payment; the ads will go away in a few minutes.",
+  'ads.cancelled': 'Payment cancelled.',
+  'ads.settingsState': 'One-time {price}',
+
   'postIts.title': 'Post-its',
   'postIts.none': "You don't have any post-its yet. Create one to jot something down.",
   'postIts.new': 'New note',
