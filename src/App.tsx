@@ -1265,7 +1265,7 @@ export default function App() {
             onSaved={handleDayNoteSaved}
           />
 
-          <PostItsPanel />
+          <PostItsPanel fileId={selectedFileId} />
 
           <div className={timerEnabled ? 'main-grid' : 'main-grid main-grid--no-timer'}>
             <section className="tasks-panel card">
@@ -1347,6 +1347,8 @@ export default function App() {
                 previousWeekLabel={data.previousWeekLabel}
                 nextWeekLabel={data.nextWeekLabel}
                 fileId={selectedFileId}
+                days={data.days}
+                currentDay={data.selectedDay}
                 allTags={data.tags}
                 onManageTags={() => setShowTags(true)}
                 canReorder={!filterTagId && completionFilter === 'all'}
@@ -1532,7 +1534,7 @@ export default function App() {
         />
       )}
 
-      {showPostIts && <PostItsDialog onClose={() => setShowPostIts(false)} />}
+      {showPostIts && <PostItsDialog fileId={selectedFileId} onClose={() => setShowPostIts(false)} />}
 
       {showFeeds && (
         <CalendarFeedsDialog

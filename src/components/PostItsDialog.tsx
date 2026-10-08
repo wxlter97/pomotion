@@ -213,7 +213,7 @@ function PostItCard({
  *  diálogo de Ajustes (`PostItsDialog`) como inline en la pantalla principal
  *  (`PostItsPanel`). `onRequestClose`, si viene, se llama con Escape —
  *  salvo que haya una confirmación de borrado abierta, que se cierra primero. */
-function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
+function PostItsBoard({ fileId, onRequestClose }: { fileId: string | null; onRequestClose?: () => void }) {
   const t = useT();
   const colorLabel = (key: TagColor) => t(`tags.color.${key}` as MsgKey);
 
@@ -224,17 +224,28 @@ function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
   const [newestId, setNewestId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<PostIt | null>(null);
 
-  const reload = useCallback(async () => {
-    try {
-      setPostIts((await getPostIts()).postIts);
-    } catch (err) {
-      setError(errText(err, t));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Una respuesta tardía del espacio anterior no debe pisar el tablero actual.
+  const fileIdRef = useRef(fileId);
+  fileIdRef.current = fileId;
 
+  const reload = useCallback(async () => {
+    const requested = fileId;
+    try {
+      const { postIts: list } = await getPostIts(requested);
+      if (fileIdRef.current === requested) setPostIts(list);
+    } catch (err) {
+      if (fileIdRef.current === requested) setError(errText(err, t));
+    } finally {
+      if (fileIdRef.current === requested) setLoading(false);
+    }
+  }, [fileId]);
+
+  // Cada espacio tiene sus propios post-its: al cambiar de espacio se vacía
+  // el tablero y se vuelve a cargar (sin mostrar por un instante los del anterior).
   useEffect(() => {
+    setLoading(true);
+    setPostIts([]);
+    setError(null);
     void reload();
   }, [reload]);
 
@@ -264,7 +275,7 @@ function PostItsBoard({ onRequestClose }: { onRequestClose?: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const { postIt } = await createPostIt();
+      const { postIt } = await createPostIt({}, fileId);
       setNewestId(postIt.id);
       await reload();
     } catch (err) {
@@ -347,7 +358,7 @@ function readPanelCollapsed(): boolean {
 /** Post-its "a mano" en la pantalla principal: mismo cajón plegable que
  *  `DayNote`, pero abierto por defecto — a diferencia de la bitácora, un
  *  post-it real siempre está a la vista. */
-export function PostItsPanel() {
+export function PostItsPanel({ fileId }: { fileId: string | null }) {
   const t = useT();
   const [collapsed, setCollapsed] = useState(readPanelCollapsed);
 
@@ -373,7 +384,7 @@ export function PostItsPanel() {
 
       {!collapsed && (
         <div className="day-note-body">
-          <PostItsBoard />
+          <PostItsBoard fileId={fileId} />
         </div>
       )}
     </section>
@@ -403,7 +414,7 @@ function ChevronIcon() {
  *  texto libre, independientes del calendario. Se abre desde Ajustes, para
  *  quienes prefieren una vista más grande que el panel de la pantalla
  *  principal (`PostItsPanel`). */
-export default function PostItsDialog({ onClose }: { onClose: () => void }) {
+export default function PostItsDialog({ fileId, onClose }: { fileId: string | null; onClose: () => void }) {
   const t = useT();
 
   return (
@@ -417,7 +428,7 @@ export default function PostItsDialog({ onClose }: { onClose: () => void }) {
       >
         <h2 id="post-its-title">{t('postIts.title')}</h2>
 
-        <PostItsBoard onRequestClose={onClose} />
+        <PostItsBoard fileId={fileId} onRequestClose={onClose} />
 
         <div className="sheet-actions">
           <button type="button" className="btn btn-plain" onClick={onClose}>

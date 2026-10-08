@@ -30,7 +30,9 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       }
       // ?post_its=1 → tablero de post-its del usuario.
       if (typeof req.query.post_its === 'string') {
-        return res.status(200).json({ postIts: await sqliteStore.listPostIts() });
+        return res.status(200).json({
+          postIts: await sqliteStore.listPostIts(typeof req.query.file === 'string' ? req.query.file : undefined),
+        });
       }
       // ?export=1 → volcado completo del dataset del usuario (backup).
       //   &download=1 fuerza la descarga como archivo .json (navegación normal).
@@ -210,6 +212,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
           title: body.title,
           body: body.body_text,
           color: body.color,
+          fileId: body.file,
         });
         return res.status(200).json({ ok: true, postIt });
       }

@@ -56,6 +56,7 @@ describe('runMigrations', () => {
     expect(applied).toContain('016_day_notes_per_context.sql');
     expect(applied).toContain('018_post_it_size.sql');
     expect(applied).toContain('019_ads_free.sql');
+    expect(applied).toContain('020_post_its_per_context.sql');
     const tables = await tableNames(db);
     for (const t of SCHEMA_TABLES) expect(tables.has(t), `falta la tabla ${t}`).toBe(true);
   });
