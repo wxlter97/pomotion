@@ -492,6 +492,37 @@ describe('post-its', () => {
     expect(await as(USER, () => sqliteStore.listPostIts())).toHaveLength(0);
   });
 
+  it('cada espacio tiene sus propios post-its; sin espacio = el por defecto', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createPostIt({ body: 'trabajo 1', fileId: 'Trabajo' });
+      await sqliteStore.createPostIt({ body: 'trabajo 2', fileId: 'Trabajo' });
+      await sqliteStore.createPostIt({ body: 'casa', fileId: 'Casa' });
+      await sqliteStore.createPostIt({ body: 'suelta' });
+    });
+    const bodies = async (fileId?: string) =>
+      (await as(USER, () => sqliteStore.listPostIts(fileId))).map((p) => p.body).sort();
+    expect(await bodies('Trabajo')).toEqual(['trabajo 1', 'trabajo 2']);
+    expect(await bodies('Casa')).toEqual(['casa']);
+    expect(await bodies()).toEqual(['suelta']);
+    expect(await bodies('Otro')).toEqual([]);
+    // y no se cuelan los de otro usuario con el mismo espacio
+    expect(await as(OTHER, () => sqliteStore.listPostIts('Trabajo'))).toEqual([]);
+  });
+
+  it('renombrar un contexto se lleva sus post-its; borrarlo los pasa al espacio por defecto', async () => {
+    await as(USER, async () => {
+      await sqliteStore.createTask({ date: '2026-08-24', text: 'a', fileId: 'Casa' });
+      await sqliteStore.createPostIt({ body: 'nota de casa', fileId: 'Casa' });
+    });
+    await as(USER, () => sqliteStore.updateContext({ id: 'Casa', label: 'Hogar' }));
+    expect((await as(USER, () => sqliteStore.listPostIts('Hogar'))).map((p) => p.body)).toEqual(['nota de casa']);
+    expect(await as(USER, () => sqliteStore.listPostIts('Casa'))).toEqual([]);
+
+    await as(USER, () => sqliteStore.deleteContext('Hogar'));
+    expect(await as(USER, () => sqliteStore.listPostIts('Hogar'))).toEqual([]);
+    expect((await as(USER, () => sqliteStore.listPostIts())).map((p) => p.body)).toEqual(['nota de casa']);
+  });
+
   it('guarda ancho y alto por nota, los recorta al rango y null vuelve al defecto', async () => {
     const p = await as(USER, () => sqliteStore.createPostIt({ body: 'x' }));
     expect(p.width).toBeNull();

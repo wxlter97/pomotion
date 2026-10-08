@@ -33,6 +33,8 @@ export default function TaskRowMenu({
   previousWeekLabel,
   nextWeekLabel,
   fileId,
+  days,
+  currentDay,
   onMove,
 }: {
   onEdit: () => void;
@@ -51,6 +53,10 @@ export default function TaskRowMenu({
   previousWeekLabel: string | null;
   nextWeekLabel: string | null;
   fileId: string | null;
+  /** Días de la semana visible, para mover la tarea a otro día sin seleccionarla. */
+  days: DayColumn[];
+  /** Día (nombre) de la tarea; se excluye de los destinos. */
+  currentDay: string | null;
   onMove: (target: MoveTarget) => void;
 }) {
   const t = useT();
@@ -109,9 +115,12 @@ export default function TaskRowMenu({
     close();
   }
 
-  // Dentro de la semana visible se mueve arrastrando a la pestaña del día;
-  // el menú solo cubre lo que el arrastre no puede: saltar a otra semana.
-  const canMove = Boolean(previousWeekLabel) || Boolean(nextWeekLabel);
+  // Esta semana: los otros días. Otras semanas: la anterior y la siguiente.
+  // (Arrastrar a la pestaña del día sigue funcionando; esto cubre teclado/táctil
+  // y no obliga a seleccionar la tarea.)
+  const dayTargets = movableTargets(days, currentDay);
+  const canMove = dayTargets.length > 0 || Boolean(previousWeekLabel) || Boolean(nextWeekLabel);
+  const hasOtherWeek = Boolean(previousWeekLabel) || Boolean(nextWeekLabel);
 
   return (
     <div className="move-menu-wrap" ref={wrapRef}>
@@ -161,7 +170,23 @@ export default function TaskRowMenu({
                 >
                   ‹ {t('rowMenu.back')}
                 </button>
-                <div className="move-menu-heading">{t('rowMenu.moveOtherWeek')}</div>
+                {dayTargets.length > 0 && (
+                  <>
+                    <div className="move-menu-heading">{t('rowMenu.thisWeek')}</div>
+                    {dayTargets.map((d) => (
+                      <button
+                        key={d.date}
+                        type="button"
+                        className="move-menu-item"
+                        role="menuitem"
+                        onClick={() => pick(d)}
+                      >
+                        {localizeDay(d.day, lang)}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {hasOtherWeek && <div className="move-menu-heading">{t('rowMenu.otherWeek')}</div>}
                 {previousWeekLabel && (
                   <button
                     type="button"
@@ -214,7 +239,7 @@ export default function TaskRowMenu({
                   onClick={() => setView('move')}
                   disabled={disabled}
                 >
-                  {t('rowMenu.moveOtherWeek')}
+                  {t('rowMenu.move')}
                 </button>
               )}
               {onSendToInbox && (

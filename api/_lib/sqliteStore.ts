@@ -1062,7 +1062,7 @@ async function createContext(input: CreateContextInput): Promise<FileEntry> {
 }
 
 /** Cambia el `file` de todas las tablas que lo usan, de una — incluye
- *  `recurring_runs.file_key` / `day_notes.file_key` (mismo campo, otro
+ *  `recurring_runs.file_key` / `day_notes.file_key` / `post_its.file_key` (mismo campo, otro
  *  nombre) y `habits.context_id`. */
 async function renameContextEverywhere(userId: string, from: string, to: string): Promise<void> {
   await getDb().batch(
@@ -1075,6 +1075,7 @@ async function renameContextEverywhere(userId: string, from: string, to: string)
       { sql: 'UPDATE day_templates SET file = ? WHERE user_id = ? AND file = ?', args: [to, userId, from] },
       { sql: 'UPDATE recurring_runs SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
       { sql: 'UPDATE day_notes SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
+      { sql: 'UPDATE post_its SET file_key = ? WHERE user_id = ? AND file_key = ?', args: [to, userId, from] },
       { sql: 'UPDATE habits SET context_id = ? WHERE user_id = ? AND context_id = ?', args: [to, userId, from] },
     ],
     'write'
@@ -1149,6 +1150,9 @@ async function deleteContext(id?: string): Promise<void> {
       { sql: 'UPDATE day_templates SET file = NULL WHERE user_id = ? AND file = ?', args: [userId, contextId] },
       { sql: 'DELETE FROM recurring_runs WHERE user_id = ? AND file_key = ?', args: [userId, contextId] },
       { sql: 'DELETE FROM day_notes WHERE user_id = ? AND file_key = ?', args: [userId, contextId] },
+      // Los post-its son texto escrito a mano: como las tareas, pasan al
+      // espacio por defecto en vez de borrarse con el contexto.
+      { sql: "UPDATE post_its SET file_key = '' WHERE user_id = ? AND file_key = ?", args: [userId, contextId] },
       { sql: 'DELETE FROM contexts WHERE user_id = ? AND id = ?', args: [userId, contextId] },
     ],
     'write'
@@ -2604,13 +2608,14 @@ function toPostIt(r: Row): PostIt {
   };
 }
 
-/** Post-its del usuario: fijados primero, luego por última edición. */
-async function listPostIts(): Promise<PostIt[]> {
+/** Post-its del usuario en un espacio: fijados primero, luego por última
+ *  edición. `fileId` ausente = el espacio por defecto (file_key ''). */
+async function listPostIts(fileId?: string): Promise<PostIt[]> {
   const userId = currentUserId();
   const rows = (
     await getDb().execute({
-      sql: 'SELECT * FROM post_its WHERE user_id = ? ORDER BY pinned DESC, updated_at DESC',
-      args: [userId],
+      sql: 'SELECT * FROM post_its WHERE user_id = ? AND file_key = ? ORDER BY pinned DESC, updated_at DESC',
+      args: [userId, fileId ?? ''],
     })
   ).rows;
   return rows.map(toPostIt);
@@ -2627,9 +2632,9 @@ async function createPostIt(input: CreatePostItInput): Promise<PostIt> {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await getDb().execute({
-    sql: `INSERT INTO post_its (id, user_id, title, body, color, pinned, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, 0, ?, ?)`,
-    args: [id, userId, title, body, color, now, now],
+    sql: `INSERT INTO post_its (id, user_id, file_key, title, body, color, pinned, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    args: [id, userId, input.fileId ?? '', title, body, color, now, now],
   });
   return { id, title, body, color, pinned: false, width: null, height: null, updatedAt: now };
 }

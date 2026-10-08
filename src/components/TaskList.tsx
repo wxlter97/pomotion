@@ -14,7 +14,7 @@ import {
   nowAsHHMM,
   parseDurationToSeconds,
 } from '../duration';
-import type { Session, Tag, Task } from '../types';
+import type { DayColumn, Session, Tag, Task } from '../types';
 import { firstBlockStart, isoWeekdayOf, type BusinessHoursSettings } from '../businessHours';
 import {
   daysBetween,
@@ -97,6 +97,8 @@ export default function TaskList({
   previousWeekLabel,
   nextWeekLabel,
   fileId,
+  days,
+  currentDay,
   allTags,
   onManageTags,
   canReorder = true,
@@ -126,6 +128,9 @@ export default function TaskList({
   previousWeekLabel: string;
   nextWeekLabel: string;
   fileId: string | null;
+  /** Días de la semana visible y el del día seleccionado: destinos del menú «Mover». */
+  days: DayColumn[];
+  currentDay: string | null;
   allTags: Tag[];
   onManageTags: () => void;
   /** Con un filtro por etiqueta activo se desactiva reordenar (los índices
@@ -595,6 +600,8 @@ export default function TaskList({
                         previousWeekLabel={previousWeekLabel}
                         nextWeekLabel={nextWeekLabel}
                         fileId={fileId}
+                        days={days}
+                        currentDay={currentDay}
                         onMove={(target) => onMoveTask(task, target)}
                       />
                     </div>

@@ -415,14 +415,25 @@ export function deleteGoal(id: string) {
 
 // --- Post-its ---
 
-export function getPostIts() {
-  return request<{ postIts: PostIt[] }>('/api/tasks?post_its=1');
+/** Post-its del espacio `fileId` (null/ausente = el espacio por defecto). */
+export function getPostIts(fileId?: string | null) {
+  const qs = fileId ? `&file=${encodeURIComponent(fileId)}` : '';
+  return request<{ postIts: PostIt[] }>(`/api/tasks?post_its=1${qs}`);
 }
 
-export function createPostIt(fields: { title?: string; body?: string; color?: string } = {}) {
+export function createPostIt(
+  fields: { title?: string; body?: string; color?: string } = {},
+  fileId?: string | null
+) {
   return request<{ ok: true; postIt: PostIt }>('/api/tasks', {
     method: 'POST',
-    body: JSON.stringify({ action: 'create_post_it', title: fields.title, body_text: fields.body, color: fields.color }),
+    body: JSON.stringify({
+      action: 'create_post_it',
+      title: fields.title,
+      body_text: fields.body,
+      color: fields.color,
+      file: fileId ?? undefined,
+    }),
   });
 }
 

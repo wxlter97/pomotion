@@ -359,7 +359,7 @@ export type GetAnalyticsInput = { fileId?: string; weeks?: number };
 export type ReportInput = { from?: string; to?: string; fileId?: string };
 export type GetWeeklyReviewInput = { week?: string };
 export type SaveWeekFocusInput = { weekStart?: string; body?: string };
-export type CreatePostItInput = { title?: string; body?: string; color?: string };
+export type CreatePostItInput = { title?: string; body?: string; color?: string; fileId?: string };
 export type UpdatePostItInput = {
   id?: string;
   title?: string;
@@ -628,7 +628,8 @@ export interface TaskStore {
   syncCalendarFeeds(input: { feedId?: string; force?: boolean }): Promise<SyncCalendarResult>;
 
   /** Post-its del usuario: fijados primero, luego por última edición. */
-  listPostIts(): Promise<PostIt[]>;
+  /** Post-its del espacio `fileId` (ausente = el espacio por defecto). */
+  listPostIts(fileId?: string): Promise<PostIt[]>;
   createPostIt(input: CreatePostItInput): Promise<PostIt>;
   updatePostIt(input: UpdatePostItInput): Promise<PostIt>;
   deletePostIt(id?: string): Promise<void>;
